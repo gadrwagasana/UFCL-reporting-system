@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UFCL — Production Management System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- LOGIN VIEW -->
+      <div id="loginView">
+        <div class="lcard">
+          <div class="lbrand">
+            <div class="llogo"><img src="./assets/logo.png" alt="UFCL logo" /></div>
+            <h1>Ultimate Forests Company Limited</h1>
+            <p>Production Management System</p>
+          </div>
+          <div class="lerr" id="lerr">Invalid username or password</div>
+          <div class="fl">
+            <label for="uname">Username</label>
+            <input type="text" id="uname" placeholder="Enter username" autocomplete="off" />
+          </div>
+          <div class="fl">
+            <label for="upass">Password</label>
+            <input type="password" id="upass" placeholder="Enter password" />
+            <div id="pwStrength" class="pwbar" style="width: 0%"></div>
+          </div>
+          <button type="button" class="lbtn" id="loginBtn">
+            Sign in <i class="ti ti-arrow-right" style="font-size: 13px"></i>
+          </button>
+          <div class="lhint">
+            Use the seeded accounts after first run migration.<br />
+            Default password: <strong>UFCL@1234</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- APP SHELL -->
+      <div id="shell">
+        <div class="topbar">
+          <div class="tl">
+            <button class="ibtn" id="sidebarToggle" title="Toggle sidebar" aria-label="Toggle sidebar">
+              <i class="ti ti-layout-sidebar-left-collapse" id="sidebarToggleIcon"></i>
+            </button>
+            <img src="./assets/logo.png" alt="UFCL" style="width:30px;height:30px;object-fit:contain;flex-shrink:0" />
+            <div class="tlogo">UFCL</div>
+            <div class="tsub" id="topSub">Connected</div>
+          </div>
+          <div class="tr">
+            <button class="ibtn" id="notifBtn" title="Notifications" aria-label="Notifications">
+              <i class="ti ti-bell"></i><span class="nbadge" id="nbadge"></span>
+            </button>
+            <div class="upill">
+              <div class="av" id="uav" style="background: #2e8b57">UF</div>
+              <div>
+                <div class="uname" id="uname2">User</div>
+                <div class="urole" id="urole">role</div>
+              </div>
+            </div>
+            <button class="logoutbtn" id="logoutBtn"><i class="ti ti-logout"></i> Sign out</button>
+          </div>
+        </div>
+
+        <div class="main">
+          <div class="sidebar" id="sidebar"></div>
+          <div class="content">
+            <div class="page" id="page-dashboard"></div>
+            <div class="page" id="page-daily"></div>
+            <div class="page" id="page-sales"></div>
+            <div class="page" id="page-products"></div>
+            <div class="page" id="page-logistics"></div>
+            <div class="page" id="page-weekly-cost"></div>
+            <div class="page" id="page-weekly-perf"></div>
+            <div class="page" id="page-monthly"></div>
+            <div class="page" id="page-inventory"></div>
+            <div class="page" id="page-sage"></div>
+            <div class="page" id="page-kpi"></div>
+            <div class="page" id="page-changes"></div>
+            <div class="page" id="page-notifications"></div>
+            <div class="page" id="page-audit"></div>
+            <div class="page" id="page-export"></div>
+            <div class="page" id="page-users"></div>
+          </div>
+        </div>
+
+        <!-- overlays -->
+        <div class="overlay" id="overlay" style="display: none"></div>
+      </div>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
+

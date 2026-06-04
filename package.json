@@ -1,0 +1,46 @@
+{
+  "name": "ufcl-reporting-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "UFCL Production Management System (Electron + Postgres)",
+  "main": "electron/main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron .",
+    "setup": "node tools/setup.js",
+    "migrate": "node db/migrate.js",
+    "lint": "node -e \"console.log('No lint configured yet')\"",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "dotenv": "^17.2.2",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "electron": "^37.2.4",
+    "electron-builder": "^24.6.0"
+  },
+  "build": {
+    "appId": "com.ufcl.reporting",
+    "productName": "UFCL Reporting",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+    ],
+    "win": {
+      "target": ["nsis"],
+      "publisherName": "UFCL"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}
+
