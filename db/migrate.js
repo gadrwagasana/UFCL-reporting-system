@@ -65,6 +65,18 @@ async function ensureSchema() {
     `alter table sales_orders
      add column if not exists status text not null default 'Pending'`
   );
+  // Product sub-types and structured dimensions
+  await pool.query(`alter table products add column if not exists sub_type text`);
+  await pool.query(`alter table products add column if not exists width_mm int`);
+  await pool.query(`alter table products add column if not exists height_mm int`);
+  await pool.query(`alter table products add column if not exists length_m numeric(5,2)`);
+  await pool.query(`alter table products add column if not exists diameter_mm int`);
+  // Sales sub-type
+  await pool.query(`alter table sales_orders add column if not exists product_sub_type text`);
+  // Daily log timber breakdown
+  await pool.query(`alter table daily_logs add column if not exists timber_kiln_dried int not null default 0`);
+  await pool.query(`alter table daily_logs add column if not exists timber_cca_treated int not null default 0`);
+  await pool.query(`alter table daily_logs add column if not exists timber_untreated int not null default 0`);
 }
 
 async function seedProductCatalog() {

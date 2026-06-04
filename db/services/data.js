@@ -1,24 +1,55 @@
 const { pool } = require('../pool');
 const bcrypt = require('bcryptjs');
 
-// All-time stock balance: total produced minus total sold
+// All-time stock balance: total produced minus total sold, broken down by timber sub-type
 const STOCK_SQL = `
   WITH produced AS (
-    SELECT COALESCE(SUM(timber_units),0)::int AS timber,
-           COALESCE(SUM(poles_units),0)::int  AS poles
+    SELECT COALESCE(SUM(timber_units),0)::int         AS timber,
+           COALESCE(SUM(timber_kiln_dried),0)::int    AS kiln_dried,
+           COALESCE(SUM(timber_cca_treated),0)::int   AS cca_treated,
+           COALESCE(SUM(timber_untreated),0)::int     AS untreated,
+           COALESCE(SUM(poles_units),0)::int          AS poles
     FROM daily_logs
   ),
   sold AS (
     SELECT COALESCE(SUM(CASE WHEN product_type='Timber' THEN quantity ELSE 0 END),0)::int AS timber,
+           COALESCE(SUM(CASE WHEN product_type='Timber' AND COALESCE(product_sub_type,'')='Kiln-dried'  THEN quantity ELSE 0 END),0)::int AS kiln_dried,
+           COALESCE(SUM(CASE WHEN product_type='Timber' AND COALESCE(product_sub_type,'')='CCA-treated' THEN quantity ELSE 0 END),0)::int AS cca_treated,
+           COALESCE(SUM(CASE WHEN product_type='Timber' AND COALESCE(product_sub_type,'')='Untreated'   THEN quantity ELSE 0 END),0)::int AS untreated,
            COALESCE(SUM(CASE WHEN product_type='Poles'  THEN quantity ELSE 0 END),0)::int AS poles
     FROM sales_orders
   )
   SELECT p.timber AS timber_produced, p.poles AS poles_produced,
+         p.kiln_dried AS kiln_dried_produced, p.cca_treated AS cca_treated_produced, p.untreated AS untreated_produced,
          s.timber AS timber_sold,     s.poles AS poles_sold,
-         (p.timber - s.timber) AS timber_stock,
-         (p.poles  - s.poles)  AS poles_stock
+         s.kiln_dried AS kiln_dried_sold, s.cca_treated AS cca_treated_sold, s.untreated AS untreated_sold,
+         (p.timber    - s.timber)    AS timber_stock,
+         (p.poles     - s.poles)     AS poles_stock,
+         (p.kiln_dried  - s.kiln_dried)  AS kiln_dried_stock,
+         (p.cca_treated - s.cca_treated) AS cca_treated_stock,
+         (p.untreated   - s.untreated)   AS untreated_stock
   FROM produced p, sold s
 `;
+
+function buildStock(st) {
+  return {
+    timberProduced:     Number(st.timber_produced    || 0),
+    polesProduced:      Number(st.poles_produced     || 0),
+    kilnDriedProduced:  Number(st.kiln_dried_produced  || 0),
+    ccaTreatedProduced: Number(st.cca_treated_produced || 0),
+    untreatedProduced:  Number(st.untreated_produced   || 0),
+    timberSold:         Number(st.timber_sold        || 0),
+    polesSold:          Number(st.poles_sold         || 0),
+    kilnDriedSold:      Number(st.kiln_dried_sold    || 0),
+    ccaTreatedSold:     Number(st.cca_treated_sold   || 0),
+    untreatedSold:      Number(st.untreated_sold     || 0),
+    timberStock:        Number(st.timber_stock       || 0),
+    polesStock:         Number(st.poles_stock        || 0),
+    kilnDriedStock:     Number(st.kiln_dried_stock   || 0),
+    ccaTreatedStock:    Number(st.cca_treated_stock  || 0),
+    untreatedStock:     Number(st.untreated_stock    || 0)
+  };
+}
 
 const ROLE_PAGES = {
   admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes'],
@@ -155,27 +186,16 @@ async function dailyList(userId) {
   if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
   const [{ rows }, { rows: stockRows }] = await Promise.all([
     pool.query(
-      `select id, to_char(log_date,'DD/MM/YYYY') as date, machine, product_size, timber_units, timber_waste, poles_units, poles_waste,
-              downtime_hours, supervisor, remarks, created_at
+      `select id, to_char(log_date,'DD/MM/YYYY') as date, machine, product_size,
+              timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
+              timber_waste, poles_units, poles_waste, downtime_hours, supervisor, remarks, created_at
        from daily_logs
        order by log_date desc, id desc
        limit 50`
     ),
     pool.query(STOCK_SQL)
   ]);
-  const st = stockRows[0] || {};
-  return {
-    ok: true,
-    rows,
-    stock: {
-      timberProduced: Number(st.timber_produced || 0),
-      polesProduced:  Number(st.poles_produced  || 0),
-      timberSold:     Number(st.timber_sold     || 0),
-      polesSold:      Number(st.poles_sold      || 0),
-      timberStock:    Number(st.timber_stock    || 0),
-      polesStock:     Number(st.poles_stock     || 0)
-    }
-  };
+  return { ok: true, rows, stock: buildStock(stockRows[0] || {}) };
 }
 
 async function dailyCreate(userId, payload) {
@@ -183,23 +203,31 @@ async function dailyCreate(userId, payload) {
   if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.date) return { ok: false, error: 'Date is required' };
+  const kilnDried   = Number(p.timber_kiln_dried  || 0);
+  const ccaTreated  = Number(p.timber_cca_treated || 0);
+  const untreated   = Number(p.timber_untreated   || 0);
+  const timberTotal = kilnDried + ccaTreated + untreated || Number(p.timber_units || 0);
   await pool.query(
-    `insert into daily_logs(log_date, supervisor, timber_units, timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    `insert into daily_logs(log_date, supervisor, timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
+                            timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
     [
       p.date,
       p.supervisor || user.name,
-      Number(p.timber_units || 0),
+      timberTotal,
+      kilnDried,
+      ccaTreated,
+      untreated,
       Number(p.timber_waste || 0),
-      Number(p.poles_units || 0),
-      Number(p.poles_waste || 0),
+      Number(p.poles_units  || 0),
+      Number(p.poles_waste  || 0),
       Number(p.downtime_hours || 0),
       p.downtime_reason || null,
       p.remarks || null,
       user.id
     ]
   );
-  await logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date });
+  await logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date, timber: timberTotal, poles: Number(p.poles_units || 0) });
   return { ok: true };
 }
 
@@ -349,26 +377,14 @@ async function salesList(userId) {
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
   const [{ rows }, { rows: stockRows }] = await Promise.all([
     pool.query(
-      `select id, order_number, customer_name, product_type, product_size, quantity, unit_price, notes, status, created_at
+      `select id, order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, status, created_at
        from sales_orders
        order by created_at desc, id desc
        limit 50`
     ),
     pool.query(STOCK_SQL)
   ]);
-  const st = stockRows[0] || {};
-  return {
-    ok: true,
-    rows,
-    stock: {
-      timberProduced: Number(st.timber_produced || 0),
-      polesProduced:  Number(st.poles_produced  || 0),
-      timberSold:     Number(st.timber_sold     || 0),
-      polesSold:      Number(st.poles_sold      || 0),
-      timberStock:    Number(st.timber_stock    || 0),
-      polesStock:     Number(st.poles_stock     || 0)
-    }
-  };
+  return { ok: true, rows, stock: buildStock(stockRows[0] || {}) };
 }
 
 async function salesCreate(userId, payload) {
@@ -378,13 +394,17 @@ async function salesCreate(userId, payload) {
   if (!p.order_number || !p.customer_name || !p.product_type || !p.product_size || !p.quantity || !p.unit_price || !p.reason) {
     return { ok: false, error: 'Missing required fields' };
   }
+  if (p.product_type === 'Timber' && !p.product_sub_type) {
+    return { ok: false, error: 'Sub-type is required for timber orders' };
+  }
   await pool.query(
-    `insert into sales_orders(order_number, customer_name, product_type, product_size, quantity, unit_price, notes, reason, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    `insert into sales_orders(order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, reason, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [
       p.order_number,
       p.customer_name,
       p.product_type,
+      p.product_sub_type || null,
       p.product_size,
       Number(p.quantity),
       Number(p.unit_price),
@@ -393,7 +413,8 @@ async function salesCreate(userId, payload) {
       user.id
     ]
   );
-  await logAudit(user, `Created sales order ${p.order_number}`, 'ti-shopping-cart', { order_number: p.order_number });
+  const label = p.product_sub_type ? `${p.product_sub_type} ${p.product_size}` : `${p.product_type} ${p.product_size}`;
+  await logAudit(user, `Created order ${p.order_number} — ${p.customer_name}: ${p.quantity} × ${label}`, 'ti-shopping-cart', { order_number: p.order_number, sub_type: p.product_sub_type });
   return { ok: true };
 }
 
@@ -416,17 +437,21 @@ async function productsList(userId, filter) {
   let where = 'where 1=1';
   const params = [];
   const f = filter || 'All';
-  if (f === 'Timber') where += ` and p.type='Timber'`;
-  if (f === 'Poles') where += ` and p.type='Poles'`;
-  if (f === 'Active') where += ` and p.active=true`;
+  if (f === 'Timber')      where += ` and p.type='Timber'`;
+  if (f === 'Poles')       where += ` and p.type='Poles'`;
+  if (f === 'Kiln-dried')  where += ` and p.sub_type='Kiln-dried'`;
+  if (f === 'CCA-treated') where += ` and p.sub_type='CCA-treated'`;
+  if (f === 'Untreated')   where += ` and p.sub_type='Untreated'`;
+  if (f === 'Active')      where += ` and p.active=true`;
 
   const { rows } = await pool.query(
-    `select p.id, p.type, p.size, p.active, p.reason, p.ref,
+    `select p.id, p.type, p.sub_type, p.size, p.active, p.reason, p.ref,
+            p.width_mm, p.height_mm, p.length_m, p.diameter_mm,
             u.name as by, to_char(p.created_at,'DD Mon YYYY') as date
      from products p
      left join app_users u on u.id=p.created_by
      ${where}
-     order by p.created_at desc, p.id desc
+     order by p.type, p.sub_type, p.size, p.created_at desc
      limit 200`,
     params
   );
@@ -437,17 +462,26 @@ async function productsCreate(userId, payload) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'products'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
-  if (!p.type || !p.size || !p.reason) return { ok: false, error: 'Missing required fields' };
+  if (!p.type || !p.size || !p.reason) return { ok: false, error: 'Type, size and reason are required' };
+  if (p.type === 'Timber' && !p.sub_type) return { ok: false, error: 'Sub-type is required for timber products' };
+  const label = p.type === 'Timber' ? `${p.sub_type} ${p.size}` : `Poles ${p.size}`;
   await pool.query(
-    `insert into products(type,size,active,reason,ref,created_by)
-     values ($1,$2,true,$3,$4,$5)`,
-    [p.type, p.size, p.reason, p.ref || null, user.id]
+    `insert into products(type, sub_type, size, active, reason, ref, width_mm, height_mm, length_m, diameter_mm, created_by)
+     values ($1,$2,$3,true,$4,$5,$6,$7,$8,$9,$10)`,
+    [
+      p.type, p.sub_type || null, p.size, p.reason, p.ref || null,
+      p.width_mm  ? Number(p.width_mm)  : null,
+      p.height_mm ? Number(p.height_mm) : null,
+      p.length_m  ? Number(p.length_m)  : null,
+      p.diameter_mm ? Number(p.diameter_mm) : null,
+      user.id
+    ]
   );
-  await logAudit(user, `Added product ${p.type} ${p.size}`, 'ti-package', { type: p.type, size: p.size });
+  await logAudit(user, `Added product ${label}`, 'ti-package', { type: p.type, sub_type: p.sub_type, size: p.size });
   await pushNotification({
     type: 'green',
-    title: `New product added — ${p.size}`,
-    body: `${user.name} added ${p.type} ${p.size}. Reason: ${p.reason}`,
+    title: `New product added — ${label}`,
+    body: `${user.name} added ${label}. Reason: ${p.reason}`,
     roles: ['operations', 'sales', 'ceo']
   });
   return { ok: true };
@@ -941,18 +975,10 @@ async function getDashboardStats(userId) {
     pool.query(STOCK_SQL)
   ]);
 
-  const st = stockRows[0] || {};
   return {
     ok: true,
     month,
-    stock: {
-      timberProduced: Number(st.timber_produced || 0),
-      polesProduced:  Number(st.poles_produced  || 0),
-      timberSold:     Number(st.timber_sold     || 0),
-      polesSold:      Number(st.poles_sold      || 0),
-      timberStock:    Number(st.timber_stock    || 0),
-      polesStock:     Number(st.poles_stock     || 0)
-    },
+    stock: buildStock(stockRows[0] || {}),
     production: {
       thisMonth: monthProd[0] || {},
       lastMonth: lastMonthProd[0] || {},

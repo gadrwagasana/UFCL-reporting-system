@@ -502,33 +502,30 @@ async function renderDaily() {
   const rows = res.rows || [];
   const stock = res.stock || {};
 
-  const totalTimber = rows.reduce((s, r) => s + Number(r.timber_units || 0), 0);
-  const totalPoles  = rows.reduce((s, r) => s + Number(r.poles_units  || 0), 0);
-
   $('page-daily').innerHTML = `
     <div class="ptitle">Daily production log</div>
-    <div class="psub">Log daily output and downtime. Each entry adds to the available stock balance.</div>
+    <div class="psub">Log daily output by timber type and poles. Each entry updates the stock balance.</div>
 
     <div class="cards">
+      <div class="mc" style="border-top:3px solid #D97706">
+        <div class="mclbl">Kiln-dried in stock</div>
+        <div class="mcval" style="color:${stock.kilnDriedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.kilnDriedStock || 0).toLocaleString()}</div>
+        <div class="mcsub ca"><i class="ti ti-flame"></i>${Number(stock.kilnDriedProduced || 0).toLocaleString()} prod · ${Number(stock.kilnDriedSold || 0).toLocaleString()} sold</div>
+      </div>
       <div class="mc" style="border-top:3px solid #2E8B57">
-        <div class="mclbl">Timber in stock</div>
-        <div class="mcval" style="color:${stock.timberStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.timberStock || 0).toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-package"></i>after all sales</div>
+        <div class="mclbl">CCA-treated in stock</div>
+        <div class="mcval" style="color:${stock.ccaTreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.ccaTreatedStock || 0).toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-droplet"></i>${Number(stock.ccaTreatedProduced || 0).toLocaleString()} prod · ${Number(stock.ccaTreatedSold || 0).toLocaleString()} sold</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #0F766E">
+        <div class="mclbl">Untreated in stock</div>
+        <div class="mcval" style="color:${stock.untreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.untreatedStock || 0).toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-tree"></i>${Number(stock.untreatedProduced || 0).toLocaleString()} prod · ${Number(stock.untreatedSold || 0).toLocaleString()} sold</div>
       </div>
       <div class="mc" style="border-top:3px solid #1D4ED8">
         <div class="mclbl">Poles in stock</div>
         <div class="mcval" style="color:${stock.polesStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.polesStock || 0).toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-package"></i>after all sales</div>
-      </div>
-      <div class="mc">
-        <div class="mclbl">Timber (last 50 logs)</div>
-        <div class="mcval">${totalTimber.toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-ruler-2"></i>units produced</div>
-      </div>
-      <div class="mc">
-        <div class="mclbl">Poles (last 50 logs)</div>
-        <div class="mcval">${totalPoles.toLocaleString()}</div>
-        <div class="mcsub bp"><i class="ti ti-current-location"></i>units produced</div>
+        <div class="mcsub bp"><i class="ti ti-current-location"></i>${Number(stock.polesProduced || 0).toLocaleString()} prod · ${Number(stock.polesSold || 0).toLocaleString()} sold</div>
       </div>
     </div>
 
@@ -539,19 +536,20 @@ async function renderDaily() {
       </div>
       <div class="tw">
         <table class="dt">
-          <thead><tr><th>Date</th><th>Supervisor</th><th>Timber</th><th>T. waste</th><th>Poles</th><th>P. waste</th><th>Downtime</th><th>Remarks</th></tr></thead>
+          <thead><tr><th>Date</th><th>Supervisor</th><th>Kiln-dried</th><th>CCA-treated</th><th>Untreated</th><th>T. waste</th><th>Poles</th><th>P. waste</th><th>Downtime</th></tr></thead>
           <tbody>
             ${rows.length === 0
-              ? '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:2rem">No production entries yet.</td></tr>'
+              ? '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No production entries yet.</td></tr>'
               : rows.map((r) => `<tr>
                 <td style="font-family:var(--fm)">${r.date}</td>
                 <td>${r.supervisor || '—'}</td>
-                <td style="font-weight:500;color:var(--g-dark)">${Number(r.timber_units || 0).toLocaleString()}</td>
+                <td style="color:#D97706;font-weight:500">${Number(r.timber_kiln_dried || 0).toLocaleString()}</td>
+                <td style="color:var(--g-soft);font-weight:500">${Number(r.timber_cca_treated || 0).toLocaleString()}</td>
+                <td style="font-weight:500">${Number(r.timber_untreated || 0).toLocaleString()}</td>
                 <td style="color:var(--amber)">${Number(r.timber_waste || 0).toLocaleString()}</td>
-                <td style="font-weight:500;color:#1D4ED8">${Number(r.poles_units || 0).toLocaleString()}</td>
+                <td style="color:#1D4ED8;font-weight:500">${Number(r.poles_units || 0).toLocaleString()}</td>
                 <td style="color:var(--amber)">${Number(r.poles_waste || 0).toLocaleString()}</td>
                 <td style="font-family:var(--fm);color:var(--t3)">${Number(r.downtime_hours || 0).toFixed(1)}h</td>
-                <td style="color:var(--t3)">${r.remarks || '—'}</td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -562,18 +560,26 @@ async function renderDaily() {
   $('newDaily').onclick = () =>
     openOverlay(
       'Add production entry',
-      `Current stock — Timber: <strong>${Number(stock.timberStock || 0).toLocaleString()}</strong> &nbsp;·&nbsp; Poles: <strong>${Number(stock.polesStock || 0).toLocaleString()}</strong>`,
+      `Stock — Kiln: <strong>${Number(stock.kilnDriedStock||0).toLocaleString()}</strong> &nbsp;CCA: <strong>${Number(stock.ccaTreatedStock||0).toLocaleString()}</strong> &nbsp;Untreated: <strong>${Number(stock.untreatedStock||0).toLocaleString()}</strong> &nbsp;Poles: <strong>${Number(stock.polesStock||0).toLocaleString()}</strong>`,
       `
       <div class="frow">
         <div class="fg"><label>Date</label><input type="date" id="dl-date" value="${new Date().toISOString().split('T')[0]}"></div>
         <div class="fg"><label>Supervisor</label><input type="text" id="dl-sup" placeholder="${STORAGE.user.name}"></div>
       </div>
-      <div class="frow">
-        <div class="fg"><label>Timber units produced</label><input type="number" id="dl-tu" placeholder="0" min="0"></div>
-        <div class="fg"><label>Timber waste (pieces)</label><input type="number" id="dl-tw" placeholder="0" min="0"></div>
+      <div style="background:var(--surf);border:1px solid var(--border);border-radius:var(--r-sm);padding:.75rem;margin-bottom:.75rem">
+        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.625rem">Timber production breakdown</div>
+        <div class="frow three">
+          <div class="fg"><label>Kiln-dried (units)</label><input type="number" id="dl-kd" placeholder="0" min="0"></div>
+          <div class="fg"><label>CCA-treated (units)</label><input type="number" id="dl-cca" placeholder="0" min="0"></div>
+          <div class="fg"><label>Untreated (units)</label><input type="number" id="dl-unt" placeholder="0" min="0"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Timber waste (pieces)</label><input type="number" id="dl-tw" placeholder="0" min="0"></div>
+          <div class="fg"><label style="color:var(--g-soft)">Total timber</label><input type="text" id="dl-total" readonly style="background:var(--g-light);color:var(--g-dark);font-weight:600" placeholder="0"></div>
+        </div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Poles units produced</label><input type="number" id="dl-pu" placeholder="0" min="0"></div>
+        <div class="fg"><label>Poles (units)</label><input type="number" id="dl-pu" placeholder="0" min="0"></div>
         <div class="fg"><label>Poles waste (pieces)</label><input type="number" id="dl-pw" placeholder="0" min="0"></div>
       </div>
       <div class="frow">
@@ -585,15 +591,17 @@ async function renderDaily() {
       `,
       async () => {
         const payload = {
-          date:           $('dl-date').value,
-          supervisor:     $('dl-sup').value,
-          timber_units:   $('dl-tu').value,
-          timber_waste:   $('dl-tw').value,
-          poles_units:    $('dl-pu').value,
-          poles_waste:    $('dl-pw').value,
-          downtime_hours: $('dl-dt').value,
-          downtime_reason: $('dl-dr').value,
-          remarks:        $('dl-rem').value
+          date:               $('dl-date').value,
+          supervisor:         $('dl-sup').value,
+          timber_kiln_dried:  $('dl-kd').value,
+          timber_cca_treated: $('dl-cca').value,
+          timber_untreated:   $('dl-unt').value,
+          timber_waste:       $('dl-tw').value,
+          poles_units:        $('dl-pu').value,
+          poles_waste:        $('dl-pw').value,
+          downtime_hours:     $('dl-dt').value,
+          downtime_reason:    $('dl-dr').value,
+          remarks:            $('dl-rem').value
         };
         const r = await UFCL.dailyCreate(STORAGE.user.id, payload);
         if (!r.ok) return showOverlayError(r.error || 'Failed to save entry.');
@@ -601,6 +609,17 @@ async function renderDaily() {
         await renderDaily();
       }
     );
+
+  // live timber total
+  setTimeout(() => {
+    ['dl-kd','dl-cca','dl-unt'].forEach((id) => {
+      const el = $(id);
+      if (el) el.oninput = () => {
+        const total = Number($('dl-kd')?.value||0) + Number($('dl-cca')?.value||0) + Number($('dl-unt')?.value||0);
+        const t = $('dl-total'); if (t) t.value = total > 0 ? total.toLocaleString() : '';
+      };
+    });
+  }, 50);
 }
 
 async function renderSales() {
@@ -625,12 +644,22 @@ async function renderSales() {
       <div class="mc" style="border-top:3px solid #1D4ED8">
         <div class="mclbl">Poles in stock</div>
         <div class="mcval" style="color:${stock.polesStock < 0 ? 'var(--red)' : polesLow ? 'var(--amber)' : 'inherit'}">${Number(stock.polesStock || 0).toLocaleString()}</div>
-        <div class="mcsub ${polesLow ? 'cr' : 'cg'}"><i class="ti ti-package"></i>${Number(stock.polesProduced || 0).toLocaleString()} produced · ${Number(stock.polesSold || 0).toLocaleString()} sold</div>
+        <div class="mcsub ${polesLow ? 'cr' : 'cg'}"><i class="ti ti-package"></i>${Number(stock.polesProduced || 0).toLocaleString()} prod · ${Number(stock.polesSold || 0).toLocaleString()} sold</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #D97706">
+        <div class="mclbl">Kiln-dried in stock</div>
+        <div class="mcval" style="color:${stock.kilnDriedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.kilnDriedStock || 0).toLocaleString()}</div>
+        <div class="mcsub ca"><i class="ti ti-flame"></i>kiln-dried</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #2E8B57">
+        <div class="mclbl">CCA-treated in stock</div>
+        <div class="mcval" style="color:${stock.ccaTreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.ccaTreatedStock || 0).toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-droplet"></i>CCA-treated</div>
       </div>
       <div class="mc">
-        <div class="mclbl">Total orders</div>
-        <div class="mcval">${rows.length}</div>
-        <div class="mcsub cg"><i class="ti ti-receipt"></i>last 50</div>
+        <div class="mclbl">Untreated in stock</div>
+        <div class="mcval" style="color:${stock.untreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.untreatedStock || 0).toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-tree"></i>untreated</div>
       </div>
     </div>
 
@@ -641,60 +670,72 @@ async function renderSales() {
       </div>
       <div class="tw">
         <table class="dt">
-          <thead><tr><th>Order #</th><th>Customer</th><th>Type</th><th>Size</th><th>Qty</th><th>Unit price (RWF)</th><th>Total (RWF)</th><th>Status</th><th>Date</th></tr></thead>
+          <thead><tr><th>Order #</th><th>Customer</th><th>Category</th><th>Type</th><th>Size / Spec</th><th>Qty</th><th>Unit (RWF)</th><th>Total (RWF)</th><th>Status</th><th>Date</th></tr></thead>
           <tbody>
             ${rows.length === 0
-              ? '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
-              : rows.map((r) => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.order_number}</td>
-                <td>${r.customer_name}</td>
-                <td><span class="badge ${r.product_type === 'Timber' ? 'ba' : 'bb'}">${r.product_type}</span></td>
-                <td style="font-family:var(--fm)">${r.product_size}</td>
-                <td style="font-weight:500">${Number(r.quantity).toLocaleString()}</td>
-                <td style="font-family:var(--fm)">${Number(r.unit_price).toLocaleString()}</td>
-                <td style="font-family:var(--fm);font-weight:500">${(Number(r.quantity) * Number(r.unit_price)).toLocaleString()}</td>
-                <td><button class="so-status-btn" data-so="${r.id}" data-cur="${r.status || 'Pending'}" style="all:unset;cursor:pointer">${soStatusBadge(r.status || 'Pending')}</button></td>
-                <td style="color:var(--t3)">${new Date(r.created_at).toLocaleDateString('en-GB')}</td>
-              </tr>`).join('')}
+              ? '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
+              : rows.map((r) => {
+                  const subBadge = r.product_sub_type === 'Kiln-dried' ? 'ba' : r.product_sub_type === 'CCA-treated' ? 'bg' : r.product_sub_type === 'Untreated' ? 'bt' : '';
+                  return `<tr>
+                    <td style="font-family:var(--fm);font-weight:500">${r.order_number}</td>
+                    <td>${r.customer_name}</td>
+                    <td><span class="badge ${r.product_type === 'Timber' ? 'ba' : 'bb'}">${r.product_type}</span></td>
+                    <td>${r.product_sub_type ? `<span class="badge ${subBadge}">${r.product_sub_type}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
+                    <td style="font-family:var(--fm)">${r.product_size}</td>
+                    <td style="font-weight:500">${Number(r.quantity).toLocaleString()}</td>
+                    <td style="font-family:var(--fm)">${Number(r.unit_price).toLocaleString()}</td>
+                    <td style="font-family:var(--fm);font-weight:500">${(Number(r.quantity)*Number(r.unit_price)).toLocaleString()}</td>
+                    <td><button class="so-status-btn" data-so="${r.id}" data-cur="${r.status||'Pending'}" style="all:unset;cursor:pointer">${soStatusBadge(r.status||'Pending')}</button></td>
+                    <td style="color:var(--t3)">${new Date(r.created_at).toLocaleDateString('en-GB')}</td>
+                  </tr>`;
+                }).join('')}
           </tbody>
         </table>
       </div>
     </div>
   `;
 
-  $('newSO').onclick = () =>
+  $('newSO').onclick = () => {
     openOverlay(
       'New sales order',
-      `Available stock — Timber: <strong>${Number(stock.timberStock || 0).toLocaleString()}</strong> units &nbsp;·&nbsp; Poles: <strong>${Number(stock.polesStock || 0).toLocaleString()}</strong> units`,
+      `Stock — Kiln: <strong>${Number(stock.kilnDriedStock||0).toLocaleString()}</strong> &nbsp;CCA: <strong>${Number(stock.ccaTreatedStock||0).toLocaleString()}</strong> &nbsp;Untreated: <strong>${Number(stock.untreatedStock||0).toLocaleString()}</strong> &nbsp;Poles: <strong>${Number(stock.polesStock||0).toLocaleString()}</strong>`,
       `
       <div class="frow">
         <div class="fg"><label>Order number</label><input type="text" placeholder="SO-2026-XXX" id="so-num"></div>
         <div class="fg"><label>Customer name</label><input type="text" placeholder="Customer company" id="so-cust"></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Product type</label>
+        <div class="fg">
+          <label>Product category</label>
           <select id="so-type"><option value="">— Select —</option><option value="Timber">Timber</option><option value="Poles">Wooden Poles</option></select>
         </div>
-        <div class="fg"><label>Product size / spec</label><input type="text" id="so-size" placeholder="e.g. 120×250×4m"></div>
+        <div class="fg" id="so-sub-row" style="display:none">
+          <label>Timber type</label>
+          <select id="so-sub"><option value="Kiln-dried">Kiln-dried</option><option value="CCA-treated">CCA-treated</option><option value="Untreated">Untreated (sawn)</option></select>
+        </div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Size / spec</label><input type="text" id="so-size" placeholder="e.g. 100x200x4m or O255x9m"></div>
         <div class="fg"><label>Quantity</label><input type="number" placeholder="0" min="1" id="so-qty"></div>
-        <div class="fg"><label>Unit price (RWF)</label><input type="number" placeholder="0" min="0" id="so-price"></div>
       </div>
-      <div class="frow full"><div class="fg"><label>Notes</label><input type="text" id="so-notes" placeholder="Delivery instructions or special requirements (optional)"></div></div>
+      <div class="frow">
+        <div class="fg"><label>Unit price (RWF)</label><input type="number" placeholder="0" min="0" id="so-price"></div>
+        <div class="fg"><label>Notes (optional)</label><input type="text" id="so-notes" placeholder="Delivery or special instructions"></div>
+      </div>
       <div class="frow full"><div class="fg"><label>Reason / description</label><input type="text" id="so-reason" placeholder="Required for audit trail"></div></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy" style="font-size:13px;vertical-align:-1px"></i> Save order</button><button class="bs1" id="ovCancel">Cancel</button></div>
       `,
       async () => {
         const payload = {
-          order_number:  $('so-num').value.trim(),
-          customer_name: $('so-cust').value.trim(),
-          product_type:  $('so-type').value,
-          product_size:  $('so-size').value.trim(),
-          quantity:      $('so-qty').value,
-          unit_price:    $('so-price').value,
-          notes:         $('so-notes').value.trim(),
-          reason:        $('so-reason').value.trim()
+          order_number:      $('so-num').value.trim(),
+          customer_name:     $('so-cust').value.trim(),
+          product_type:      $('so-type').value,
+          product_sub_type:  $('so-type').value === 'Timber' ? $('so-sub').value : null,
+          product_size:      $('so-size').value.trim(),
+          quantity:          $('so-qty').value,
+          unit_price:        $('so-price').value,
+          notes:             $('so-notes').value.trim(),
+          reason:            $('so-reason').value.trim()
         };
         const r = await UFCL.salesCreate(STORAGE.user.id, payload);
         if (!r.ok) return showOverlayError(r.error || 'Failed to save order.');
@@ -702,6 +743,14 @@ async function renderSales() {
         await renderSales();
       }
     );
+    setTimeout(() => {
+      const soType = $('so-type');
+      const soSubRow = $('so-sub-row');
+      if (soType && soSubRow) soType.onchange = () => {
+        soSubRow.style.display = soType.value === 'Timber' ? '' : 'none';
+      };
+    }, 30);
+  };
 
   const STATUSES = ['Pending', 'Confirmed', 'Dispatched', 'Delivered', 'Cancelled'];
 
@@ -746,38 +795,68 @@ async function renderProducts() {
   const rows = res.rows || [];
   const isAdmin = !!res.isAdmin;
 
-  const activeCount = rows.filter((p) => p.active).length;
-  const timberCount = rows.filter((p) => p.type === 'Timber').length;
-  const polesCount = rows.filter((p) => p.type === 'Poles').length;
-  const cols = isAdmin ? 8 : 7;
+  const activeCount  = rows.filter((p) => p.active).length;
+  const kilnCount    = rows.filter((p) => p.sub_type === 'Kiln-dried').length;
+  const ccaCount     = rows.filter((p) => p.sub_type === 'CCA-treated').length;
+  const untreatedCnt = rows.filter((p) => p.sub_type === 'Untreated').length;
+  const polesCount   = rows.filter((p) => p.type === 'Poles').length;
+  const cols = isAdmin ? 9 : 8;
 
   $('page-products').innerHTML = `
     <div class="ptitle">Product catalog</div>
-    <div class="psub">Product sizes available for production orders. All additions and status changes are logged to the audit trail.</div>
+    <div class="psub">Timber and poles available for production and dispatch. All changes are logged to the audit trail.</div>
 
     <div class="cards">
-      <div class="mc"><div class="mclbl">Total</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-package"></i>products</div></div>
+      <div class="mc"><div class="mclbl">Kiln-dried</div><div class="mcval">${kilnCount}</div><div class="mcsub ca"><i class="ti ti-flame"></i>sizes</div></div>
+      <div class="mc"><div class="mclbl">CCA-treated</div><div class="mcval">${ccaCount}</div><div class="mcsub cg"><i class="ti ti-droplet"></i>sizes</div></div>
+      <div class="mc"><div class="mclbl">Untreated</div><div class="mcval">${untreatedCnt}</div><div class="mcsub bt"><i class="ti ti-tree"></i>sizes</div></div>
+      <div class="mc"><div class="mclbl">Poles</div><div class="mcval">${polesCount}</div><div class="mcsub bp"><i class="ti ti-current-location"></i>specs</div></div>
       <div class="mc"><div class="mclbl">Active</div><div class="mcval">${activeCount}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>in use</div></div>
-      <div class="mc"><div class="mclbl">Timber sizes</div><div class="mcval">${timberCount}</div><div class="mcsub ca"><i class="ti ti-ruler-2"></i>sizes</div></div>
-      <div class="mc"><div class="mclbl">Pole specs</div><div class="mcval">${polesCount}</div><div class="mcsub bp"><i class="ti ti-current-location"></i>specs</div></div>
     </div>
 
     <div class="card">
       <h3><i class="ti ti-plus"></i>Add product</h3>
-      <div class="frow three">
-        <div class="fg"><label>Type</label><select id="np-type"><option value="Timber">Timber</option><option value="Poles">Wooden Poles</option></select></div>
-        <div class="fg"><label>Size / Spec</label><input type="text" id="np-size" placeholder="e.g. 50×100×3000 or 200mm dia×5m"></div>
+      <div class="frow">
+        <div class="fg">
+          <label>Category</label>
+          <select id="np-type">
+            <option value="Timber">Timber</option>
+            <option value="Poles">Wooden Poles</option>
+          </select>
+        </div>
+        <div class="fg" id="np-sub-row">
+          <label>Timber type</label>
+          <select id="np-sub">
+            <option value="Kiln-dried">Kiln-dried</option>
+            <option value="CCA-treated">CCA-treated</option>
+            <option value="Untreated">Untreated (sawn)</option>
+          </select>
+        </div>
+      </div>
+      <div class="frow three" id="np-dim-timber">
+        <div class="fg"><label>Width (mm)</label><input type="number" id="np-w" placeholder="e.g. 100" min="1"></div>
+        <div class="fg"><label>Height (mm)</label><input type="number" id="np-h" placeholder="e.g. 200" min="1"></div>
+        <div class="fg"><label>Length (m)</label><input type="number" id="np-lt" placeholder="e.g. 4" min="0.1" step="0.5"></div>
+      </div>
+      <div class="frow" id="np-dim-poles" style="display:none">
+        <div class="fg"><label>Diameter (mm)</label><input type="number" id="np-d" placeholder="e.g. 255" min="1"></div>
+        <div class="fg"><label>Length (m)</label><input type="number" id="np-lp" placeholder="e.g. 9" min="0.5" step="0.5"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Size preview</label><input type="text" id="np-size-preview" readonly placeholder="Auto-generated from dimensions" style="background:var(--surf);color:var(--t2)"></div>
         <div class="fg"><label>Customer ref</label><input type="text" id="np-ref" placeholder="e.g. SO-2026-120 (optional)"></div>
       </div>
-      <div class="frow full"><div class="fg"><label>Reason for adding</label><textarea id="np-reason" rows="2" placeholder="Briefly explain the business need for this new size — required for audit…"></textarea></div></div>
+      <div class="frow full"><div class="fg"><label>Reason for adding</label><textarea id="np-reason" rows="2" placeholder="Briefly explain the business need — required for audit…"></textarea></div></div>
       <div class="brow"><button class="bp1" id="np-save"><i class="ti ti-circle-check" style="font-size:13px;vertical-align:-1px"></i> Add product</button></div>
       <div class="lerr" id="np-err"></div>
     </div>
 
     <div class="fchips" id="prodFilter" data-v="${currentFilter}">
       <button class="fchip ${currentFilter === 'All' ? 'active' : ''}" data-f="All">All</button>
-      <button class="fchip ${currentFilter === 'Timber' ? 'active' : ''}" data-f="Timber">Timber</button>
-      <button class="fchip ${currentFilter === 'Poles' ? 'active' : ''}" data-f="Poles">Wooden Poles</button>
+      <button class="fchip ${currentFilter === 'Kiln-dried' ? 'active' : ''}" data-f="Kiln-dried">Kiln-dried</button>
+      <button class="fchip ${currentFilter === 'CCA-treated' ? 'active' : ''}" data-f="CCA-treated">CCA-treated</button>
+      <button class="fchip ${currentFilter === 'Untreated' ? 'active' : ''}" data-f="Untreated">Untreated</button>
+      <button class="fchip ${currentFilter === 'Poles' ? 'active' : ''}" data-f="Poles">Poles</button>
       <button class="fchip ${currentFilter === 'Active' ? 'active' : ''}" data-f="Active">Active only</button>
     </div>
 
@@ -785,36 +864,74 @@ async function renderProducts() {
       <h3><i class="ti ti-table"></i>Products</h3>
       <div class="tw">
         <table class="dt">
-          <thead><tr><th>Type</th><th>Size / Spec</th><th>Status</th><th>Added by</th><th>Date</th><th>Reason</th><th>Ref</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
+          <thead><tr><th>Category</th><th>Type</th><th>Dimensions</th><th>Status</th><th>Added by</th><th>Date</th><th>Reason</th><th>Ref</th>${isAdmin ? '<th></th>' : ''}</tr></thead>
           <tbody>
             ${rows.length === 0
               ? `<tr><td colspan="${cols}" style="text-align:center;color:var(--t3);padding:2rem">No products match this filter.</td></tr>`
-              : rows.map((p) => `<tr>
-                <td><span class="badge ${p.type === 'Timber' ? 'ba' : 'bb'}">${p.type}</span></td>
-                <td style="font-family:var(--fm);font-weight:500">${p.size}</td>
-                <td><span class="badge ${p.active ? 'bg' : 'br'}">${p.active ? 'Active' : 'Inactive'}</span></td>
-                <td>${p.by || '—'}</td>
-                <td style="font-family:var(--fm);color:var(--t3)">${p.date}</td>
-                <td style="color:var(--t3);max-width:200px">${p.reason || '—'}</td>
-                <td style="font-family:var(--fm);color:var(--t3)">${p.ref || '—'}</td>
-                ${isAdmin ? `<td><button class="${p.active ? 'bdanger' : 'bs1'}" style="font-size:11px;padding:4px 10px" data-tog="${p.id}" data-active="${p.active}" data-size="${p.size}">${p.active ? 'Deactivate' : 'Reactivate'}</button></td>` : ''}
-              </tr>`).join('')}
+              : rows.map((p) => {
+                  const subBadge = p.sub_type === 'Kiln-dried' ? 'ba' : p.sub_type === 'CCA-treated' ? 'bg' : p.sub_type === 'Untreated' ? 'bt' : '';
+                  return `<tr>
+                    <td><span class="badge ${p.type === 'Timber' ? 'ba' : 'bb'}">${p.type}</span></td>
+                    <td>${p.sub_type ? `<span class="badge ${subBadge}">${p.sub_type}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
+                    <td style="font-family:var(--fm);font-weight:500">${p.size}</td>
+                    <td><span class="badge ${p.active ? 'bg' : 'br'}">${p.active ? 'Active' : 'Inactive'}</span></td>
+                    <td>${p.by || '—'}</td>
+                    <td style="font-family:var(--fm);color:var(--t3)">${p.date}</td>
+                    <td style="color:var(--t3);max-width:180px">${p.reason || '—'}</td>
+                    <td style="font-family:var(--fm);color:var(--t3)">${p.ref || '—'}</td>
+                    ${isAdmin ? `<td><button class="${p.active ? 'bdanger' : 'bs1'}" style="font-size:11px;padding:4px 10px" data-tog="${p.id}" data-active="${p.active}" data-size="${p.size}">${p.active ? 'Deactivate' : 'Reactivate'}</button></td>` : ''}
+                  </tr>`;
+                }).join('')}
           </tbody>
         </table>
       </div>
     </div>
   `;
 
+  // dimension helper
+  const updateSizePreview = () => {
+    const type = $('np-type').value;
+    const preview = $('np-size-preview');
+    if (type === 'Timber') {
+      const w = $('np-w').value, h = $('np-h').value, l = $('np-lt').value;
+      preview.value = (w && h && l) ? `${w}x${h}x${l}m` : '';
+    } else {
+      const d = $('np-d').value, l = $('np-lp').value;
+      preview.value = (d && l) ? `O${d}x${l}m` : '';
+    }
+  };
+
+  const toggleProductForm = () => {
+    const isTimber = $('np-type').value === 'Timber';
+    $('np-sub-row').style.display    = isTimber ? '' : 'none';
+    $('np-dim-timber').style.display = isTimber ? '' : 'none';
+    $('np-dim-poles').style.display  = isTimber ? 'none' : '';
+    updateSizePreview();
+  };
+
+  $('np-type').onchange = toggleProductForm;
+  ['np-w','np-h','np-lt','np-d','np-lp'].forEach((id) => {
+    const el = $(id); if (el) el.oninput = updateSizePreview;
+  });
+
   const npErr = $('np-err');
   $('np-save').onclick = async () => {
     npErr.style.display = 'none';
+    const type = $('np-type').value;
+    const isTimber = type === 'Timber';
+    const size = $('np-size-preview').value.trim();
     const payload = {
-      type: $('np-type').value,
-      size: $('np-size').value.trim(),
-      ref: $('np-ref').value.trim(),
+      type,
+      sub_type:    isTimber ? $('np-sub').value : null,
+      size,
+      width_mm:    isTimber ? $('np-w').value  : null,
+      height_mm:   isTimber ? $('np-h').value  : null,
+      length_m:    isTimber ? $('np-lt').value : $('np-lp').value,
+      diameter_mm: !isTimber ? $('np-d').value : null,
+      ref:    $('np-ref').value.trim(),
       reason: $('np-reason').value.trim()
     };
-    if (!payload.size) { npErr.textContent = 'Size / Spec is required.'; npErr.style.display = 'block'; return; }
+    if (!size) { npErr.textContent = 'Enter dimensions to generate the size spec.'; npErr.style.display = 'block'; return; }
     if (!payload.reason) { npErr.textContent = 'A reason is required for the audit trail.'; npErr.style.display = 'block'; return; }
     const r = await UFCL.productsCreate(STORAGE.user.id, payload);
     if (!r.ok) { npErr.textContent = r.error || 'Failed to add product.'; npErr.style.display = 'block'; return; }
@@ -822,10 +939,7 @@ async function renderProducts() {
   };
 
   $('page-products').querySelectorAll('#prodFilter .fchip').forEach((b) => {
-    b.onclick = async () => {
-      $('prodFilter').dataset.v = b.dataset.f;
-      await renderProducts();
-    };
+    b.onclick = async () => { $('prodFilter').dataset.v = b.dataset.f; await renderProducts(); };
   });
 
   $('page-products').querySelectorAll('[data-tog]').forEach((btn) => {
@@ -835,9 +949,7 @@ async function renderProducts() {
       const size = btn.dataset.size;
       openOverlay(
         active ? 'Deactivate product' : 'Reactivate product',
-        active
-          ? `<strong>${size}</strong> will be hidden from new production orders.`
-          : `<strong>${size}</strong> will be available for new production orders again.`,
+        active ? `<strong>${size}</strong> will be hidden from new orders.` : `<strong>${size}</strong> will be available again.`,
         `
           <div class="frow full"><div class="fg"><label>Reason</label><input type="text" id="tog-reason" placeholder="Required — recorded in the audit trail"></div></div>
           <div class="brow">
