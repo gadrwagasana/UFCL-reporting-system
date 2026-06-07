@@ -71,6 +71,7 @@ async function ensureSchema() {
   await pool.query(`alter table products add column if not exists height_mm int`);
   await pool.query(`alter table products add column if not exists length_m numeric(5,2)`);
   await pool.query(`alter table products add column if not exists diameter_mm int`);
+  await pool.query(`alter table products add column if not exists machine text`);
   // Sales sub-type
   await pool.query(`alter table sales_orders add column if not exists product_sub_type text`);
   // Daily log timber breakdown
@@ -142,14 +143,22 @@ async function seedRoles() {
   ];
 
   const permissionsByRole = {
-    admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes'],
-    ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes'],
-    operations: ['dashboard', 'daily', 'products', 'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes'],
-    sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes'],
+    admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
+            'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch',
+            'harvest', 'timber-inventory', 'transport'],
+    ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
+          'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport'],
+    operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
+                 'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
+                 'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'transport'],
+    sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
     finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
-    logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes'],
-    supervisor: ['dashboard', 'daily', 'audit', 'export', 'notifications', 'changes'],
-    storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications']
+    logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
+                'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'transport'],
+    supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
+                 'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory'],
+    storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
+                  'warehouses', 'stock-items', 'stock-movements']
   };
 
   for (const [role, label, description] of roles) {
@@ -159,6 +168,16 @@ async function seedRoles() {
       [role, label, description, JSON.stringify([]), JSON.stringify(permissionsByRole[role] || [])]
     );
   }
+}
+
+async function seedDefaultWarehouse() {
+  const { rows } = await pool.query('select count(*)::int as n from warehouses');
+  if (rows[0].n > 0) return;
+  await pool.query(
+    `insert into warehouses(name, location, capacity, notes, active)
+     values ($1,$2,$3,$4,true)`,
+    ['Main Warehouse', 'UFCL Main Site', 10000, 'Primary storage facility']
+  );
 }
 
 async function seedExpenseCategories() {
@@ -184,6 +203,93 @@ async function seedExpenseCategories() {
   }
 }
 
+async function seedMachineCategories() {
+  const { rows } = await pool.query('select count(*)::int as n from machine_categories');
+  if (rows[0].n > 0) return;
+
+  const categories = [
+    ['Sawmill', 'Timber cutting and processing machines', 'ti-cut'],
+    ['Log Loader', 'Machines for loading and unloading log volumes', 'ti-crane'],
+    ['Chipper', 'Wood chipping and shredding equipment', 'ti-axe'],
+    ['Crane / Forklift', 'Material handling and lifting equipment', 'ti-arrow-up'],
+    ['Generator', 'Power generation equipment', 'ti-bolt']
+  ];
+
+  for (const [name, description, icon] of categories) {
+    await pool.query(
+      `insert into machine_categories(name, description, icon) values ($1,$2,$3)`,
+      [name, description, icon]
+    );
+  }
+}
+
+async function seedMachineKpiDefinitions() {
+  const { rows } = await pool.query('select count(*)::int as n from machine_kpi_definitions');
+  if (rows[0].n > 0) return;
+
+  const { rows: cats } = await pool.query('select id, name from machine_categories');
+  const catMap = Object.fromEntries(cats.map(c => [c.name, c.id]));
+
+  const defs = [
+    // Universal (category_id = null applies to all)
+    [null, 'utilization_hours', 'Utilization Hours', 'hrs', true, 1.0, 'Total productive hours worked'],
+    [null, 'downtime_hours', 'Downtime Hours', 'hrs', false, 1.0, 'Total non-productive downtime'],
+    [null, 'fuel_consumed', 'Fuel Consumed', 'L', false, 0.5, 'Total fuel consumption'],
+    // Sawmill-specific
+    [catMap['Sawmill'], 'daily_production', 'Daily Production', 'm³', true, 2.0, 'Actual daily output in cubic metres'],
+    [catMap['Sawmill'], 'efficiency_pct', 'Production Efficiency %', '%', true, 2.0, 'Actual output vs capacity per day'],
+    // Log Loader-specific
+    [catMap['Log Loader'], 'logs_loaded', 'Logs Loaded', 'm³', true, 2.0, 'Volume of logs loaded'],
+    [catMap['Log Loader'], 'logs_unloaded', 'Logs Unloaded', 'm³', true, 1.5, 'Volume of logs unloaded'],
+    [catMap['Log Loader'], 'loading_trips', 'Loading Trips', 'trips', true, 1.0, 'Number of loading trips completed']
+  ];
+
+  for (const [cat_id, kpi_code, kpi_name, unit, higher_is_better, weight, description] of defs) {
+    await pool.query(
+      `insert into machine_kpi_definitions(category_id, kpi_code, kpi_name, unit, higher_is_better, weight, description)
+       values ($1,$2,$3,$4,$5,$6,$7)`,
+      [cat_id, kpi_code, kpi_name, unit, higher_is_better, weight, description]
+    );
+  }
+}
+
+async function updateRolePermissions() {
+  const permissionsByRole = {
+    admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
+            'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch',
+            'harvest', 'timber-inventory', 'transport',
+            'machines', 'machine-logs', 'machine-kpi'],
+    ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
+          'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
+          'machines', 'machine-kpi'],
+    operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
+                 'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
+                 'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'transport',
+                 'machines', 'machine-logs', 'machine-kpi'],
+    sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
+    finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
+    logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
+                'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'transport',
+                'machines'],
+    supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
+                 'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
+                 'machine-logs'],
+    storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
+                  'warehouses', 'stock-items', 'stock-movements']
+  };
+
+  for (const [role, perms] of Object.entries(permissionsByRole)) {
+    const { rows } = await pool.query('select permissions from role_definitions where role=$1', [role]);
+    if (!rows.length) continue;
+    const existing = Array.isArray(rows[0].permissions) ? rows[0].permissions : [];
+    const newPerms = Array.from(new Set([...existing, ...perms]));
+    await pool.query(
+      'update role_definitions set permissions=$1, updated_at=now() where role=$2',
+      [JSON.stringify(newPerms), role]
+    );
+  }
+}
+
 async function migrate() {
   await ensureDatabaseExists();
   await ensureSchema();
@@ -191,6 +297,10 @@ async function migrate() {
   await seedRoles();
   await seedExpenseCategories();
   await seedProductCatalog();
+  await seedDefaultWarehouse();
+  await seedMachineCategories();
+  await seedMachineKpiDefinitions();
+  await updateRolePermissions();
 }
 
 if (require.main === module) {

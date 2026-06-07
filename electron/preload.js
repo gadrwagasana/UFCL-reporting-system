@@ -38,6 +38,7 @@ contextBridge.exposeInMainWorld('UFCL', {
 
   dailyList: (userId) => ipcRenderer.invoke('daily:list', { userId }),
   dailyCreate: (userId, payload) => ipcRenderer.invoke('daily:create', { userId, payload }),
+  dailyHarvestData: (userId) => ipcRenderer.invoke('daily:harvest-data', { userId }),
 
   salesList: (userId) => ipcRenderer.invoke('sales:list', { userId }),
   salesCreate: (userId, payload) => ipcRenderer.invoke('sales:create', { userId, payload }),
@@ -76,9 +77,101 @@ contextBridge.exposeInMainWorld('UFCL', {
   dashboardStats: (userId) => ipcRenderer.invoke('dashboard:stats', { userId }),
   weeklyPerf: (userId) => ipcRenderer.invoke('weekly:perf', { userId }),
   productsCatalog: (userId) => ipcRenderer.invoke('products:catalog', { userId }),
+  productsActiveForForm: (userId, type) => ipcRenderer.invoke('products:active-for-form', { userId, type }),
+  machinesForDropdown: (userId) => ipcRenderer.invoke('machines:for-dropdown', { userId }),
   kpiBudgetsList: (userId, month) => ipcRenderer.invoke('kpi:budgets:list', { userId, month }),
   kpiBudgetSave: (userId, payload) => ipcRenderer.invoke('kpi:budgets:save', { userId, payload }),
   monthlyDashboard: (userId, month) => ipcRenderer.invoke('monthly:dashboard', { userId, month }),
-  inventoryList: (userId) => ipcRenderer.invoke('inventory:list', { userId })
+  inventoryList: (userId) => ipcRenderer.invoke('inventory:list', { userId }),
+
+  warehousesList: (userId) => ipcRenderer.invoke('warehouses:list', { userId }),
+  warehousesCreate: (userId, payload) => ipcRenderer.invoke('warehouses:create', { userId, payload }),
+  warehousesUpdate: (userId, warehouseId, payload) => ipcRenderer.invoke('warehouses:update', { userId, warehouseId, payload }),
+
+  stockItemsList: (userId) => ipcRenderer.invoke('stock-items:list', { userId }),
+  stockItemsCreate: (userId, payload) => ipcRenderer.invoke('stock-items:create', { userId, payload }),
+  stockItemsUpdate: (userId, itemId, payload) => ipcRenderer.invoke('stock-items:update', { userId, itemId, payload }),
+
+  stockMovementsList: (userId) => ipcRenderer.invoke('stock-movements:list', { userId }),
+  stockMovementsCreate: (userId, payload) => ipcRenderer.invoke('stock-movements:create', { userId, payload }),
+
+  vehiclesList: (userId) => ipcRenderer.invoke('vehicles:list', { userId }),
+  vehiclesCreate: (userId, payload) => ipcRenderer.invoke('vehicles:create', { userId, payload }),
+  vehiclesUpdate: (userId, vehicleId, payload) => ipcRenderer.invoke('vehicles:update', { userId, vehicleId, payload }),
+  fuelLogsList: (userId, vehicleId) => ipcRenderer.invoke('fuel-logs:list', { userId, vehicleId }),
+  fuelLogsCreate: (userId, payload) => ipcRenderer.invoke('fuel-logs:create', { userId, payload }),
+  maintenanceList: (userId, vehicleId) => ipcRenderer.invoke('maintenance:list', { userId, vehicleId }),
+  maintenanceCreate: (userId, payload) => ipcRenderer.invoke('maintenance:create', { userId, payload }),
+
+  deliveriesList: (userId) => ipcRenderer.invoke('deliveries:list', { userId }),
+  deliveriesCreate: (userId, payload) => ipcRenderer.invoke('deliveries:create', { userId, payload }),
+  deliveriesUpdateStatus: (userId, orderId, status) => ipcRenderer.invoke('deliveries:updateStatus', { userId, orderId, status }),
+
+  dispatchList: (userId) => ipcRenderer.invoke('dispatch:list', { userId }),
+  dispatchCreate: (userId, payload) => ipcRenderer.invoke('dispatch:create', { userId, payload }),
+  dispatchReview: (userId, requestId, status, notes) => ipcRenderer.invoke('dispatch:review', { userId, requestId, status, notes }),
+
+  harvestList: (userId) => ipcRenderer.invoke('harvest:list', { userId }),
+  harvestCreate: (userId, payload) => ipcRenderer.invoke('harvest:create', { userId, payload }),
+
+  timberInventoryList: (userId) => ipcRenderer.invoke('timber-inventory:list', { userId }),
+
+  transportCompaniesList: (userId) => ipcRenderer.invoke('transport:companies:list', { userId }),
+  transportCompaniesCreate: (userId, payload) => ipcRenderer.invoke('transport:companies:create', { userId, payload }),
+  transportCompaniesUpdate: (userId, companyId, payload) => ipcRenderer.invoke('transport:companies:update', { userId, companyId, payload }),
+  transportJobsList: (userId) => ipcRenderer.invoke('transport:jobs:list', { userId }),
+  transportJobsCreate: (userId, payload) => ipcRenderer.invoke('transport:jobs:create', { userId, payload }),
+  transportJobsUpdateStatus: (userId, jobId, status) => ipcRenderer.invoke('transport:jobs:updateStatus', { userId, jobId, status }),
+
+  pendingEditsList:   (userId) => ipcRenderer.invoke('pending-edits:list', { userId }),
+  pendingEditsCreate: (userId, payload) => ipcRenderer.invoke('pending-edits:create', { userId, payload }),
+  pendingEditsReview: (userId, pendingId, status, reviewNotes) =>
+    ipcRenderer.invoke('pending-edits:review', { userId, pendingId, status, reviewNotes }),
+
+  dailyUpdate: (userId, logId, payload) => ipcRenderer.invoke('daily:update', { userId, logId, payload }),
+  dailyDelete: (userId, logId) => ipcRenderer.invoke('daily:delete', { userId, logId }),
+  salesUpdate: (userId, orderId, payload) => ipcRenderer.invoke('sales:update', { userId, orderId, payload }),
+  salesDelete: (userId, orderId) => ipcRenderer.invoke('sales:delete', { userId, orderId }),
+  logisticsUpdate: (userId, itemId, payload) => ipcRenderer.invoke('logistics:update', { userId, itemId, payload }),
+  logisticsDelete: (userId, itemId) => ipcRenderer.invoke('logistics:delete', { userId, itemId }),
+  harvestUpdate: (userId, logId, payload) => ipcRenderer.invoke('harvest:update', { userId, logId, payload }),
+  harvestDelete: (userId, logId) => ipcRenderer.invoke('harvest:delete', { userId, logId }),
+  deliveriesUpdate: (userId, orderId, payload) => ipcRenderer.invoke('deliveries:update', { userId, orderId, payload }),
+  deliveriesDelete: (userId, orderId) => ipcRenderer.invoke('deliveries:delete', { userId, orderId }),
+  dispatchDelete: (userId, requestId) => ipcRenderer.invoke('dispatch:delete', { userId, requestId }),
+  transportJobsUpdate: (userId, jobId, payload) => ipcRenderer.invoke('transport:jobs:update', { userId, jobId, payload }),
+  transportJobsDelete: (userId, jobId) => ipcRenderer.invoke('transport:jobs:delete', { userId, jobId }),
+  fuelLogsDelete: (userId, logId) => ipcRenderer.invoke('fuel-logs:delete', { userId, logId }),
+  maintenanceDelete: (userId, recordId) => ipcRenderer.invoke('maintenance:delete', { userId, recordId }),
+  stockMovementsDelete: (userId, movementId) => ipcRenderer.invoke('stock-movements:delete', { userId, movementId }),
+  warehousesDelete: (userId, warehouseId) => ipcRenderer.invoke('warehouses:delete', { userId, warehouseId }),
+  stockItemsDelete: (userId, itemId) => ipcRenderer.invoke('stock-items:delete', { userId, itemId }),
+  vehiclesDelete: (userId, vehicleId) => ipcRenderer.invoke('vehicles:delete', { userId, vehicleId }),
+  transportCompaniesDelete: (userId, companyId) => ipcRenderer.invoke('transport:companies:delete', { userId, companyId }),
+
+  // Machine Management
+  machineCategoriesList:   (userId) => ipcRenderer.invoke('machines:categories:list', { userId }),
+  machineCategoriesCreate: (userId, payload) => ipcRenderer.invoke('machines:categories:create', { userId, payload }),
+  machinesList:   (userId) => ipcRenderer.invoke('machines:list', { userId }),
+  machinesCreate: (userId, payload) => ipcRenderer.invoke('machines:create', { userId, payload }),
+  machinesUpdate: (userId, machineId, payload) => ipcRenderer.invoke('machines:update', { userId, machineId, payload }),
+
+  // Machine Daily Logs
+  machineLogsList:   (userId, machineId, month) => ipcRenderer.invoke('machine-logs:list', { userId, machineId, month }),
+  machineLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-logs:create', { userId, payload }),
+  machineLogsUpdate: (userId, logId, payload) => ipcRenderer.invoke('machine-logs:update', { userId, logId, payload }),
+  machineLogsDelete: (userId, logId) => ipcRenderer.invoke('machine-logs:delete', { userId, logId }),
+
+  // Machine KPI
+  machineKpiDefinitionsList:   (userId) => ipcRenderer.invoke('machine-kpi:definitions:list', { userId }),
+  machineKpiDefinitionsCreate: (userId, payload) => ipcRenderer.invoke('machine-kpi:definitions:create', { userId, payload }),
+  machineKpiTargetsList: (userId, machineId, month) => ipcRenderer.invoke('machine-kpi:targets:list', { userId, machineId, month }),
+  machineKpiTargetsSave: (userId, payload) => ipcRenderer.invoke('machine-kpi:targets:save', { userId, payload }),
+  machineKpiPerformance: (userId, month) => ipcRenderer.invoke('machine-kpi:performance', { userId, month }),
+
+  // Machine Maintenance Schedules
+  machineMaintList:   (userId, machineId) => ipcRenderer.invoke('machine-maint:list', { userId, machineId }),
+  machineMaintCreate: (userId, payload) => ipcRenderer.invoke('machine-maint:create', { userId, payload }),
+  machineMaintUpdate: (userId, schedId, payload) => ipcRenderer.invoke('machine-maint:update', { userId, schedId, payload })
 });
 

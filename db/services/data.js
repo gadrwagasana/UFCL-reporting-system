@@ -52,25 +52,28 @@ function buildStock(st) {
 }
 
 const ROLE_PAGES = {
-  admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes'],
-  ceo: [
-    'dashboard',
-    'weekly-cost',
-    'weekly-perf',
-    'monthly',
-    'kpi',
-    'audit',
-    'export',
-    'users',
-    'notifications',
-    'changes'
-  ],
-  operations: ['dashboard', 'daily', 'products', 'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes'],
-  sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes'],
+  admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
+          'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
+          'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch',
+          'harvest', 'timber-inventory', 'transport',
+          'machines', 'machine-logs', 'machine-kpi'],
+  ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
+        'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
+        'machines', 'machine-kpi'],
+  operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
+               'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
+               'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'transport',
+               'machines', 'machine-logs', 'machine-kpi'],
+  sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
   finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
-  logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes'],
-  supervisor: ['dashboard', 'daily', 'audit', 'export', 'notifications', 'changes'],
-  storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications']
+  logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
+              'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'transport',
+              'machines'],
+  supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
+               'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
+               'machine-logs'],
+  storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
+                'warehouses', 'stock-items', 'stock-movements']
 };
 
 async function getRolePages(role) {
@@ -130,12 +133,25 @@ async function getBootstrap(userId) {
   const { rows: appr } = await pool.query('select approved from monthly_approvals where month_key=$1', ['2024-11']);
   const approved = appr[0]?.approved || false;
   const { rows: roles } = await pool.query('select role, permissions from role_definitions');
+
+  // Expand 'daily' → the 3 sub-type tokens so sidebar items appear for users
+  // whose role_definitions were created before the sub-types existed.
+  function expandPages(pages) {
+    if (!Array.isArray(pages) || !pages.includes('daily')) return pages;
+    const sub = ['daily-timber', 'daily-poles', 'daily-harvest'];
+    const extra = sub.filter(p => !pages.includes(p));
+    return extra.length ? [...pages, ...extra] : pages;
+  }
+
   const rolePages = roles.reduce((acc, row) => {
     const perms = Array.isArray(row.permissions) ? row.permissions : [];
-    acc[row.role] = perms.length ? perms : ROLE_PAGES[row.role] || [];
+    acc[row.role] = expandPages(perms.length ? perms : ROLE_PAGES[row.role] || []);
     return acc;
   }, {});
-  const userPages = Array.isArray(user.user_permissions) && user.user_permissions.length ? user.user_permissions : rolePages[user.role] || [];
+  const rawUserPages = Array.isArray(user.user_permissions) && user.user_permissions.length
+    ? user.user_permissions
+    : rolePages[user.role] || [];
+  const userPages = expandPages(rawUserPages);
   return {
     ok: true,
     user,
@@ -209,8 +225,8 @@ async function dailyCreate(userId, payload) {
   const timberTotal = kilnDried + ccaTreated + untreated || Number(p.timber_units || 0);
   await pool.query(
     `insert into daily_logs(log_date, supervisor, timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
-                            timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+                            timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, product_size, machine, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [
       p.date,
       p.supervisor || user.name,
@@ -224,6 +240,8 @@ async function dailyCreate(userId, payload) {
       Number(p.downtime_hours || 0),
       p.downtime_reason || null,
       p.remarks || null,
+      p.product_size || null,
+      p.machine || null,
       user.id
     ]
   );
@@ -445,7 +463,7 @@ async function productsList(userId, filter) {
   if (f === 'Active')      where += ` and p.active=true`;
 
   const { rows } = await pool.query(
-    `select p.id, p.type, p.sub_type, p.size, p.active, p.reason, p.ref,
+    `select p.id, p.type, p.sub_type, p.size, p.machine, p.active, p.reason, p.ref,
             p.width_mm, p.height_mm, p.length_m, p.diameter_mm,
             u.name as by, to_char(p.created_at,'DD Mon YYYY') as date
      from products p
@@ -466,14 +484,15 @@ async function productsCreate(userId, payload) {
   if (p.type === 'Timber' && !p.sub_type) return { ok: false, error: 'Sub-type is required for timber products' };
   const label = p.type === 'Timber' ? `${p.sub_type} ${p.size}` : `Poles ${p.size}`;
   await pool.query(
-    `insert into products(type, sub_type, size, active, reason, ref, width_mm, height_mm, length_m, diameter_mm, created_by)
-     values ($1,$2,$3,true,$4,$5,$6,$7,$8,$9,$10)`,
+    `insert into products(type, sub_type, size, active, reason, ref, width_mm, height_mm, length_m, diameter_mm, machine, created_by)
+     values ($1,$2,$3,true,$4,$5,$6,$7,$8,$9,$10,$11)`,
     [
       p.type, p.sub_type || null, p.size, p.reason, p.ref || null,
       p.width_mm  ? Number(p.width_mm)  : null,
       p.height_mm ? Number(p.height_mm) : null,
       p.length_m  ? Number(p.length_m)  : null,
       p.diameter_mm ? Number(p.diameter_mm) : null,
+      p.machine || null,
       user.id
     ]
   );
@@ -515,6 +534,31 @@ async function productsToggle(userId, productId, reason) {
     roles: ['operations', 'sales', 'ceo']
   });
   return { ok: true };
+}
+
+async function productsActiveForForm(userId, type) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select id, type, sub_type, size, machine from products
+     where active=true and type=$1
+     order by sub_type, size`,
+    [type]
+  );
+  return { ok: true, rows };
+}
+
+async function machinesForDropdown(userId) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select m.id, m.name, mc.name as category_name
+     from machines m
+     join machine_categories mc on mc.id = m.category_id
+     where m.active = true
+     order by mc.name, m.name`
+  );
+  return { ok: true, rows };
 }
 
 async function logisticsList(userId) {
@@ -1071,6 +1115,1035 @@ async function inventoryList(userId) {
   return { ok: true, rows, lowStockCount };
 }
 
+// ── Warehouses ───────────────────────────────────────────────────────────────
+
+async function warehousesList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'warehouses'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select id, name, location, capacity, notes, active, created_at
+     from warehouses order by name`
+  );
+  return { ok: true, rows };
+}
+
+async function warehousesCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'warehouses'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.name) return { ok: false, error: 'Name is required' };
+  const { rows } = await pool.query(
+    `insert into warehouses(name, location, capacity, notes, active)
+     values ($1,$2,$3,$4,true) returning id`,
+    [p.name, p.location || null, p.capacity ? Number(p.capacity) : null, p.notes || null]
+  );
+  await logAudit(user, `Created warehouse: ${p.name}`, 'ti-building-warehouse', { id: rows[0].id });
+  return { ok: true };
+}
+
+async function warehousesUpdate(userId, warehouseId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'warehouses'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update warehouses set name=$1, location=$2, capacity=$3, notes=$4, active=$5
+     where id=$6`,
+    [p.name, p.location || null, p.capacity ? Number(p.capacity) : null, p.notes || null, p.active !== false, warehouseId]
+  );
+  await logAudit(user, `Updated warehouse #${warehouseId}`, 'ti-building-warehouse', { id: warehouseId });
+  return { ok: true };
+}
+
+// ── Stock Catalog ─────────────────────────────────────────────────────────────
+
+async function stockItemsList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const { rows: items } = await pool.query(
+    `select sc.id, sc.category, sc.name, sc.sku, sc.uom, sc.unit_cost,
+            sc.min_stock, sc.max_stock, sc.notes, sc.active,
+            coalesce(sum(sl.quantity),0)::int as total_stock
+     from stock_catalog sc
+     left join stock_levels sl on sl.item_id=sc.id
+     where sc.active=true
+     group by sc.id
+     order by sc.category, sc.name`
+  );
+  const { rows: wh } = await pool.query(`select id, name from warehouses where active=true order by name`);
+  return { ok: true, rows: items, warehouses: wh };
+}
+
+async function stockItemsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.category || !p.name || !p.uom) return { ok: false, error: 'Category, name, and unit of measure are required' };
+  const { rows } = await pool.query(
+    `insert into stock_catalog(category, name, sku, uom, unit_cost, min_stock, max_stock, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
+    [p.category, p.name, p.sku || null, p.uom, Number(p.unit_cost || 0),
+     Number(p.min_stock || 0), p.max_stock ? Number(p.max_stock) : null,
+     p.notes || null, user.id]
+  );
+  await logAudit(user, `Added stock item: ${p.name}`, 'ti-package', { id: rows[0].id, category: p.category });
+  return { ok: true };
+}
+
+async function stockItemsUpdate(userId, itemId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update stock_catalog
+     set category=$1, name=$2, sku=$3, uom=$4, unit_cost=$5,
+         min_stock=$6, max_stock=$7, notes=$8, active=$9
+     where id=$10`,
+    [p.category, p.name, p.sku || null, p.uom, Number(p.unit_cost || 0),
+     Number(p.min_stock || 0), p.max_stock ? Number(p.max_stock) : null,
+     p.notes || null, p.active !== false, itemId]
+  );
+  await logAudit(user, `Updated stock item #${itemId}`, 'ti-package', { id: itemId });
+  return { ok: true };
+}
+
+// ── Stock Movements ───────────────────────────────────────────────────────────
+
+async function stockMovementsList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-movements'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select sm.id, sc.name as item_name, sc.category, sc.uom,
+            w.name as warehouse_name, tw.name as to_warehouse_name,
+            sm.movement_type, sm.quantity, sm.reference, sm.notes,
+            to_char(sm.created_at,'DD/MM/YYYY HH24:MI') as created_at,
+            u.name as created_by
+     from stock_movements sm
+     join stock_catalog sc on sc.id=sm.item_id
+     left join warehouses w on w.id=sm.warehouse_id
+     left join warehouses tw on tw.id=sm.to_warehouse_id
+     left join app_users u on u.id=sm.created_by
+     order by sm.created_at desc
+     limit 100`
+  );
+  const { rows: items } = await pool.query(
+    `select sc.id, sc.name, sc.category, sc.uom,
+            coalesce(sum(sl.quantity),0)::int as total_stock
+     from stock_catalog sc
+     left join stock_levels sl on sl.item_id=sc.id
+     where sc.active=true group by sc.id order by sc.category, sc.name`
+  );
+  const { rows: wh } = await pool.query(`select id, name from warehouses where active=true order by name`);
+  return { ok: true, rows, items, warehouses: wh };
+}
+
+async function stockMovementsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-movements'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.item_id || !p.movement_type || !p.quantity) return { ok: false, error: 'Item, movement type, and quantity are required' };
+  const qty = Number(p.quantity);
+  if (qty <= 0) return { ok: false, error: 'Quantity must be greater than zero' };
+
+  const validTypes = ['in', 'out', 'adjustment', 'transfer', 'return'];
+  if (!validTypes.includes(p.movement_type)) return { ok: false, error: 'Invalid movement type' };
+
+  await pool.query(
+    `insert into stock_movements(item_id, warehouse_id, to_warehouse_id, movement_type, quantity, reference, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [p.item_id, p.warehouse_id || null, p.to_warehouse_id || null,
+     p.movement_type, qty, p.reference || null, p.notes || null, user.id]
+  );
+
+  // Update stock_levels
+  if (p.warehouse_id) {
+    const delta = ['in', 'return'].includes(p.movement_type) ? qty : ['out'].includes(p.movement_type) ? -qty : 0;
+    if (p.movement_type === 'adjustment') {
+      await pool.query(
+        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at)
+         values ($1,$2,$3,now())
+         on conflict(item_id, warehouse_id) do update set quantity=$3, updated_at=now()`,
+        [p.item_id, p.warehouse_id, qty]
+      );
+    } else if (delta !== 0) {
+      await pool.query(
+        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at)
+         values ($1,$2,$3,now())
+         on conflict(item_id, warehouse_id) do update
+         set quantity=greatest(0, stock_levels.quantity+$3), updated_at=now()`,
+        [p.item_id, p.warehouse_id, delta]
+      );
+    }
+    if (p.movement_type === 'transfer' && p.to_warehouse_id) {
+      await pool.query(
+        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at)
+         values ($1,$2,$3,now())
+         on conflict(item_id, warehouse_id) do update
+         set quantity=greatest(0, stock_levels.quantity-$3), updated_at=now()`,
+        [p.item_id, p.warehouse_id, qty]
+      );
+      await pool.query(
+        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at)
+         values ($1,$2,$3,now())
+         on conflict(item_id, warehouse_id) do update
+         set quantity=stock_levels.quantity+$3, updated_at=now()`,
+        [p.item_id, p.to_warehouse_id, qty]
+      );
+    }
+  }
+
+  await logAudit(user, `Stock ${p.movement_type}: item #${p.item_id} qty ${qty}`, 'ti-arrows-exchange', { ...p });
+  return { ok: true };
+}
+
+// ── Vehicles ──────────────────────────────────────────────────────────────────
+
+async function vehiclesList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select v.id, v.registration, v.make, v.model, v.vehicle_type, v.status,
+            v.fuel_type, v.insurance_expiry, v.notes,
+            coalesce(sum(fl.total_cost),0)::numeric as total_fuel_cost,
+            coalesce(sum(fl.liters),0)::numeric as total_liters,
+            (select count(*)::int from maintenance_records mr where mr.vehicle_id=v.id) as maintenance_count
+     from vehicles v
+     left join fuel_logs fl on fl.vehicle_id=v.id
+     group by v.id
+     order by v.registration`
+  );
+  return { ok: true, rows };
+}
+
+async function vehiclesCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.registration) return { ok: false, error: 'Registration number is required' };
+  const { rows } = await pool.query(
+    `insert into vehicles(registration, make, model, vehicle_type, status, fuel_type, insurance_expiry, notes)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
+    [p.registration, p.make || null, p.model || null, p.vehicle_type || null,
+     p.status || 'Active', p.fuel_type || null,
+     p.insurance_expiry || null, p.notes || null]
+  );
+  await logAudit(user, `Registered vehicle: ${p.registration}`, 'ti-truck', { id: rows[0].id });
+  return { ok: true };
+}
+
+async function vehiclesUpdate(userId, vehicleId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update vehicles set registration=$1, make=$2, model=$3, vehicle_type=$4,
+     status=$5, fuel_type=$6, insurance_expiry=$7, notes=$8
+     where id=$9`,
+    [p.registration, p.make || null, p.model || null, p.vehicle_type || null,
+     p.status || 'Active', p.fuel_type || null,
+     p.insurance_expiry || null, p.notes || null, vehicleId]
+  );
+  await logAudit(user, `Updated vehicle #${vehicleId}`, 'ti-truck', { id: vehicleId });
+  return { ok: true };
+}
+
+async function fuelLogsList(userId, vehicleId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select fl.id, v.registration, fl.liters, fl.cost_per_liter, fl.total_cost,
+            fl.odometer, to_char(fl.log_date,'DD/MM/YYYY') as log_date, fl.notes,
+            u.name as logged_by
+     from fuel_logs fl
+     join vehicles v on v.id=fl.vehicle_id
+     left join app_users u on u.id=fl.logged_by
+     where fl.vehicle_id=$1
+     order by fl.log_date desc`,
+    [vehicleId]
+  );
+  return { ok: true, rows };
+}
+
+async function fuelLogsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.vehicle_id || !p.liters || !p.log_date) return { ok: false, error: 'Vehicle, liters, and date are required' };
+  const liters = Number(p.liters);
+  const costPerLiter = Number(p.cost_per_liter || 0);
+  const totalCost = p.total_cost ? Number(p.total_cost) : liters * costPerLiter;
+  await pool.query(
+    `insert into fuel_logs(vehicle_id, liters, cost_per_liter, total_cost, odometer, log_date, logged_by, notes)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [p.vehicle_id, liters, costPerLiter || null, totalCost || null,
+     p.odometer ? Number(p.odometer) : null, p.log_date, user.id, p.notes || null]
+  );
+  await logAudit(user, `Fuel log for vehicle #${p.vehicle_id}: ${liters}L`, 'ti-gas-station', { vehicle_id: p.vehicle_id, liters });
+  return { ok: true };
+}
+
+async function maintenanceList(userId, vehicleId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select mr.id, v.registration, mr.maintenance_type, mr.description,
+            mr.cost, to_char(mr.maintenance_date,'DD/MM/YYYY') as maintenance_date,
+            to_char(mr.next_due_date,'DD/MM/YYYY') as next_due_date,
+            mr.performed_by, mr.notes
+     from maintenance_records mr
+     join vehicles v on v.id=mr.vehicle_id
+     where mr.vehicle_id=$1
+     order by mr.maintenance_date desc`,
+    [vehicleId]
+  );
+  return { ok: true, rows };
+}
+
+async function maintenanceCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.vehicle_id || !p.maintenance_type || !p.description || !p.maintenance_date)
+    return { ok: false, error: 'Vehicle, type, description, and date are required' };
+  await pool.query(
+    `insert into maintenance_records(vehicle_id, maintenance_type, description, cost, maintenance_date, next_due_date, performed_by, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [p.vehicle_id, p.maintenance_type, p.description, p.cost ? Number(p.cost) : null,
+     p.maintenance_date, p.next_due_date || null, p.performed_by || null, p.notes || null, user.id]
+  );
+  await logAudit(user, `Maintenance record for vehicle #${p.vehicle_id}`, 'ti-tool', { vehicle_id: p.vehicle_id, type: p.maintenance_type });
+  return { ok: true };
+}
+
+// ── Delivery Orders ───────────────────────────────────────────────────────────
+
+async function deliveryOrdersList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select do2.id, do2.order_number, do2.driver_name,
+            do2.status, do2.route, do2.notes,
+            to_char(do2.delivery_date,'DD/MM/YYYY') as delivery_date,
+            to_char(do2.created_at,'DD/MM/YYYY') as created_at,
+            v.registration as vehicle_registration,
+            so.order_number as sales_order_number,
+            so.customer_name,
+            u.name as created_by
+     from delivery_orders do2
+     left join vehicles v on v.id=do2.vehicle_id
+     left join sales_orders so on so.id=do2.sales_order_id
+     left join app_users u on u.id=do2.created_by
+     order by do2.created_at desc
+     limit 100`
+  );
+  const { rows: vehicles } = await pool.query(
+    `select id, registration, make, model from vehicles where status='Active' order by registration`
+  );
+  const { rows: salesOrders } = await pool.query(
+    `select id, order_number, customer_name from sales_orders where status in ('Confirmed') order by created_at desc limit 50`
+  );
+  return { ok: true, rows, vehicles, salesOrders };
+}
+
+async function deliveryOrdersCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.driver_name) return { ok: false, error: 'Driver name is required' };
+  const ts = Date.now().toString(36).toUpperCase();
+  const orderNum = `DEL-${ts}`;
+  const { rows } = await pool.query(
+    `insert into delivery_orders(order_number, sales_order_id, vehicle_id, driver_name, delivery_date, status, route, notes, created_by)
+     values ($1,$2,$3,$4,$5,'Pending',$6,$7,$8) returning id`,
+    [orderNum, p.sales_order_id || null, p.vehicle_id || null, p.driver_name,
+     p.delivery_date || null, p.route || null, p.notes || null, user.id]
+  );
+  await logAudit(user, `Created delivery order ${orderNum}`, 'ti-truck-delivery', { id: rows[0].id });
+  return { ok: true };
+}
+
+async function deliveryOrdersUpdateStatus(userId, orderId, status) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const valid = ['Pending', 'Assigned', 'In Transit', 'Delivered', 'Failed'];
+  if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
+  await pool.query('update delivery_orders set status=$1 where id=$2', [status, orderId]);
+  await logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
+  return { ok: true };
+}
+
+// ── Dispatch ──────────────────────────────────────────────────────────────────
+
+async function dispatchList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'dispatch'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select dr.id, dr.request_number, dr.status, dr.notes,
+            to_char(dr.created_at,'DD/MM/YYYY HH24:MI') as created_at,
+            to_char(dr.approved_at,'DD/MM/YYYY HH24:MI') as approved_at,
+            do2.order_number as delivery_order_number,
+            do2.driver_name, do2.route,
+            v.registration as vehicle_registration,
+            u.name as created_by,
+            au.name as approved_by
+     from dispatch_requests dr
+     left join delivery_orders do2 on do2.id=dr.delivery_order_id
+     left join vehicles v on v.id=do2.vehicle_id
+     left join app_users u on u.id=dr.created_by
+     left join app_users au on au.id=dr.approved_by
+     order by dr.created_at desc
+     limit 100`
+  );
+  const { rows: pendingDeliveries } = await pool.query(
+    `select id, order_number, driver_name from delivery_orders where status='Assigned' order by created_at desc`
+  );
+  return { ok: true, rows, pendingDeliveries };
+}
+
+async function dispatchCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'dispatch'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.delivery_order_id) return { ok: false, error: 'Delivery order is required' };
+  const ts = Date.now().toString(36).toUpperCase();
+  const reqNum = `DSP-${ts}`;
+  await pool.query(
+    `insert into dispatch_requests(request_number, delivery_order_id, status, notes, created_by)
+     values ($1,$2,'Pending',$3,$4)`,
+    [reqNum, p.delivery_order_id, p.notes || null, user.id]
+  );
+  await logAudit(user, `Created dispatch request ${reqNum}`, 'ti-send', { delivery_order_id: p.delivery_order_id });
+  return { ok: true };
+}
+
+async function dispatchReview(userId, requestId, status, notes) {
+  const user = await getUser(userId);
+  if (!['admin', 'ceo', 'logistics', 'operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const valid = ['Approved', 'Rejected', 'Dispatched'];
+  if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
+  await pool.query(
+    `update dispatch_requests set status=$1, notes=coalesce($2,notes), approved_by=$3, approved_at=now()
+     where id=$4`,
+    [status, notes || null, user.id, requestId]
+  );
+  if (status === 'Dispatched') {
+    await pool.query(
+      `update delivery_orders set status='In Transit'
+       where id=(select delivery_order_id from dispatch_requests where id=$1)`,
+      [requestId]
+    );
+  }
+  await logAudit(user, `Dispatch request #${requestId} ${status}`, 'ti-send', { requestId, status });
+  return { ok: true };
+}
+
+// ── Harvest ───────────────────────────────────────────────────────────────────
+
+async function harvestList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select hl.id, hl.location, hl.species, hl.quantity, hl.uom, hl.notes,
+            to_char(hl.harvest_date,'DD/MM/YYYY') as harvest_date,
+            to_char(hl.created_at,'DD/MM/YYYY') as created_at,
+            u.name as logged_by
+     from harvest_logs hl
+     left join app_users u on u.id=hl.logged_by
+     order by hl.harvest_date desc
+     limit 100`
+  );
+  const summary = {};
+  for (const r of rows) {
+    if (!summary[r.species]) summary[r.species] = 0;
+    summary[r.species] += Number(r.quantity);
+  }
+  return { ok: true, rows, summary };
+}
+
+async function harvestCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.location || !p.species || !p.harvest_date || !p.quantity)
+    return { ok: false, error: 'Location, species, date, and quantity are required' };
+  await pool.query(
+    `insert into harvest_logs(location, species, harvest_date, quantity, uom, notes, logged_by)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [p.location, p.species, p.harvest_date, Number(p.quantity),
+     p.uom || 'units', p.notes || null, user.id]
+  );
+  await logAudit(user, `Harvest logged: ${p.species} at ${p.location}`, 'ti-tree', { ...p });
+  return { ok: true };
+}
+
+// ── Timber Inventory ──────────────────────────────────────────────────────────
+
+async function timberInventoryList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'timber-inventory'))) return { ok: false, error: 'Access denied' };
+
+  const [{ rows: stockRows }, { rows: logs7 }, { rows: harvestRows }] = await Promise.all([
+    pool.query(STOCK_SQL),
+    pool.query(
+      `select to_char(log_date,'DD Mon YYYY') as date,
+              timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
+              timber_waste, poles_units, poles_waste, downtime_hours, supervisor
+       from daily_logs order by log_date desc limit 7`
+    ),
+    pool.query(
+      `select species, coalesce(sum(quantity),0)::int as total,
+              count(*)::int as harvests
+       from harvest_logs group by species order by total desc`
+    )
+  ]);
+
+  const stock = buildStock(stockRows[0] || {});
+  const wasteRate = stock.timberProduced > 0
+    ? ((await pool.query(`select coalesce(sum(timber_waste),0)::int as w from daily_logs`)).rows[0].w / stock.timberProduced * 100).toFixed(1)
+    : '0.0';
+
+  return { ok: true, stock, logs7, harvestSummary: harvestRows, wasteRate };
+}
+
+async function dailyHarvestData(userId) {
+  const user = await getUser(userId);
+  const userPerms = Array.isArray(user.user_permissions) && user.user_permissions.length
+    ? user.user_permissions
+    : await getRolePages(user.role);
+  if (!userPerms.includes('daily-harvest') && !userPerms.includes('harvest') && !userPerms.includes('daily'))
+    return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select hl.id, hl.location, hl.species, hl.quantity, hl.uom, hl.notes,
+            to_char(hl.harvest_date,'DD/MM/YYYY') as harvest_date,
+            to_char(hl.created_at,'DD/MM/YYYY') as created_at,
+            u.name as logged_by
+     from harvest_logs hl
+     left join app_users u on u.id=hl.logged_by
+     order by hl.harvest_date desc
+     limit 100`
+  );
+  const summary = {};
+  for (const r of rows) {
+    if (!summary[r.species]) summary[r.species] = 0;
+    summary[r.species] += Number(r.quantity);
+  }
+  return { ok: true, rows, summary };
+}
+
+// ── Supervisor Pending-Edit Approvals ────────────────────────────────────────
+
+const APPROVAL_MANAGERS = ['admin', 'ceo', 'operations', 'logistics'];
+
+async function pendingEditsList(userId) {
+  const user = await getUser(userId);
+  const { rows } = await pool.query(
+    `select pe.id, pe.action_type, pe.entity_type, pe.entity_id, pe.entity_ref,
+            pe.payload, pe.status, pe.review_notes,
+            to_char(pe.submitted_at,'DD/MM/YYYY HH24:MI') as submitted_at,
+            to_char(pe.reviewed_at,'DD/MM/YYYY HH24:MI') as reviewed_at,
+            su.name as submitted_by_name,
+            ru.name as reviewed_by_name
+     from pending_edits pe
+     left join app_users su on su.id=pe.submitted_by
+     left join app_users ru on ru.id=pe.reviewed_by
+     order by pe.submitted_at desc
+     limit 200`
+  );
+  return { ok: true, rows };
+}
+
+async function pendingEditsCreate(userId, payload) {
+  const user = await getUser(userId);
+  const p = payload || {};
+  if (!p.entity_type || !p.entity_id || !p.action_type)
+    return { ok: false, error: 'Missing required fields' };
+  await pool.query(
+    `insert into pending_edits(action_type, entity_type, entity_id, entity_ref, payload, submitted_by)
+     values ($1,$2,$3,$4,$5,$6)`,
+    [p.action_type, p.entity_type, p.entity_id, p.entity_ref || null,
+     p.payload ? JSON.stringify(p.payload) : null, user.id]
+  );
+  await logAudit(user,
+    `Submitted ${p.action_type} request for ${p.entity_type} #${p.entity_id}`,
+    'ti-send', { entity_type: p.entity_type, entity_id: p.entity_id }
+  );
+  return { ok: true };
+}
+
+async function pendingEditsReview(userId, pendingId, status, reviewNotes) {
+  const user = await getUser(userId);
+  if (!APPROVAL_MANAGERS.includes(user.role))
+    return { ok: false, error: 'Only managers can review pending requests' };
+
+  const { rows } = await pool.query('select * from pending_edits where id=$1', [pendingId]);
+  if (!rows.length) return { ok: false, error: 'Request not found' };
+  const pe = rows[0];
+  if (pe.status !== 'Pending') return { ok: false, error: 'Already reviewed' };
+
+  if (status === 'Approved') {
+    try {
+      await applyPendingEdit(pe);
+    } catch (e) {
+      return { ok: false, error: `Could not apply change: ${e.message}` };
+    }
+  }
+
+  await pool.query(
+    `update pending_edits
+     set status=$1, review_notes=$2, reviewed_by=$3, reviewed_at=now()
+     where id=$4`,
+    [status, reviewNotes || null, user.id, pendingId]
+  );
+  await logAudit(user,
+    `${status} ${pe.action_type} request for ${pe.entity_type} #${pe.entity_id}`,
+    status === 'Approved' ? 'ti-circle-check' : 'ti-circle-x',
+    { pendingId, entity_type: pe.entity_type, entity_id: pe.entity_id }
+  );
+  return { ok: true };
+}
+
+async function applyPendingEdit(pe) {
+  const p = pe.payload || {};
+
+  if (pe.action_type === 'delete') {
+    const tableMap = {
+      daily_log:      'daily_logs',
+      harvest_log:    'harvest_logs',
+      logistics_item: 'logistics_items'
+    };
+    const tbl = tableMap[pe.entity_type];
+    if (!tbl) throw new Error(`Unknown entity type: ${pe.entity_type}`);
+    await pool.query(`delete from ${tbl} where id=$1`, [pe.entity_id]);
+    return;
+  }
+
+  switch (pe.entity_type) {
+    case 'daily_log': {
+      const kd  = Number(p.timber_kiln_dried  || 0);
+      const cca = Number(p.timber_cca_treated || 0);
+      const unt = Number(p.timber_untreated   || 0);
+      const tot = kd + cca + unt || Number(p.timber_units || 0);
+      await pool.query(
+        `update daily_logs
+         set log_date=$1, supervisor=$2, timber_units=$3,
+             timber_kiln_dried=$4, timber_cca_treated=$5, timber_untreated=$6,
+             timber_waste=$7, poles_units=$8, poles_waste=$9,
+             downtime_hours=$10, downtime_reason=$11, remarks=$12
+         where id=$13`,
+        [p.date, p.supervisor, tot, kd, cca, unt,
+         Number(p.timber_waste || 0), Number(p.poles_units || 0), Number(p.poles_waste || 0),
+         Number(p.downtime_hours || 0), p.downtime_reason || null, p.remarks || null,
+         pe.entity_id]
+      );
+      break;
+    }
+    case 'harvest_log':
+      await pool.query(
+        `update harvest_logs
+         set location=$1, species=$2, harvest_date=$3, quantity=$4, uom=$5, notes=$6
+         where id=$7`,
+        [p.location, p.species, p.harvest_date, Number(p.quantity),
+         p.uom || 'units', p.notes || null, pe.entity_id]
+      );
+      break;
+    case 'logistics_item':
+      await pool.query(
+        `update logistics_items
+         set category=$1, name=$2, sku=$3, uom=$4, unit_cost=$5, stock=$6, min_stock=$7
+         where id=$8`,
+        [p.category, p.name, p.sku || null, p.uom,
+         Number(p.unit_cost || 0), Number(p.stock || 0), Number(p.min_stock || 0),
+         pe.entity_id]
+      );
+      break;
+    default:
+      throw new Error(`No apply handler for entity type: ${pe.entity_type}`);
+  }
+}
+
+// ── Edit / Delete ─────────────────────────────────────────────────────────────
+
+async function dailyUpdate(userId, logId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.date) return { ok: false, error: 'Date is required' };
+  const kd = Number(p.timber_kiln_dried || 0);
+  const cca = Number(p.timber_cca_treated || 0);
+  const unt = Number(p.timber_untreated || 0);
+  const total = kd + cca + unt || Number(p.timber_units || 0);
+  await pool.query(
+    `update daily_logs set log_date=$1, supervisor=$2, timber_units=$3,
+     timber_kiln_dried=$4, timber_cca_treated=$5, timber_untreated=$6,
+     timber_waste=$7, poles_units=$8, poles_waste=$9,
+     downtime_hours=$10, downtime_reason=$11, remarks=$12, product_size=$13, machine=$14
+     where id=$15`,
+    [p.date, p.supervisor || user.name, total, kd, cca, unt,
+     Number(p.timber_waste || 0), Number(p.poles_units || 0), Number(p.poles_waste || 0),
+     Number(p.downtime_hours || 0), p.downtime_reason || null, p.remarks || null,
+     p.product_size || null, p.machine || null, logId]
+  );
+  await logAudit(user, `Updated daily log #${logId}`, 'ti-edit', { logId, date: p.date });
+  return { ok: true };
+}
+
+async function dailyDelete(userId, logId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select log_date from daily_logs where id=$1', [logId]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query('delete from daily_logs where id=$1', [logId]);
+  await logAudit(user, `Deleted daily log #${logId} (${rows[0].log_date})`, 'ti-trash', { logId });
+  return { ok: true };
+}
+
+async function salesUpdate(userId, orderId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.customer_name || !p.product_type) return { ok: false, error: 'Customer and product type are required' };
+  await pool.query(
+    `update sales_orders
+     set order_number=$1, customer_name=$2, product_type=$3, product_sub_type=$4,
+         product_size=$5, quantity=$6, unit_price=$7, notes=$8
+     where id=$9`,
+    [p.order_number, p.customer_name, p.product_type, p.product_sub_type || null,
+     p.product_size, Number(p.quantity), Number(p.unit_price), p.notes || null, orderId]
+  );
+  await logAudit(user, `Updated sales order #${orderId}`, 'ti-edit', { orderId });
+  return { ok: true };
+}
+
+async function salesDelete(userId, orderId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select order_number from sales_orders where id=$1', [orderId]);
+  if (!rows.length) return { ok: false, error: 'Order not found' };
+  await pool.query('delete from sales_orders where id=$1', [orderId]);
+  await logAudit(user, `Deleted sales order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  return { ok: true };
+}
+
+async function logisticsUpdate(userId, itemId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'logistics'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update logistics_items
+     set category=$1, name=$2, sku=$3, uom=$4, unit_cost=$5, stock=$6, min_stock=$7
+     where id=$8`,
+    [p.category, p.name, p.sku || null, p.uom,
+     Number(p.unit_cost || 0), Number(p.stock || 0), Number(p.min_stock || 0), itemId]
+  );
+  await logAudit(user, `Updated logistics item #${itemId}`, 'ti-edit', { itemId });
+  return { ok: true };
+}
+
+async function logisticsDelete(userId, itemId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'logistics'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select name from logistics_items where id=$1', [itemId]);
+  if (!rows.length) return { ok: false, error: 'Item not found' };
+  await pool.query('delete from logistics_items where id=$1', [itemId]);
+  await logAudit(user, `Deleted logistics item: ${rows[0].name}`, 'ti-trash', { itemId });
+  return { ok: true };
+}
+
+async function harvestUpdate(userId, logId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.location || !p.species || !p.harvest_date || !p.quantity)
+    return { ok: false, error: 'Location, species, date, and quantity are required' };
+  await pool.query(
+    `update harvest_logs set location=$1, species=$2, harvest_date=$3, quantity=$4, uom=$5, notes=$6
+     where id=$7`,
+    [p.location, p.species, p.harvest_date, Number(p.quantity), p.uom || 'units', p.notes || null, logId]
+  );
+  await logAudit(user, `Updated harvest log #${logId}`, 'ti-edit', { logId });
+  return { ok: true };
+}
+
+async function harvestDelete(userId, logId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from harvest_logs where id=$1', [logId]);
+  await logAudit(user, `Deleted harvest log #${logId}`, 'ti-trash', { logId });
+  return { ok: true };
+}
+
+async function deliveryOrdersUpdate(userId, orderId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update delivery_orders set vehicle_id=$1, driver_name=$2, delivery_date=$3, route=$4, notes=$5
+     where id=$6`,
+    [p.vehicle_id || null, p.driver_name, p.delivery_date || null, p.route || null, p.notes || null, orderId]
+  );
+  await logAudit(user, `Updated delivery order #${orderId}`, 'ti-edit', { orderId });
+  return { ok: true };
+}
+
+async function deliveryOrdersDelete(userId, orderId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select order_number from delivery_orders where id=$1', [orderId]);
+  if (!rows.length) return { ok: false, error: 'Delivery order not found' };
+  await pool.query('delete from dispatch_requests where delivery_order_id=$1', [orderId]);
+  await pool.query('delete from delivery_orders where id=$1', [orderId]);
+  await logAudit(user, `Deleted delivery order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  return { ok: true };
+}
+
+async function dispatchDelete(userId, requestId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'dispatch'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from dispatch_requests where id=$1', [requestId]);
+  await logAudit(user, `Deleted dispatch request #${requestId}`, 'ti-trash', { requestId });
+  return { ok: true };
+}
+
+async function transportJobsUpdate(userId, jobId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update transport_jobs
+     set transport_company_id=$1, sales_order_id=$2, job_type=$3,
+         origin=$4, destination=$5, job_date=$6, quantity=$7,
+         uom=$8, cost=$9, waybill_ref=$10, notes=$11
+     where id=$12`,
+    [p.transport_company_id, p.sales_order_id || null, p.job_type || 'Delivery',
+     p.origin || null, p.destination || null, p.job_date,
+     p.quantity ? Number(p.quantity) : null, p.uom || null,
+     p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, jobId]
+  );
+  await logAudit(user, `Updated transport job #${jobId}`, 'ti-edit', { jobId });
+  return { ok: true };
+}
+
+async function transportJobsDelete(userId, jobId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from transport_jobs where id=$1', [jobId]);
+  await logAudit(user, `Deleted transport job #${jobId}`, 'ti-trash', { jobId });
+  return { ok: true };
+}
+
+async function fuelLogsDelete(userId, logId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from fuel_logs where id=$1', [logId]);
+  await logAudit(user, `Deleted fuel log #${logId}`, 'ti-trash', { logId });
+  return { ok: true };
+}
+
+async function maintenanceDelete(userId, recordId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from maintenance_records where id=$1', [recordId]);
+  await logAudit(user, `Deleted maintenance record #${recordId}`, 'ti-trash', { recordId });
+  return { ok: true };
+}
+
+async function stockMovementsDelete(userId, movementId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-movements'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    'select item_id, warehouse_id, to_warehouse_id, movement_type, quantity from stock_movements where id=$1',
+    [movementId]
+  );
+  if (!rows.length) return { ok: false, error: 'Movement not found' };
+  const { item_id, warehouse_id, to_warehouse_id, movement_type, quantity } = rows[0];
+  // Reverse the stock level effect
+  if (warehouse_id) {
+    if (['in', 'return'].includes(movement_type)) {
+      await pool.query(
+        `update stock_levels set quantity=greatest(0,quantity-$1), updated_at=now()
+         where item_id=$2 and warehouse_id=$3`,
+        [quantity, item_id, warehouse_id]
+      );
+    } else if (movement_type === 'out') {
+      await pool.query(
+        `update stock_levels set quantity=quantity+$1, updated_at=now()
+         where item_id=$2 and warehouse_id=$3`,
+        [quantity, item_id, warehouse_id]
+      );
+    } else if (movement_type === 'transfer' && to_warehouse_id) {
+      await pool.query(
+        `update stock_levels set quantity=quantity+$1, updated_at=now() where item_id=$2 and warehouse_id=$3`,
+        [quantity, item_id, warehouse_id]
+      );
+      await pool.query(
+        `update stock_levels set quantity=greatest(0,quantity-$1), updated_at=now() where item_id=$2 and warehouse_id=$3`,
+        [quantity, item_id, to_warehouse_id]
+      );
+    }
+  }
+  await pool.query('delete from stock_movements where id=$1', [movementId]);
+  await logAudit(user, `Deleted stock movement #${movementId} (${movement_type})`, 'ti-trash', { movementId });
+  return { ok: true };
+}
+
+async function warehousesDelete(userId, warehouseId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'warehouses'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select name from warehouses where id=$1', [warehouseId]);
+  if (!rows.length) return { ok: false, error: 'Warehouse not found' };
+  await pool.query('delete from stock_levels where warehouse_id=$1', [warehouseId]);
+  await pool.query('delete from warehouses where id=$1', [warehouseId]);
+  await logAudit(user, `Deleted warehouse: ${rows[0].name}`, 'ti-trash', { warehouseId });
+  return { ok: true };
+}
+
+async function stockItemsDelete(userId, itemId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select name from stock_catalog where id=$1', [itemId]);
+  if (!rows.length) return { ok: false, error: 'Item not found' };
+  await pool.query('delete from stock_levels where item_id=$1', [itemId]);
+  await pool.query('delete from stock_movements where item_id=$1', [itemId]);
+  await pool.query('delete from stock_catalog where id=$1', [itemId]);
+  await logAudit(user, `Deleted stock item: ${rows[0].name}`, 'ti-trash', { itemId });
+  return { ok: true };
+}
+
+async function vehiclesDelete(userId, vehicleId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select registration from vehicles where id=$1', [vehicleId]);
+  if (!rows.length) return { ok: false, error: 'Vehicle not found' };
+  await pool.query('delete from fuel_logs where vehicle_id=$1', [vehicleId]);
+  await pool.query('delete from maintenance_records where vehicle_id=$1', [vehicleId]);
+  await pool.query('update delivery_orders set vehicle_id=null where vehicle_id=$1', [vehicleId]);
+  await pool.query('delete from vehicles where id=$1', [vehicleId]);
+  await logAudit(user, `Deleted vehicle: ${rows[0].registration}`, 'ti-trash', { vehicleId });
+  return { ok: true };
+}
+
+async function transportCompaniesDelete(userId, companyId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select name from transport_companies where id=$1', [companyId]);
+  if (!rows.length) return { ok: false, error: 'Company not found' };
+  const { rows: jobRows } = await pool.query('select count(*)::int as n from transport_jobs where transport_company_id=$1', [companyId]);
+  if (jobRows[0].n > 0) return { ok: false, error: `Cannot delete — ${jobRows[0].n} job(s) recorded for this company. Deactivate it instead.` };
+  await pool.query('delete from transport_companies where id=$1', [companyId]);
+  await logAudit(user, `Deleted transport company: ${rows[0].name}`, 'ti-trash', { companyId });
+  return { ok: true };
+}
+
+// ── Third-Party Transport ─────────────────────────────────────────────────────
+
+async function transportCompaniesList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select id, name, contact_person, phone, email, rate_per_km, notes, active,
+            (select count(*)::int from transport_jobs tj where tj.transport_company_id=tc.id) as job_count,
+            (select coalesce(sum(tj.cost),0)::numeric from transport_jobs tj where tj.transport_company_id=tc.id) as total_cost
+     from transport_companies tc
+     order by name`
+  );
+  return { ok: true, rows };
+}
+
+async function transportCompaniesCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.name) return { ok: false, error: 'Company name is required' };
+  const { rows } = await pool.query(
+    `insert into transport_companies(name, contact_person, phone, email, rate_per_km, notes, active)
+     values ($1,$2,$3,$4,$5,$6,true) returning id`,
+    [p.name, p.contact_person || null, p.phone || null, p.email || null,
+     p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null]
+  );
+  await logAudit(user, `Added transport company: ${p.name}`, 'ti-building', { id: rows[0].id });
+  return { ok: true };
+}
+
+async function transportCompaniesUpdate(userId, companyId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  await pool.query(
+    `update transport_companies
+     set name=$1, contact_person=$2, phone=$3, email=$4, rate_per_km=$5, notes=$6, active=$7
+     where id=$8`,
+    [p.name, p.contact_person || null, p.phone || null, p.email || null,
+     p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null, p.active !== false, companyId]
+  );
+  await logAudit(user, `Updated transport company #${companyId}`, 'ti-building', { id: companyId });
+  return { ok: true };
+}
+
+async function transportJobsList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select tj.id, tj.job_number, tj.job_type, tj.origin, tj.destination,
+            tj.quantity, tj.uom, tj.cost, tj.waybill_ref, tj.status, tj.notes,
+            to_char(tj.job_date,'DD/MM/YYYY') as job_date,
+            to_char(tj.created_at,'DD/MM/YYYY') as created_at,
+            tc.name as company_name, tc.phone as company_phone,
+            so.order_number as sales_order_number, so.customer_name,
+            do2.order_number as delivery_order_number,
+            u.name as created_by
+     from transport_jobs tj
+     join transport_companies tc on tc.id=tj.transport_company_id
+     left join sales_orders so on so.id=tj.sales_order_id
+     left join delivery_orders do2 on do2.id=tj.delivery_order_id
+     left join app_users u on u.id=tj.created_by
+     order by tj.created_at desc
+     limit 100`
+  );
+  const { rows: companies } = await pool.query(
+    `select id, name, phone from transport_companies where active=true order by name`
+  );
+  const { rows: salesOrders } = await pool.query(
+    `select id, order_number, customer_name, product_type, product_size, quantity
+     from sales_orders
+     where status in ('Confirmed','Pending')
+     order by created_at desc limit 50`
+  );
+  return { ok: true, rows, companies, salesOrders };
+}
+
+async function transportJobsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.transport_company_id || !p.job_date)
+    return { ok: false, error: 'Transport company and job date are required' };
+  const ts = Date.now().toString(36).toUpperCase();
+  const jobNum = `TRN-${ts}`;
+  await pool.query(
+    `insert into transport_jobs(job_number, transport_company_id, sales_order_id, delivery_order_id,
+      job_type, origin, destination, job_date, quantity, uom, cost, waybill_ref, status, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Scheduled',$13,$14)`,
+    [jobNum, p.transport_company_id, p.sales_order_id || null, p.delivery_order_id || null,
+     p.job_type || 'Delivery', p.origin || null, p.destination || null, p.job_date,
+     p.quantity ? Number(p.quantity) : null, p.uom || null,
+     p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, user.id]
+  );
+  await logAudit(user, `Created transport job ${jobNum}`, 'ti-truck', {
+    company_id: p.transport_company_id, sales_order_id: p.sales_order_id
+  });
+  return { ok: true, jobNum };
+}
+
+async function transportJobsUpdateStatus(userId, jobId, status) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
+  const valid = ['Scheduled', 'In Transit', 'Completed', 'Cancelled'];
+  if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
+  await pool.query('update transport_jobs set status=$1 where id=$2', [status, jobId]);
+  await logAudit(user, `Transport job #${jobId} → ${status}`, 'ti-truck', { jobId, status });
+  return { ok: true };
+}
+
 module.exports = {
   getDashboardStats,
   getBootstrap,
@@ -1082,6 +2155,8 @@ module.exports = {
   productsList,
   productsCreate,
   productsToggle,
+  productsActiveForForm,
+  machinesForDropdown,
   productCatalogList,
   logisticsList,
   logisticsCreate,
@@ -1105,6 +2180,440 @@ module.exports = {
   usersUpdate,
   usersResetPassword,
   rolesList,
-  rolesUpdate
+  rolesUpdate,
+  warehousesList,
+  warehousesCreate,
+  warehousesUpdate,
+  stockItemsList,
+  stockItemsCreate,
+  stockItemsUpdate,
+  stockMovementsList,
+  stockMovementsCreate,
+  vehiclesList,
+  vehiclesCreate,
+  vehiclesUpdate,
+  fuelLogsList,
+  fuelLogsCreate,
+  maintenanceList,
+  maintenanceCreate,
+  deliveryOrdersList,
+  deliveryOrdersCreate,
+  deliveryOrdersUpdateStatus,
+  dispatchList,
+  dispatchCreate,
+  dispatchReview,
+  harvestList,
+  harvestCreate,
+  timberInventoryList,
+  transportCompaniesList,
+  transportCompaniesCreate,
+  transportCompaniesUpdate,
+  transportJobsList,
+  transportJobsCreate,
+  transportJobsUpdateStatus,
+  pendingEditsList,
+  pendingEditsCreate,
+  pendingEditsReview,
+  dailyUpdate,
+  dailyDelete,
+  salesUpdate,
+  salesDelete,
+  logisticsUpdate,
+  logisticsDelete,
+  harvestUpdate,
+  harvestDelete,
+  deliveryOrdersUpdate,
+  deliveryOrdersDelete,
+  dispatchDelete,
+  transportJobsUpdate,
+  transportJobsDelete,
+  fuelLogsDelete,
+  maintenanceDelete,
+  stockMovementsDelete,
+  warehousesDelete,
+  stockItemsDelete,
+  vehiclesDelete,
+  transportCompaniesDelete,
+  dailyHarvestData,
+  machineCategoriesList,
+  machineCategoriesCreate,
+  machinesList,
+  machinesCreate,
+  machinesUpdate,
+  machineLogsCreate,
+  machineLogsList,
+  machineLogsUpdate,
+  machineLogsDelete,
+  machineKpiDefinitionsList,
+  machineKpiDefinitionsCreate,
+  machineKpiTargetsList,
+  machineKpiTargetsSave,
+  machineKpiPerformance,
+  machineMaintScheduleList,
+  machineMaintScheduleCreate,
+  machineMaintScheduleUpdate
 };
+
+// ── Machine Management ────────────────────────────────────────────────────────
+
+async function machineCategoriesList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines')) && !(await mustRole(user, 'machine-logs')) && !(await mustRole(user, 'machine-kpi')))
+    return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select * from machine_categories order by name');
+  return { ok: true, rows };
+}
+
+async function machineCategoriesCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { name, description, icon } = payload;
+  if (!name?.trim()) return { ok: false, error: 'Name is required' };
+  await pool.query(
+    `insert into machine_categories(name, description, icon) values ($1,$2,$3)`,
+    [name.trim(), description || null, icon || 'ti-tool']
+  );
+  await logAudit(user, `Machine category created: ${name}`, 'ti-tool', { name });
+  return { ok: true };
+}
+
+async function machinesList(userId) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machines')) || (await mustRole(user, 'machine-logs')) || (await mustRole(user, 'machine-kpi'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+  const { rows: machines } = await pool.query(`
+    select m.*, mc.name as category_name, mc.icon as category_icon,
+           (select next_due from machine_maintenance_schedules where machine_id=m.id order by next_due asc limit 1) as next_maintenance
+    from machines m
+    join machine_categories mc on mc.id = m.category_id
+    where m.active = true
+    order by mc.name, m.name
+  `);
+  const { rows: categories } = await pool.query('select * from machine_categories order by name');
+  return { ok: true, rows: machines, categories };
+}
+
+async function machinesCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  const { machine_code, name, category_id, status, production_capacity, capacity_unit,
+          fuel_consumption_rate, fuel_type, manufacturer, model_number,
+          serial_number, year_manufactured, date_acquired, notes } = payload;
+  if (!machine_code?.trim()) return { ok: false, error: 'Machine code is required' };
+  if (!name?.trim()) return { ok: false, error: 'Name is required' };
+  if (!category_id) return { ok: false, error: 'Category is required' };
+  await pool.query(
+    `insert into machines(machine_code, name, category_id, status, production_capacity, capacity_unit,
+       fuel_consumption_rate, fuel_type, manufacturer, model_number, serial_number,
+       year_manufactured, date_acquired, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [machine_code.trim(), name.trim(), category_id,
+     status || 'Available', production_capacity || 0, capacity_unit || 'm³',
+     fuel_consumption_rate || 0, fuel_type || null,
+     manufacturer || null, model_number || null, serial_number || null,
+     year_manufactured || null, date_acquired || null, notes || null, userId]
+  );
+  await logAudit(user, `Machine registered: ${machine_code} — ${name}`, 'ti-settings-2', { machine_code, name });
+  return { ok: true };
+}
+
+async function machinesUpdate(userId, machineId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  const { name, category_id, status, production_capacity, capacity_unit,
+          fuel_consumption_rate, fuel_type, manufacturer, model_number,
+          serial_number, year_manufactured, date_acquired, notes } = payload;
+  if (!name?.trim()) return { ok: false, error: 'Name is required' };
+  await pool.query(
+    `update machines set name=$1, category_id=$2, status=$3, production_capacity=$4, capacity_unit=$5,
+       fuel_consumption_rate=$6, fuel_type=$7, manufacturer=$8, model_number=$9,
+       serial_number=$10, year_manufactured=$11, date_acquired=$12, notes=$13
+     where id=$14`,
+    [name.trim(), category_id, status || 'Available',
+     production_capacity || 0, capacity_unit || 'm³',
+     fuel_consumption_rate || 0, fuel_type || null,
+     manufacturer || null, model_number || null, serial_number || null,
+     year_manufactured || null, date_acquired || null, notes || null, machineId]
+  );
+  await logAudit(user, `Machine updated: #${machineId}`, 'ti-settings-2', { machineId, status });
+  return { ok: true };
+}
+
+async function machineLogsList(userId, machineId, month) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machine-logs')) || (await mustRole(user, 'machines'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+
+  let whereClause = '';
+  const params = [];
+  if (machineId) { params.push(machineId); whereClause += ` and mdl.machine_id = $${params.length}`; }
+  if (month) { params.push(month); whereClause += ` and to_char(mdl.log_date,'YYYY-MM') = $${params.length}`; }
+
+  const { rows } = await pool.query(`
+    select mdl.*, m.name as machine_name, m.machine_code, mc.name as category_name
+    from machine_daily_logs mdl
+    join machines m on m.id = mdl.machine_id
+    join machine_categories mc on mc.id = m.category_id
+    where 1=1 ${whereClause}
+    order by mdl.log_date desc, m.name
+  `, params);
+  const { rows: machines } = await pool.query(
+    `select m.id, m.name, m.machine_code, mc.name as category_name, m.production_capacity, m.capacity_unit
+     from machines m join machine_categories mc on mc.id=m.category_id where m.active=true order by m.name`
+  );
+  return { ok: true, rows, machines };
+}
+
+async function machineLogsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machine-logs')) && !(await mustRole(user, 'machines')))
+    return { ok: false, error: 'Access denied' };
+  const { machine_id, log_date, shift, hours_worked, downtime_hours, downtime_reason,
+          fuel_consumed, daily_production, capacity_per_day, product_type,
+          logs_loaded, logs_unloaded, loading_trips, remarks } = payload;
+  if (!machine_id) return { ok: false, error: 'Machine is required' };
+  if (!log_date) return { ok: false, error: 'Date is required' };
+  await pool.query(
+    `insert into machine_daily_logs(machine_id, log_date, shift, hours_worked, downtime_hours, downtime_reason,
+       fuel_consumed, daily_production, capacity_per_day, product_type,
+       logs_loaded, logs_unloaded, loading_trips, remarks, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+    [machine_id, log_date, shift || 'Full Day',
+     hours_worked || 0, downtime_hours || 0, downtime_reason || null,
+     fuel_consumed || 0, daily_production || 0, capacity_per_day || 0, product_type || null,
+     logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, userId]
+  );
+  await logAudit(user, `Machine log created: machine #${machine_id} on ${log_date}`, 'ti-list-details', { machine_id, log_date });
+  return { ok: true };
+}
+
+async function machineLogsUpdate(userId, logId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machine-logs')) && !(await mustRole(user, 'machines')))
+    return { ok: false, error: 'Access denied' };
+  const { hours_worked, downtime_hours, downtime_reason, fuel_consumed,
+          daily_production, capacity_per_day, product_type,
+          logs_loaded, logs_unloaded, loading_trips, remarks } = payload;
+  await pool.query(
+    `update machine_daily_logs set hours_worked=$1, downtime_hours=$2, downtime_reason=$3,
+       fuel_consumed=$4, daily_production=$5, capacity_per_day=$6, product_type=$7,
+       logs_loaded=$8, logs_unloaded=$9, loading_trips=$10, remarks=$11
+     where id=$12`,
+    [hours_worked || 0, downtime_hours || 0, downtime_reason || null,
+     fuel_consumed || 0, daily_production || 0, capacity_per_day || 0, product_type || null,
+     logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, logId]
+  );
+  await logAudit(user, `Machine log updated: #${logId}`, 'ti-list-details', { logId });
+  return { ok: true };
+}
+
+async function machineLogsDelete(userId, logId) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from machine_daily_logs where id=$1', [logId]);
+  await logAudit(user, `Machine log deleted: #${logId}`, 'ti-trash', { logId });
+  return { ok: true };
+}
+
+async function machineKpiDefinitionsList(userId) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machine-kpi')) || (await mustRole(user, 'machines'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(`
+    select mkd.*, mc.name as category_name
+    from machine_kpi_definitions mkd
+    left join machine_categories mc on mc.id = mkd.category_id
+    where mkd.active = true
+    order by mc.name nulls first, mkd.kpi_name
+  `);
+  return { ok: true, rows };
+}
+
+async function machineKpiDefinitionsCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { category_id, kpi_code, kpi_name, unit, higher_is_better, weight, description } = payload;
+  if (!kpi_code?.trim()) return { ok: false, error: 'KPI code is required' };
+  if (!kpi_name?.trim()) return { ok: false, error: 'KPI name is required' };
+  await pool.query(
+    `insert into machine_kpi_definitions(category_id, kpi_code, kpi_name, unit, higher_is_better, weight, description)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [category_id || null, kpi_code.trim(), kpi_name.trim(),
+     unit || '', higher_is_better !== false, weight || 1.0, description || null]
+  );
+  await logAudit(user, `KPI definition created: ${kpi_name}`, 'ti-target', { kpi_name });
+  return { ok: true };
+}
+
+async function machineKpiTargetsList(userId, machineId, month) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machine-kpi')) || (await mustRole(user, 'machines'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+  const params = [machineId, month];
+  const { rows } = await pool.query(`
+    select mkt.*, mkd.kpi_name, mkd.unit, mkd.higher_is_better, mkd.kpi_code,
+           au.name as set_by_name
+    from machine_kpi_targets mkt
+    join machine_kpi_definitions mkd on mkd.id = mkt.kpi_id
+    left join app_users au on au.id = mkt.set_by
+    where mkt.machine_id=$1 and mkt.effective_month=$2
+    order by mkd.kpi_name
+  `, params);
+  const { rows: kpiDefs } = await pool.query(`
+    select mkd.*, mc.name as category_name
+    from machine_kpi_definitions mkd
+    left join machine_categories mc on mc.id = mkd.category_id
+    where mkd.active=true order by mkd.kpi_name
+  `);
+  return { ok: true, rows, kpiDefs };
+}
+
+async function machineKpiTargetsSave(userId, payload) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { machine_id, kpi_id, target_value, effective_month, reason } = payload;
+  if (!machine_id || !kpi_id || !effective_month) return { ok: false, error: 'Missing required fields' };
+  if (target_value === null || target_value === undefined || target_value === '')
+    return { ok: false, error: 'Target value is required' };
+  await pool.query(
+    `insert into machine_kpi_targets(machine_id, kpi_id, target_value, effective_month, set_by, reason)
+     values ($1,$2,$3,$4,$5,$6)
+     on conflict (machine_id, kpi_id, effective_month)
+     do update set target_value=$3, set_by=$5, reason=$6, created_at=now()`,
+    [machine_id, kpi_id, target_value, effective_month, userId, reason || null]
+  );
+  await logAudit(user, `KPI target set: machine #${machine_id}, month ${effective_month}`, 'ti-target', { machine_id, effective_month });
+  return { ok: true };
+}
+
+async function machineKpiPerformance(userId, month) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machine-kpi')) || (await mustRole(user, 'machines'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+
+  const targetMonth = month || new Date().toISOString().slice(0, 7);
+
+  const { rows: perf } = await pool.query(`
+    with logs as (
+      select
+        m.id                                                     as machine_id,
+        m.machine_code,
+        m.name                                                   as machine_name,
+        mc.name                                                  as category_name,
+        m.production_capacity,
+        m.capacity_unit,
+        m.status,
+        count(mdl.id)::int                                       as days_logged,
+        coalesce(sum(mdl.hours_worked),0)::numeric               as total_hours_worked,
+        coalesce(sum(mdl.downtime_hours),0)::numeric             as total_downtime,
+        coalesce(sum(mdl.fuel_consumed),0)::numeric              as total_fuel,
+        coalesce(sum(mdl.daily_production),0)::numeric           as total_production,
+        coalesce(sum(mdl.capacity_per_day),0)::numeric           as total_capacity,
+        coalesce(sum(mdl.logs_loaded),0)::numeric                as total_logs_loaded,
+        coalesce(sum(mdl.logs_unloaded),0)::numeric              as total_logs_unloaded,
+        coalesce(sum(mdl.loading_trips),0)::int                  as total_trips,
+        case when sum(mdl.hours_worked + mdl.downtime_hours) > 0
+             then round(sum(mdl.hours_worked) / sum(mdl.hours_worked + mdl.downtime_hours) * 100, 1)
+             else 0 end                                          as utilization_pct,
+        case when sum(mdl.capacity_per_day) > 0
+             then round(sum(mdl.daily_production) / sum(mdl.capacity_per_day) * 100, 1)
+             else 0 end                                          as efficiency_pct
+      from machines m
+      join machine_categories mc on mc.id = m.category_id
+      left join machine_daily_logs mdl
+        on mdl.machine_id = m.id and to_char(mdl.log_date,'YYYY-MM') = $1
+      where m.active = true
+      group by m.id, m.machine_code, m.name, mc.name, m.production_capacity, m.capacity_unit, m.status
+    )
+    select * from logs order by category_name, machine_name
+  `, [targetMonth]);
+
+  // Fetch KPI targets for this month alongside definitions
+  const { rows: targets } = await pool.query(`
+    select mkt.machine_id, mkt.target_value, mkd.kpi_code, mkd.kpi_name, mkd.unit, mkd.higher_is_better
+    from machine_kpi_targets mkt
+    join machine_kpi_definitions mkd on mkd.id = mkt.kpi_id
+    where mkt.effective_month = $1
+  `, [targetMonth]);
+
+  // Attach targets to each machine row
+  const targetsByMachine = {};
+  for (const t of targets) {
+    if (!targetsByMachine[t.machine_id]) targetsByMachine[t.machine_id] = [];
+    targetsByMachine[t.machine_id].push(t);
+  }
+
+  const rows = perf.map(m => {
+    const mt = targetsByMachine[m.machine_id] || [];
+    const actuals = {
+      utilization_hours: Number(m.total_hours_worked),
+      downtime_hours: Number(m.total_downtime),
+      fuel_consumed: Number(m.total_fuel),
+      daily_production: Number(m.total_production),
+      efficiency_pct: Number(m.efficiency_pct),
+      logs_loaded: Number(m.total_logs_loaded),
+      logs_unloaded: Number(m.total_logs_unloaded),
+      loading_trips: Number(m.total_trips)
+    };
+    const kpiResults = mt.map(t => {
+      const actual = actuals[t.kpi_code] ?? null;
+      const target = Number(t.target_value);
+      const achievement = (actual !== null && target > 0)
+        ? Math.round((actual / target) * 100)
+        : null;
+      return { ...t, actual, achievement };
+    });
+    const scored = kpiResults.filter(k => k.achievement !== null);
+    const avgAchievement = scored.length
+      ? Math.round(scored.reduce((s, k) => s + k.achievement, 0) / scored.length)
+      : null;
+    return { ...m, kpiResults, avgAchievement };
+  });
+
+  return { ok: true, rows, month: targetMonth };
+}
+
+async function machineMaintScheduleList(userId, machineId) {
+  const user = await getUser(userId);
+  const hasPerm = (await mustRole(user, 'machines')) || (await mustRole(user, 'machine-logs'));
+  if (!hasPerm) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select mms.*, m.name as machine_name, m.machine_code
+     from machine_maintenance_schedules mms
+     join machines m on m.id = mms.machine_id
+     where mms.machine_id=$1
+     order by mms.next_due asc nulls last`,
+    [machineId]
+  );
+  return { ok: true, rows };
+}
+
+async function machineMaintScheduleCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  const { machine_id, maintenance_type, frequency_days, last_performed, next_due, estimated_hours, notes } = payload;
+  if (!machine_id) return { ok: false, error: 'Machine is required' };
+  if (!maintenance_type?.trim()) return { ok: false, error: 'Maintenance type is required' };
+  await pool.query(
+    `insert into machine_maintenance_schedules(machine_id, maintenance_type, frequency_days, last_performed, next_due, estimated_hours, notes)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [machine_id, maintenance_type.trim(), frequency_days || 30,
+     last_performed || null, next_due || null, estimated_hours || 1, notes || null]
+  );
+  await logAudit(user, `Maintenance schedule created for machine #${machine_id}`, 'ti-calendar', { machine_id, maintenance_type });
+  return { ok: true };
+}
+
+async function machineMaintScheduleUpdate(userId, schedId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  const { maintenance_type, frequency_days, last_performed, next_due, estimated_hours, notes } = payload;
+  await pool.query(
+    `update machine_maintenance_schedules set maintenance_type=$1, frequency_days=$2, last_performed=$3,
+       next_due=$4, estimated_hours=$5, notes=$6 where id=$7`,
+    [maintenance_type, frequency_days || 30, last_performed || null,
+     next_due || null, estimated_hours || 1, notes || null, schedId]
+  );
+  return { ok: true };
+}
 
