@@ -243,6 +243,11 @@ ipcMain.handle('machines:list',   async (_evt, { userId }) => data.machinesList(
 ipcMain.handle('machines:create', async (_evt, { userId, payload }) => data.machinesCreate(userId, payload));
 ipcMain.handle('machines:update', async (_evt, { userId, machineId, payload }) => data.machinesUpdate(userId, machineId, payload));
 
+// Machine Log Item Categories
+ipcMain.handle('machine-log-cats:list',   async (_evt, { userId }) => data.machineLogCategoriesList(userId));
+ipcMain.handle('machine-log-cats:create', async (_evt, { userId, payload }) => data.machineLogCategoriesCreate(userId, payload));
+ipcMain.handle('machine-log-cats:delete', async (_evt, { userId, id }) => data.machineLogCategoriesDelete(userId, id));
+
 // Machine Daily Logs
 ipcMain.handle('machine-logs:list',   async (_evt, { userId, machineId, month }) => data.machineLogsList(userId, machineId, month));
 ipcMain.handle('machine-logs:create', async (_evt, { userId, payload }) => data.machineLogsCreate(userId, payload));
@@ -260,4 +265,41 @@ ipcMain.handle('machine-kpi:performance',  async (_evt, { userId, month }) => da
 ipcMain.handle('machine-maint:list',   async (_evt, { userId, machineId }) => data.machineMaintScheduleList(userId, machineId));
 ipcMain.handle('machine-maint:create', async (_evt, { userId, payload }) => data.machineMaintScheduleCreate(userId, payload));
 ipcMain.handle('machine-maint:update', async (_evt, { userId, schedId, payload }) => data.machineMaintScheduleUpdate(userId, schedId, payload));
+
+// Compartments
+ipcMain.handle('compartments:list',   async (_evt, { userId }) => data.compartmentsList(userId));
+ipcMain.handle('compartments:create', async (_evt, { userId, payload }) => data.compartmentsCreate(userId, payload));
+ipcMain.handle('compartments:update', async (_evt, { userId, comptId, payload }) => data.compartmentsUpdate(userId, comptId, payload));
+ipcMain.handle('compartments:delete', async (_evt, { userId, comptId }) => data.compartmentsDelete(userId, comptId));
+ipcMain.handle('compartments:for-dropdown', async (_evt, { userId }) => data.compartmentsForDropdown(userId));
+
+// Log Transport
+ipcMain.handle('log-transport:list',   async (_evt, { userId }) => data.logTransportList(userId));
+ipcMain.handle('log-transport:create', async (_evt, { userId, payload }) => data.logTransportCreate(userId, payload));
+ipcMain.handle('log-transport:delete', async (_evt, { userId, id }) => data.logTransportDelete(userId, id));
+
+// Value-Added Timber
+ipcMain.handle('value-added-timber:list',   async (_evt, { userId }) => data.valueAddedTimberList(userId));
+ipcMain.handle('value-added-timber:create', async (_evt, { userId, payload }) => data.valueAddedTimberCreate(userId, payload));
+ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id }) => data.valueAddedTimberDelete(userId, id));
+
+// Logistics Dashboard
+ipcMain.handle('logistics:dashboard', async (_evt, { userId }) => data.logisticsDashboard(userId));
+
+// Machine Fuel Logs
+ipcMain.handle('machine-fuel:list',   async (_evt, { userId }) => data.machineFuelLogsList(userId));
+ipcMain.handle('machine-fuel:create', async (_evt, { userId, payload }) => data.machineFuelLogsCreate(userId, payload));
+ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id }) => data.machineFuelLogsDelete(userId, id));
+
+// Casual Labour Requests
+ipcMain.handle('casual-requests:list',   async (_evt, { userId }) => data.casualLabourRequestsList(userId));
+ipcMain.handle('casual-requests:create', async (_evt, { userId, payload }) => data.casualLabourRequestsCreate(userId, payload));
+ipcMain.handle('casual-requests:review', async (_evt, { userId, requestId, status }) => data.casualLabourRequestsReview(userId, requestId, status));
+ipcMain.handle('casual-requests:delete', async (_evt, { userId, id }) => data.casualLabourRequestsDelete(userId, id));
+
+// Casuals
+ipcMain.handle('casuals:list',   async (_evt, { userId }) => data.casualsList(userId));
+ipcMain.handle('casuals:create', async (_evt, { userId, payload }) => data.casualsCreate(userId, payload));
+ipcMain.handle('casuals:update', async (_evt, { userId, casualId, payload }) => data.casualsUpdate(userId, casualId, payload));
+ipcMain.handle('casuals:delete', async (_evt, { userId, casualId }) => data.casualsDelete(userId, casualId));
 

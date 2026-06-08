@@ -9,9 +9,10 @@ const STORAGE = {
 
 const NAV = [
   { id: 'dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', sec: 'Overview' },
-  { id: 'daily-timber',  icon: 'ti-trees',         label: 'Timber Daily Production',     sec: 'Production' },
-  { id: 'daily-poles',   icon: 'ti-align-center',  label: 'Poles Daily Production',      sec: 'Production' },
-  { id: 'daily-harvest', icon: 'ti-axe',            label: 'Harvesting Daily Production', sec: 'Production' },
+  { id: 'daily-timber',  icon: 'ti-trees',         label: 'Sawmill Timber Daily Production', sec: 'Production' },
+  { id: 'daily-poles',   icon: 'ti-align-center',  label: 'Poles Daily Production',           sec: 'Production' },
+  { id: 'daily-harvest', icon: 'ti-axe',            label: 'Harvesting Daily Production',      sec: 'Production' },
+  { id: 'value-added-timber', icon: 'ti-certificate', label: 'Value-Added Timber', sec: 'Production' },
   { id: 'sales', icon: 'ti-shopping-cart', label: 'Sales orders', sec: 'Commercial' },
   { id: 'products', icon: 'ti-package', label: 'Product catalog', sec: 'Commercial' },
   { id: 'weekly-cost', icon: 'ti-cash', label: 'Weekly cost report', sec: 'Reports' },
@@ -24,9 +25,10 @@ const NAV = [
   { id: 'audit', icon: 'ti-shield-check', label: 'Audit trail', sec: 'Governance' },
   { id: 'export', icon: 'ti-file-export', label: 'Exports', sec: 'Tools' },
   { id: 'users', icon: 'ti-users', label: 'Users', sec: 'System' },
+  { id: 'logistics-dashboard', icon: 'ti-chart-pie-2', label: 'Logistics Dashboard', sec: 'Logistics' },
   { id: 'inventory',      icon: 'ti-stack',              label: 'Inventory',             sec: 'Logistics' },
   { id: 'logistics',      icon: 'ti-box',                label: 'Spare Parts',           sec: 'Logistics' },
-  { id: 'warehouses',     icon: 'ti-building-warehouse', label: 'Warehouses',            sec: 'Logistics' },
+  { id: 'warehouses',     icon: 'ti-building-warehouse', label: 'Workshops',             sec: 'Logistics' },
   { id: 'stock-items',    icon: 'ti-package',            label: 'Stock Catalog',         sec: 'Logistics' },
   { id: 'stock-movements',icon: 'ti-arrows-exchange',    label: 'Stock Movements',       sec: 'Logistics' },
   { id: 'vehicles',       icon: 'ti-truck',              label: 'Vehicle Fleet',         sec: 'Logistics' },
@@ -34,10 +36,14 @@ const NAV = [
   { id: 'dispatch',       icon: 'ti-send',               label: 'Dispatch',              sec: 'Logistics' },
   { id: 'transport',      icon: 'ti-truck-loading',      label: 'Third-Party Transport', sec: 'Logistics' },
   { id: 'timber-inventory', icon: 'ti-trees', label: 'Timber inventory', sec: 'Forestry' },
-  { id: 'harvest', icon: 'ti-axe', label: 'Harvest tracking', sec: 'Forestry' },
+  { id: 'compartments', icon: 'ti-map-pin', label: 'Compartments', sec: 'Forestry' },
+  { id: 'log-transport', icon: 'ti-truck-loading', label: 'Log Transport', sec: 'Logistics' },
   { id: 'machines',     icon: 'ti-settings-2',  label: 'Machine Registry',   sec: 'Logistics' },
   { id: 'machine-logs', icon: 'ti-list-details', label: 'Machine Daily Logs', sec: 'Production' },
-  { id: 'machine-kpi',  icon: 'ti-chart-line',   label: 'KPI Performance',    sec: 'Executive' }
+  { id: 'machine-kpi',  icon: 'ti-chart-line',   label: 'KPI Performance',    sec: 'Executive' },
+  { id: 'machine-fuel', icon: 'ti-droplet', label: 'Machine Fuel Logs', sec: 'Logistics' },
+  { id: 'casual-requests', icon: 'ti-users', label: 'Casual Labour Request', sec: 'Production' },
+  { id: 'casuals', icon: 'ti-user-check', label: 'Casuals', sec: 'Production' }
 ];
 
 function $(id) {
@@ -99,7 +105,7 @@ function pageTitle(pageId) {
 }
 
 function renderPermissionCheckboxes(selected = []) {
-  const pageIds = ['dashboard', 'daily', 'sales', 'products', 'logistics', 'weekly-cost', 'weekly-perf', 'monthly', 'inventory', 'sage', 'kpi', 'changes', 'audit', 'notifications', 'export', 'users', 'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'timber-inventory', 'harvest', 'transport', 'machines', 'machine-logs', 'machine-kpi'];
+  const pageIds = ['dashboard', 'daily', 'sales', 'products', 'logistics', 'weekly-cost', 'weekly-perf', 'monthly', 'inventory', 'sage', 'kpi', 'changes', 'audit', 'notifications', 'export', 'users', 'logistics-dashboard', 'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'timber-inventory', 'transport', 'machines', 'machine-logs', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber', 'machine-fuel', 'casual-requests', 'casuals'];
   return pageIds
     .map(
       (id) => `
@@ -354,6 +360,8 @@ async function showPage(id) {
       return renderSage();
     case 'users':
       return renderUsers();
+    case 'logistics-dashboard':
+      return renderLogisticsDashboard();
     case 'warehouses':
       return renderWarehouses();
     case 'stock-items':
@@ -366,8 +374,6 @@ async function showPage(id) {
       return renderDeliveries();
     case 'dispatch':
       return renderDispatch();
-    case 'harvest':
-      return renderHarvest();
     case 'timber-inventory':
       return renderTimberInventory();
     case 'transport':
@@ -378,6 +384,18 @@ async function showPage(id) {
       return renderMachineLogs();
     case 'machine-kpi':
       return renderMachineKpi();
+    case 'compartments':
+      return renderCompartments();
+    case 'log-transport':
+      return renderLogTransport();
+    case 'value-added-timber':
+      return renderValueAddedTimber();
+    case 'machine-fuel':
+      return renderMachineFuelLogs();
+    case 'casual-requests':
+      return renderCasualLabourRequests();
+    case 'casuals':
+      return renderCasuals();
     default:
       return renderStub(id);
   }
@@ -637,7 +655,7 @@ async function renderDaily(subType = null) {
   const pages = STORAGE.pages || [];
   const hasAll = pages.includes('daily');
   const allowed = [
-    { id: 'timber',  label: 'Timber Daily Production',     icon: 'ti-trees',     perm: 'daily-timber'  },
+    { id: 'timber',  label: 'Sawmill Timber Daily Production', icon: 'ti-trees',  perm: 'daily-timber'  },
     { id: 'poles',   label: 'Poles Daily Production',      icon: 'ti-align-center', perm: 'daily-poles'   },
     { id: 'harvest', label: 'Harvesting Daily Production', icon: 'ti-axe',       perm: 'daily-harvest' }
   ].filter(st => hasAll || pages.includes(st.perm));
@@ -698,7 +716,7 @@ async function renderDaily(subType = null) {
   // ── Render the selected sub-type content ───────────────────────────────────
   if (current === 'timber') renderDailyTimber(stock, timberRows);
   else if (current === 'poles') renderDailyPoles(stock, polesRows);
-  else renderDailyHarvest(harvestRows, harvestSummary);
+  else renderDailyHarvest(harvestRows, harvestSummary, 'daily-content', null, harvestRes.compartments || []);
 }
 
 // ── Standalone page wrappers (called from showPage / sidebar) ─────────────────
@@ -742,14 +760,23 @@ async function renderPageDailyHarvest() {
   const res = await UFCL.dailyHarvestData(STORAGE.user.id);
   if (!res.ok) return renderDenied('daily-harvest', res.error);
   $('page-daily-harvest').innerHTML = '<div id="daily-content"></div>';
-  renderDailyHarvest(res.rows || [], res.summary || {}, 'page-daily-harvest', renderPageDailyHarvest);
+  renderDailyHarvest(res.rows || [], res.summary || {}, 'page-daily-harvest', renderPageDailyHarvest, res.compartments || []);
   await insertPendingPanel($('page-daily-harvest'), ['harvest_log'], renderPageDailyHarvest);
 }
 
-// ── Timber sub-view ───────────────────────────────────────────────────────────
+// ── Sawmill Timber sub-view ───────────────────────────────────────────────────
 function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null) {
   const today = new Date().toISOString().split('T')[0];
   const refresh = onRefresh || (() => renderDaily('timber'));
+
+  // Compute m³ produced from logs received
+  const totalLogsReceived = rows.reduce((s, r) => s + Number(r.logs_received || 0), 0);
+  const timberM3 = (totalLogsReceived / 4.4 * 0.5).toFixed(2);
+  const totalTimberPcs = rows.reduce((s, r) => s + Number(r.timber_units || 0), 0);
+  const totalWaste = rows.reduce((s, r) => s + Number(r.timber_waste || 0), 0);
+  const wastePct = (totalTimberPcs + totalWaste) > 0
+    ? ((totalWaste / (totalTimberPcs + totalWaste)) * 100).toFixed(1)
+    : '0.0';
 
   $(cid).innerHTML = `
     <div class="cards">
@@ -773,34 +800,50 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
         <div class="mcval" style="color:${stock.timberStock < 0 ? 'var(--red)' : 'var(--green)'}">${Number(stock.timberStock || 0).toLocaleString()}</div>
         <div class="mcsub cg"><i class="ti ti-trees"></i>all types</div>
       </div>
+      <div class="mc" style="border-top:3px solid #1D4ED8">
+        <div class="mclbl">Timber produced (m³)</div>
+        <div class="mcval" style="color:#1D4ED8">${timberM3}</div>
+        <div class="mcsub bp"><i class="ti ti-cube"></i>logs ÷ 4.4 × 50%</div>
+      </div>
+      <div class="mc" style="border-top:3px solid ${Number(wastePct) > 20 ? '#DC2626' : '#D97706'}">
+        <div class="mclbl">Waste %</div>
+        <div class="mcval" style="color:${Number(wastePct) > 20 ? 'var(--red)' : 'var(--amber)'}">${wastePct}%</div>
+        <div class="mcsub ca"><i class="ti ti-percentage"></i>waste ÷ (timber + waste)</div>
+      </div>
     </div>
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <h3 style="margin-bottom:0"><i class="ti ti-trees"></i>Timber production entries</h3>
+        <h3 style="margin-bottom:0"><i class="ti ti-trees"></i>Sawmill timber production entries</h3>
         <button class="appbtn" id="newTimber"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Add timber entry</button>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Supervisor</th><th>Size</th><th>Machine</th><th>Kiln-dried</th><th>CCA-treated</th><th>Untreated</th><th>Total</th><th>Waste</th><th>Downtime</th><th>Remarks</th><th>Action</th></tr></thead>
+        <thead><tr><th>Date</th><th>Operators/Supervisor</th><th>Machine</th><th>Logs received</th><th>Volume expected (m³)</th><th>Timber produced</th><th>Size</th><th>Waste %</th><th>Downtime</th><th>Notes</th><th>Action</th></tr></thead>
         <tbody>
           ${rows.length === 0
-            ? '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:2rem">No timber entries yet. Click "Add timber entry" to log production.</td></tr>'
-            : rows.map(r => `<tr>
-              <td style="font-family:var(--fm);font-weight:500">${r.date}</td>
-              <td>${r.supervisor || '—'}</td>
-              <td><span style="font-size:12px;font-weight:600;color:var(--green)">${r.product_size || '—'}</span></td>
-              <td style="color:var(--t3);font-size:12px">${r.machine || '—'}</td>
-              <td style="color:#D97706;font-weight:500">${Number(r.timber_kiln_dried || 0).toLocaleString()}</td>
-              <td style="color:var(--g-soft);font-weight:500">${Number(r.timber_cca_treated || 0).toLocaleString()}</td>
-              <td style="font-weight:500">${Number(r.timber_untreated || 0).toLocaleString()}</td>
-              <td style="font-weight:600;color:var(--green)">${Number(r.timber_units || 0).toLocaleString()}</td>
-              <td style="color:var(--amber)">${Number(r.timber_waste || 0).toLocaleString()}</td>
-              <td style="font-family:var(--fm);color:var(--t3)">${Number(r.downtime_hours || 0).toFixed(1)}h</td>
-              <td style="color:var(--t3);font-size:12px">${r.remarks || '—'}</td>
-              <td style="white-space:nowrap">
-                <button class="bs1 dl-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
-                <button class="bs1 dl-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
-              </td>
-            </tr>`).join('')}
+            ? '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:2rem">No entries yet. Click "Add timber entry" to log production.</td></tr>'
+            : rows.map(r => {
+                const rLogs = Number(r.logs_received || 0);
+                const rVolExp = rLogs > 0 ? (rLogs / 4.4 * 0.5).toFixed(2) : '—';
+                const rTotal = Number(r.timber_units || 0);
+                const rWaste = Number(r.timber_waste || 0);
+                const rWastePct = (rTotal + rWaste) > 0 ? ((rWaste / (rTotal + rWaste)) * 100).toFixed(1) : '0.0';
+                return `<tr>
+                  <td style="font-family:var(--fm);font-weight:500">${r.date}</td>
+                  <td>${r.supervisor || '—'}</td>
+                  <td style="color:var(--t3);font-size:12px">${r.machine || '—'}</td>
+                  <td style="font-family:var(--fm);color:#1D4ED8;font-weight:600">${rLogs.toLocaleString()}</td>
+                  <td style="font-family:var(--fm);color:var(--green)">${rVolExp}</td>
+                  <td style="font-weight:600;color:var(--g-dark)">${rTotal.toLocaleString()}</td>
+                  <td><span style="font-size:12px;font-weight:600;color:var(--green)">${r.product_size || '—'}</span></td>
+                  <td style="color:${Number(rWastePct) > 20 ? 'var(--red)' : 'var(--amber)'};font-size:12px">${rWastePct}%</td>
+                  <td style="font-family:var(--fm);color:var(--t3)">${Number(r.downtime_hours || 0).toFixed(1)}h</td>
+                  <td style="color:var(--t3);font-size:12px">${r.remarks || '—'}</td>
+                  <td style="white-space:nowrap">
+                    <button class="bs1 dl-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
+                    <button class="bs1 dl-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                  </td>
+                </tr>`;
+              }).join('')}
         </tbody>
       </table></div>
     </div>`;
@@ -818,43 +861,36 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
     const mOpts = tMachines.length
       ? tMachines.map(m => `<option value="${m.name}">${m.name} (${m.category_name})</option>`).join('')
       : '<option value="" disabled>No active machines registered</option>';
-    openOverlay(
-      'Add Timber Production Entry',
-      `Stock — Kiln: <strong>${Number(stock.kilnDriedStock||0).toLocaleString()}</strong> &nbsp;CCA: <strong>${Number(stock.ccaTreatedStock||0).toLocaleString()}</strong> &nbsp;Untreated: <strong>${Number(stock.untreatedStock||0).toLocaleString()}</strong>`,
-      `<div class="frow three">
+    openOverlay('Add Sawmill Timber Entry', null, `
+      <div class="frow three">
         <div class="fg"><label>Date *</label><input type="date" id="dl-date" value="${today}"></div>
-        <div class="fg"><label>Supervisor</label><input type="text" id="dl-sup" placeholder="${STORAGE.user.name}"></div>
+        <div class="fg"><label>Operators / Supervisor</label><input type="text" id="dl-sup" placeholder="${STORAGE.user.name}"></div>
         <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
       </div>
-      <div class="frow full">
-        <div class="fg"><label>Product</label><select id="dl-ps"><option value="">— Select product —</option>${productOpts}</select></div>
+      <div class="frow">
+        <div class="fg"><label>Logs received *</label><input type="number" id="dl-logs" placeholder="0" min="0"></div>
+        <div class="fg"><label>Volume expected (auto m³)</label><input type="text" id="dl-vol-exp" readonly style="background:var(--surf)" placeholder="0.00 m³"></div>
       </div>
-      <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:.75rem;margin-bottom:.75rem">
-        <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Timber breakdown</div>
-        <div class="frow three">
-          <div class="fg"><label>Kiln-dried (units)</label><input type="number" id="dl-kd" placeholder="0" min="0"></div>
-          <div class="fg"><label>CCA-treated (units)</label><input type="number" id="dl-cca" placeholder="0" min="0"></div>
-          <div class="fg"><label>Untreated (units)</label><input type="number" id="dl-unt" placeholder="0" min="0"></div>
-        </div>
-        <div class="frow">
-          <div class="fg"><label>Timber waste (pcs)</label><input type="number" id="dl-tw" placeholder="0" min="0"></div>
-          <div class="fg"><label>Total timber</label><input type="text" id="dl-total" readonly style="background:var(--g-light);color:var(--g-dark);font-weight:600" placeholder="0"></div>
-        </div>
+      <div class="frow">
+        <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" placeholder="0" min="0"></div>
+        <div class="fg"><label>Select size</label><select id="dl-ps"><option value="">— Select product size —</option>${productOpts}</select></div>
       </div>
       <div class="frow">
         <div class="fg"><label>Downtime (hrs)</label><input type="number" id="dl-dt" placeholder="0" step="0.5" min="0"></div>
         <div class="fg"><label>Downtime reason</label><input type="text" id="dl-dr" placeholder="e.g. Blade replacement"></div>
       </div>
-      <div class="fg"><label>Remarks</label><textarea id="dl-rem" rows="2" placeholder="Any notes for this shift"></textarea></div>
+      <div class="fg"><label>Notes</label><textarea id="dl-rem" rows="2" placeholder="Any notes for this shift"></textarea></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save entry</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
       async () => {
+        const units = Number($('dl-units').value || 0);
         const r = await UFCL.dailyCreate(STORAGE.user.id, {
           date: $('dl-date').value, supervisor: $('dl-sup').value || STORAGE.user.name,
           product_size: $('dl-ps').value || null,
           machine: $('dl-machine').value || null,
-          timber_kiln_dried: $('dl-kd').value, timber_cca_treated: $('dl-cca').value,
-          timber_untreated: $('dl-unt').value, timber_waste: $('dl-tw').value,
-          poles_units: 0, poles_waste: 0,
+          logs_received: $('dl-logs').value || 0,
+          timber_units: units,
+          timber_kiln_dried: 0, timber_cca_treated: 0, timber_untreated: units,
+          timber_waste: 0, poles_units: 0, poles_waste: 0,
           downtime_hours: $('dl-dt').value, downtime_reason: $('dl-dr').value,
           remarks: $('dl-rem').value
         });
@@ -862,13 +898,12 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
         showOverlaySuccess('Timber entry saved.'); await refresh();
       }
     );
-    ['dl-kd','dl-cca','dl-unt'].forEach(id => {
-      const el = $(id);
-      if (el) el.oninput = () => {
-        const t = Number($('dl-kd')?.value||0) + Number($('dl-cca')?.value||0) + Number($('dl-unt')?.value||0);
-        const el2 = $('dl-total'); if (el2) el2.value = t > 0 ? t.toLocaleString() : '';
-      };
-    });
+    const logsEl = document.getElementById('dl-logs');
+    const volExp = document.getElementById('dl-vol-exp');
+    if (logsEl && volExp) logsEl.oninput = () => {
+      const v = Number(logsEl.value || 0);
+      volExp.value = v > 0 ? (v / 4.4 * 0.5).toFixed(2) + ' m³' : '';
+    };
   };
 
   document.querySelectorAll('.dl-edit').forEach(btn => {
@@ -888,36 +923,38 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
       const mOpts = tMachines.map(m =>
         `<option value="${m.name}" ${r.machine === m.name ? 'selected' : ''}>${m.name} (${m.category_name})</option>`
       ).join('');
-      openOverlay('Edit Timber Entry', r.date, `
+      openOverlay('Edit Sawmill Timber Entry', r.date, `
         <div class="frow three">
           <div class="fg"><label>Date *</label><input type="date" id="dl-date" value="${isoDate}"></div>
-          <div class="fg"><label>Supervisor</label><input type="text" id="dl-sup" value="${r.supervisor||''}"></div>
+          <div class="fg"><label>Operators / Supervisor</label><input type="text" id="dl-sup" value="${r.supervisor||''}"></div>
           <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
         </div>
-        <div class="frow full">
-          <div class="fg"><label>Product</label><select id="dl-ps"><option value="">— Select product —</option>${productOpts}${r.product_size && !tProducts.find(p=>p.size===r.product_size) ? `<option value="${r.product_size}" selected>${r.product_size} (inactive)</option>` : ''}</select></div>
+        <div class="frow">
+          <div class="fg"><label>Logs received *</label><input type="number" id="dl-logs" value="${r.logs_received||0}" min="0"></div>
+          <div class="fg"><label>Volume expected (auto m³)</label><input type="text" id="dl-vol-exp" readonly style="background:var(--surf)" value="${r.logs_received ? (Number(r.logs_received)/4.4*0.5).toFixed(2)+' m³' : ''}"></div>
         </div>
-        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:.75rem;margin-bottom:.75rem">
-          <div class="frow three">
-            <div class="fg"><label>Kiln-dried</label><input type="number" id="dl-kd" value="${r.timber_kiln_dried||0}" min="0"></div>
-            <div class="fg"><label>CCA-treated</label><input type="number" id="dl-cca" value="${r.timber_cca_treated||0}" min="0"></div>
-            <div class="fg"><label>Untreated</label><input type="number" id="dl-unt" value="${r.timber_untreated||0}" min="0"></div>
-          </div>
-          <div class="fg" style="margin-top:.5rem"><label>Timber waste</label><input type="number" id="dl-tw" value="${r.timber_waste||0}" min="0"></div>
+        <div class="frow">
+          <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" value="${r.timber_units||0}" min="0"></div>
+          <div class="fg"><label>Select size</label><select id="dl-ps"><option value="">— Select product size —</option>${productOpts}${r.product_size && !tProducts.find(p=>p.size===r.product_size) ? `<option value="${r.product_size}" selected>${r.product_size} (inactive)</option>` : ''}</select></div>
         </div>
         <div class="frow">
           <div class="fg"><label>Downtime (hrs)</label><input type="number" id="dl-dt" value="${r.downtime_hours||0}" step="0.5" min="0"></div>
           <div class="fg"><label>Downtime reason</label><input type="text" id="dl-dr" value="${r.downtime_reason||''}"></div>
         </div>
-        <div class="fg"><label>Remarks</label><textarea id="dl-rem" rows="2">${r.remarks||''}</textarea></div>
+        <div class="fg"><label>Notes</label><textarea id="dl-rem" rows="2">${r.remarks||''}</textarea></div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
+          const units = Number($('dl-units').value || 0);
           const payload = {
             date: $('dl-date').value, supervisor: $('dl-sup').value,
             product_size: $('dl-ps').value || null,
             machine: $('dl-machine').value || null,
-            timber_kiln_dried: $('dl-kd').value, timber_cca_treated: $('dl-cca').value,
-            timber_untreated: $('dl-unt').value, timber_waste: $('dl-tw').value,
+            logs_received: $('dl-logs').value || 0,
+            timber_units: units,
+            timber_kiln_dried: r.timber_kiln_dried || 0,
+            timber_cca_treated: r.timber_cca_treated || 0,
+            timber_untreated: units,
+            timber_waste: r.timber_waste || 0,
             poles_units: r.poles_units || 0, poles_waste: r.poles_waste || 0,
             downtime_hours: $('dl-dt').value, downtime_reason: $('dl-dr').value,
             remarks: $('dl-rem').value
@@ -936,6 +973,12 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
           if (!res2.ok) { showOverlayError(res2.error); return; }
           showOverlaySuccess('Entry updated.'); await refresh();
         });
+      const editLogsEl = document.getElementById('dl-logs');
+      const editVolExp = document.getElementById('dl-vol-exp');
+      if (editLogsEl && editVolExp) editLogsEl.oninput = () => {
+        const v = Number(editLogsEl.value || 0);
+        editVolExp.value = v > 0 ? (v / 4.4 * 0.5).toFixed(2) + ' m³' : '';
+      };
     };
   });
 
@@ -1154,25 +1197,42 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
 }
 
 // ── Harvest sub-view ──────────────────────────────────────────────────────────
-function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = null) {
+function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = null, compartments = []) {
   const today = new Date().toISOString().split('T')[0];
   const refresh = onRefresh || (() => renderDaily('harvest'));
-  const totalHarvested = rows.reduce((s, r) => s + Number(r.quantity), 0);
+  const totalTrees = rows.reduce((s, r) => s + Number(r.quantity), 0);
+  const totalLogs = totalTrees * 2;
+  const totalVolumeM3 = (totalLogs / 4.4).toFixed(2);
+  const activeCompts = compartments.filter(c => c.status === 'Active');
+
+  // Build compartment dropdown options — disable exhausted compartments
+  function buildComptOpts(selected = '') {
+    if (!compartments.length) return '<option value="">— No compartments (add in Compartments page first) —</option>';
+    return compartments.map(c => {
+      const disabled = c.status === 'Completed' ? 'disabled' : '';
+      const label = `${c.compt_name}${c.sub_name ? ' / ' + c.sub_name : ''} [${c.status}]`;
+      const sel = String(c.id) === String(selected) ? 'selected' : '';
+      return `<option value="${c.id}" data-sub="${c.sub_name||''}" data-species="${c.species}" data-status="${c.status}" ${disabled} ${sel}>${label}</option>`;
+    }).join('');
+  }
 
   $(cid).innerHTML = `
     <div class="cards">
-      <div class="mc"><div class="mclbl">Total harvest entries</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-axe"></i>records</div></div>
-      <div class="mc"><div class="mclbl">Total quantity</div><div class="mcval">${totalHarvested.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-trees"></i>units</div></div>
-      <div class="mc"><div class="mclbl">Species tracked</div><div class="mcval">${Object.keys(summary).length}</div><div class="mcsub bp"><i class="ti ti-leaf"></i>species</div></div>
+      <div class="mc"><div class="mclbl">Trees felled</div><div class="mcval">${totalTrees.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-axe"></i>trees</div></div>
+      <div class="mc"><div class="mclbl">Total logs (×2)</div><div class="mcval">${totalLogs.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-stack-2"></i>logs</div></div>
+      <div class="mc"><div class="mclbl">Volume harvested</div><div class="mcval" style="color:var(--green)">${totalVolumeM3} m³</div><div class="mcsub cg"><i class="ti ti-cube"></i>÷ 4.4 logs/m³</div></div>
+      <div class="mc"><div class="mclbl">Active compartments</div><div class="mcval">${activeCompts.length}</div><div class="mcsub cg"><i class="ti ti-map-pin"></i>available</div></div>
     </div>
     ${Object.keys(summary).length ? `
     <div class="card">
       <h3><i class="ti ti-trees"></i>Harvest by species</h3>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Species</th><th>Total quantity</th></tr></thead>
+        <thead><tr><th>Species</th><th>Trees felled</th><th>Logs (×2)</th><th>Volume (m³)</th></tr></thead>
         <tbody>${Object.entries(summary).map(([sp, qty]) => `<tr>
-          <td style="font-weight:500">${sp}</td>
+          <td style="font-weight:500"><span class="badge bt">${sp}</span></td>
           <td style="font-family:var(--fm)">${Number(qty).toLocaleString()}</td>
+          <td style="font-family:var(--fm)">${(Number(qty) * 2).toLocaleString()}</td>
+          <td style="font-family:var(--fm);color:var(--green)">${(Number(qty) * 2 / 4.4).toFixed(2)}</td>
         </tr>`).join('')}
         </tbody>
       </table></div>
@@ -1183,71 +1243,163 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
         <button class="appbtn" id="newHarvest"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Log harvest</button>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Location</th><th>Species</th><th>Quantity</th><th>UoM</th><th>Notes</th><th>Logged by</th><th>Action</th></tr></thead>
+        <thead><tr><th>Date</th><th>Compartment</th><th>Sub name</th><th>Species</th><th>Trees felled</th><th>Cross-cut</th><th>Hand-rolled</th><th>Total logs</th><th>Volume (m³)</th><th>Notes</th><th>Logged by</th><th>Action</th></tr></thead>
         <tbody>
           ${rows.length === 0
-            ? '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:2rem">No harvest records yet. Click "Log harvest" to record a harvest.</td></tr>'
-            : rows.map(r => `<tr>
-              <td style="font-weight:500">${r.harvest_date}</td>
-              <td>${r.location}</td>
-              <td><span class="badge bt">${r.species}</span></td>
-              <td style="font-family:var(--fm);font-weight:600">${Number(r.quantity).toLocaleString()}</td>
-              <td>${r.uom}</td>
-              <td style="color:var(--t3)">${r.notes || '—'}</td>
-              <td>${r.logged_by || '—'}</td>
-              <td style="white-space:nowrap">
-                <button class="bs1 hv2-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
-                <button class="bs1 hv2-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
-              </td>
-            </tr>`).join('')}
+            ? '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:2rem">No harvest records yet. Click "Log harvest" to record a harvest.</td></tr>'
+            : rows.map(r => {
+                const xcut = Number(r.logs_crosscut || 0);
+                const hroll = Number(r.logs_handrolled || 0);
+                const totalLogs = (xcut + hroll) > 0 ? (xcut + hroll) : Number(r.quantity) * 2;
+                const volM3 = (totalLogs / 4.4).toFixed(2);
+                return `<tr>
+                  <td style="font-weight:500">${r.harvest_date}</td>
+                  <td style="font-weight:500;color:var(--g-dark)">${r.compt_name || r.location || '—'}</td>
+                  <td style="color:var(--t3)">${r.sub_name || '—'}</td>
+                  <td><span class="badge bt">${r.species}</span></td>
+                  <td style="font-family:var(--fm);font-weight:600">${Number(r.quantity).toLocaleString()}</td>
+                  <td style="font-family:var(--fm);color:var(--t3)">${xcut > 0 ? xcut.toLocaleString() : '—'}</td>
+                  <td style="font-family:var(--fm);color:var(--t3)">${hroll > 0 ? hroll.toLocaleString() : '—'}</td>
+                  <td style="font-family:var(--fm);font-weight:600;color:#1D4ED8">${totalLogs.toLocaleString()}</td>
+                  <td style="font-family:var(--fm);color:var(--green)">${volM3}</td>
+                  <td style="color:var(--t3)">${r.notes || '—'}</td>
+                  <td>${r.logged_by || '—'}</td>
+                  <td style="white-space:nowrap">
+                    <button class="bs1 hv2-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
+                    <button class="bs1 hv2-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                  </td>
+                </tr>`;
+              }).join('')}
         </tbody>
       </table></div>
     </div>`;
 
-  $('newHarvest').onclick = () => openOverlay('Log Harvest', null, `
+  function wireComptDropdown(comptSel, subRow, subSel, speciesEl) {
+    if (!comptSel) return;
+    comptSel.onchange = () => {
+      const opt = comptSel.options[comptSel.selectedIndex];
+      const sub = opt?.dataset?.sub || '';
+      const sp = opt?.dataset?.species || '';
+      if (speciesEl) speciesEl.value = sp;
+      if (subRow && subSel) {
+        if (sub) {
+          subRow.style.display = '';
+          subSel.innerHTML = `<option value="">— All —</option><option value="${sub}" selected>${sub}</option>`;
+        } else {
+          subRow.style.display = 'none';
+          subSel.innerHTML = '';
+        }
+      }
+    };
+  }
+
+  $('newHarvest').onclick = () => openOverlay('Log Harvest', 'Record trees felled and actual logs produced', `
     <div class="frow">
       <div class="fg"><label>Harvest date *</label><input id="hv-date" type="date" value="${today}"></div>
-      <div class="fg"><label>Location *</label><input id="hv-loc" type="text" placeholder="Forest block / GPS ref"></div>
     </div>
     <div class="frow">
-      <div class="fg"><label>Species *</label><input id="hv-species" type="text" placeholder="e.g. Eucalyptus, Pine"></div>
-      <div class="fg"><label>Quantity *</label><input id="hv-qty" type="number" min="1" placeholder="0"></div>
-      <div class="fg"><label>Unit</label><input id="hv-uom" type="text" value="units" placeholder="units, m³, kg"></div>
+      <div class="fg"><label>Compartment</label><select id="hv-compt"><option value="">— Select compartment —</option>${buildComptOpts()}</select></div>
+      <div class="fg" id="hv-sub-row" style="display:none"><label>Sub name</label><select id="hv-sub"><option value="">—</option></select></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Species *</label><input id="hv-species" type="text" placeholder="Auto-filled from compartment"></div>
+      <div class="fg"><label>Trees felled *</label><input id="hv-qty" type="number" min="1" placeholder="0"></div>
+    </div>
+    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:.75rem;margin-bottom:.75rem">
+      <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Actual log counts (enter manually — a 12m tree = 3 logs, 8m = 2 logs)</div>
+      <div class="frow">
+        <div class="fg"><label>Logs cross-cutted</label><input id="hv-crosscut" type="number" min="0" placeholder="0"></div>
+        <div class="fg"><label>Hand-rolled logs</label><input id="hv-handrolled" type="number" min="0" placeholder="0"></div>
+      </div>
+    </div>
+    <div class="fg" style="background:var(--g-light);border:1px solid rgba(30,95,54,.2);border-radius:6px;padding:.6rem .75rem;margin-bottom:.75rem">
+      <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Calculated totals</div>
+      <div style="display:flex;gap:1.5rem;margin-top:.35rem">
+        <span style="font-size:13px"><strong id="hv-logs-preview">0</strong> total logs</span>
+        <span style="font-size:13px;color:var(--green)"><strong id="hv-vol-preview">0.00</strong> m³ (÷4.4)</span>
+      </div>
+      <div style="font-size:11px;color:var(--t3);margin-top:4px">If logs not entered, fallback: trees × 2</div>
     </div>
     <div class="fg"><label>Notes</label><input id="hv-notes" type="text"></div>
     <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
     async () => {
       const r = await UFCL.harvestCreate(STORAGE.user.id, {
-        harvest_date: $('hv-date').value, location: $('hv-loc').value.trim(),
-        species: $('hv-species').value.trim(), quantity: $('hv-qty').value,
-        uom: $('hv-uom').value.trim() || 'units', notes: $('hv-notes').value.trim()
+        harvest_date: $('hv-date').value,
+        compt_id: $('hv-compt').value || null,
+        sub_name: $('hv-sub')?.value || null,
+        species: $('hv-species').value.trim(),
+        quantity: $('hv-qty').value,
+        logs_crosscut: $('hv-crosscut').value || 0,
+        logs_handrolled: $('hv-handrolled').value || 0,
+        uom: 'trees',
+        notes: $('hv-notes').value.trim()
       });
       if (!r.ok) { showOverlayError(r.error); return; }
       showOverlaySuccess('Harvest logged.'); await refresh();
     }
   );
+  wireComptDropdown(
+    document.getElementById('hv-compt'),
+    document.getElementById('hv-sub-row'),
+    document.getElementById('hv-sub'),
+    document.getElementById('hv-species')
+  );
+  function updateHarvestPreview() {
+    const trees = Number(document.getElementById('hv-qty')?.value || 0);
+    const xcut  = Number(document.getElementById('hv-crosscut')?.value || 0);
+    const hroll = Number(document.getElementById('hv-handrolled')?.value || 0);
+    const totalLogs = (xcut + hroll) > 0 ? (xcut + hroll) : trees * 2;
+    const volM3 = (totalLogs / 4.4).toFixed(2);
+    const lp = document.getElementById('hv-logs-preview');
+    const vp = document.getElementById('hv-vol-preview');
+    if (lp) lp.textContent = totalLogs.toLocaleString();
+    if (vp) vp.textContent = volM3;
+  }
+  ['hv-qty','hv-crosscut','hv-handrolled'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.oninput = updateHarvestPreview;
+  });
 
   document.querySelectorAll('.hv2-edit').forEach(btn => {
     btn.onclick = () => {
       const r = rows.find(x => x.id === Number(btn.dataset.id));
       if (!r) return;
+      const isoDate = r.harvest_date.split('/').reverse().join('-');
       openOverlay('Edit Harvest Log', r.species, `
         <div class="frow">
-          <div class="fg"><label>Date *</label><input id="hv-date" type="date" value="${r.harvest_date.split('/').reverse().join('-')}"></div>
-          <div class="fg"><label>Location *</label><input id="hv-loc" type="text" value="${r.location}"></div>
+          <div class="fg"><label>Date *</label><input id="hv-date" type="date" value="${isoDate}"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Compartment</label><select id="hv-compt"><option value="">— Select compartment —</option>${buildComptOpts(r.compt_id)}</select></div>
+          <div class="fg" id="hv-sub-row" ${r.sub_name ? '' : 'style="display:none"'}>
+            <label>Sub name</label>
+            <select id="hv-sub"><option value="">—</option>${r.sub_name ? `<option value="${r.sub_name}" selected>${r.sub_name}</option>` : ''}</select>
+          </div>
         </div>
         <div class="frow">
           <div class="fg"><label>Species *</label><input id="hv-species" type="text" value="${r.species}"></div>
-          <div class="fg"><label>Quantity *</label><input id="hv-qty" type="number" min="1" value="${r.quantity}"></div>
-          <div class="fg"><label>UoM</label><input id="hv-uom" type="text" value="${r.uom}"></div>
+          <div class="fg"><label>Trees felled *</label><input id="hv-qty" type="number" min="1" value="${r.quantity}"></div>
+        </div>
+        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:.75rem;margin-bottom:.75rem">
+          <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Actual log counts</div>
+          <div class="frow">
+            <div class="fg"><label>Logs cross-cutted</label><input id="hv-crosscut" type="number" min="0" value="${r.logs_crosscut||0}"></div>
+            <div class="fg"><label>Hand-rolled logs</label><input id="hv-handrolled" type="number" min="0" value="${r.logs_handrolled||0}"></div>
+          </div>
         </div>
         <div class="fg"><label>Notes</label><input id="hv-notes" type="text" value="${r.notes||''}"></div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
           const payload = {
-            harvest_date: $('hv-date').value, location: $('hv-loc').value.trim(),
-            species: $('hv-species').value.trim(), quantity: $('hv-qty').value,
-            uom: $('hv-uom').value.trim(), notes: $('hv-notes').value.trim()
+            harvest_date: $('hv-date').value,
+            compt_id: $('hv-compt').value || null,
+            sub_name: $('hv-sub')?.value || null,
+            species: $('hv-species').value.trim(),
+            quantity: $('hv-qty').value,
+            logs_crosscut: $('hv-crosscut').value || 0,
+            logs_handrolled: $('hv-handrolled').value || 0,
+            uom: 'trees',
+            notes: $('hv-notes').value.trim()
           };
           if (isSupervisor()) {
             const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
@@ -1263,6 +1415,12 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
           if (!res2.ok) { showOverlayError(res2.error); return; }
           showOverlaySuccess('Harvest log updated.'); await refresh();
         });
+      wireComptDropdown(
+        document.getElementById('hv-compt'),
+        document.getElementById('hv-sub-row'),
+        document.getElementById('hv-sub'),
+        document.getElementById('hv-species')
+      );
     };
   });
 
@@ -1282,7 +1440,7 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
         });
         return;
       }
-      confirmDelete(`Delete harvest log: <strong>${r.species}</strong> at ${r.location} on ${r.harvest_date}?`, async () => {
+      confirmDelete(`Delete harvest log: <strong>${r.species}</strong> on ${r.harvest_date}?`, async () => {
         const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id);
         if (!res2.ok) { showOverlayError(res2.error); return; }
         showOverlaySuccess('Harvest log deleted.'); await refresh();
@@ -2440,6 +2598,7 @@ async function renderUsers() {
     if (!userRes.ok) return renderDenied('users', userRes.error);
     const rows = userRes.rows || [];
     const roles = (roleRes.ok && roleRes.rows) || [];
+    const workshops = userRes.workshops || [];
 
     const activeCount = rows.filter((u) => u.active).length;
     const customCount = rows.filter((u) => (u.user_permissions || []).length || (u.user_responsibilities || []).length).length;
@@ -2462,13 +2621,14 @@ async function renderUsers() {
         </div>
         <div class="tw">
           <table class="dt">
-            <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Department</th><th>Override</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
+            <thead><tr><th>Username</th><th>Name</th><th>Role</th><th>Department</th><th>Workshop</th><th>Override</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
             <tbody>
               ${rows.map((u) => `<tr>
                 <td style="font-family:var(--fm);font-weight:500">${u.username}</td>
                 <td>${u.name}</td>
                 <td><span class="badge bt">${roleLabel(u.role)}</span></td>
                 <td>${u.department || '<span style="color:var(--t3)">—</span>'}</td>
+                <td>${u.workshop_name ? `<span class="badge bg" style="font-size:11px"><i class="ti ti-building-warehouse" style="font-size:10px"></i> ${u.workshop_name}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
                 <td>${((u.user_permissions || []).length || (u.user_responsibilities || []).length) ? '<span class="badge bb">Custom</span>' : '<span style="color:var(--t3)">—</span>'}</td>
                 <td><span class="badge ${u.active ? 'bg' : 'br'}">${u.active ? 'Active' : 'Inactive'}</span></td>
                 <td style="color:var(--t3)">${u.created}</td>
@@ -2513,6 +2673,9 @@ async function renderUsers() {
       .map((dept) => `<option value="${dept}">${dept || 'None'}</option>`)
       .join('');
 
+    const workshopOpts = `<option value="">None (all workshops)</option>` +
+      workshops.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
     const nu = $('newUser');
     if (nu)
       nu.onclick = () =>
@@ -2528,8 +2691,11 @@ async function renderUsers() {
           <div class="fg"><label>Role</label><select id="u-role">${roleOptions}</select></div>
           <div class="fg"><label>Department</label><select id="u-department">${departmentOptions}</select></div>
         </div>
+        <div class="fg"><label>Workshop assignment <span style="color:var(--t3);font-weight:400">(optional — restricts user to one workshop)</span></label>
+          <select id="u-workshop">${workshopOpts}</select>
+        </div>
         <div class="frow">
-          <div class="fg"><label>Password</label><input type="password" id="u-pass" placeholder="temporary password"></div>
+          <div class="fg"><label>Password</label><input type="password" id="u-pass" placeholder="temporary password" value="UFCL@1234"></div>
         </div>
         <div class="brow"><button type="button" class="bp1" id="ovSave">Create</button><button type="button" class="bs1" id="ovCancel">Cancel</button></div>
         `,
@@ -2539,7 +2705,8 @@ async function renderUsers() {
               name: $('u-name').value,
               role: $('u-role').value,
               department: $('u-department').value || null,
-              password: $('u-pass').value
+              password: $('u-pass').value,
+              workshop_id: $('u-workshop').value || null
             };
             const r = await UFCL.usersCreate(STORAGE.user.id, payload);
             if (!r.ok) return showOverlayError(r.error || 'Failed to create user.');
@@ -2562,6 +2729,9 @@ async function renderUsers() {
             <div class="fg"><label>Role</label><select id="eu-role">${roleOptions}</select></div>
             <div class="fg"><label>Department</label><select id="eu-department">${departmentOptions}</select></div>
           </div>
+          <div class="fg"><label>Workshop assignment <span style="color:var(--t3);font-weight:400">(restricts user to one workshop's stock)</span></label>
+            <select id="eu-workshop">${workshopOpts}</select>
+          </div>
           <div class="frow"><div class="fg"><label>Status</label><select id="eu-active"><option value="true">Active</option><option value="false">Inactive</option></select></div></div>
           <div class="brow"><button type="button" class="bp1" id="ovSave">Save</button><button type="button" class="bs1" id="ovCancel">Cancel</button></div>
           `,
@@ -2570,7 +2740,8 @@ async function renderUsers() {
               name: $('eu-name').value,
               role: $('eu-role').value,
               department: $('eu-department').value || null,
-              active: $('eu-active').value === 'true'
+              active: $('eu-active').value === 'true',
+              workshop_id: $('eu-workshop').value || null
             };
             const r = await UFCL.usersUpdate(STORAGE.user.id, id, payload);
             if (!r.ok) return showOverlayError(r.error || 'Failed to update user.');
@@ -2585,6 +2756,8 @@ async function renderUsers() {
           if (dep) dep.value = u.department || '';
           const sa = $('eu-active');
           if (sa) sa.value = u.active ? 'true' : 'false';
+          const ew = $('eu-workshop');
+          if (ew) ew.value = u.workshop_id || '';
         }, 10);
       };
     });
@@ -2881,10 +3054,157 @@ async function renderSage() {
 
 // ── Warehouses ────────────────────────────────────────────────────────────────
 
+// ── Logistics Dashboard ───────────────────────────────────────────────────────
+
+async function renderLogisticsDashboard() {
+  const pg = $('page-logistics-dashboard');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+
+  const res = await UFCL.logisticsDashboard(STORAGE.user.id);
+  if (!res.ok) return renderDenied('logistics-dashboard', res.error);
+
+  const { workshops, lowStock, recentMovements, monthTotals } = res;
+  const totalItems  = workshops.reduce((s, w) => s + Number(w.item_count || 0), 0);
+  const totalValue  = workshops.reduce((s, w) => s + Number(w.stock_value || 0), 0);
+  const totalQty    = workshops.reduce((s, w) => s + Number(w.total_qty || 0), 0);
+  const isRestricted = !!res.user_workshop_id;
+
+  const movTypeColor = t => ({ in:'var(--green)', out:'var(--red)', adjustment:'var(--amber)', transfer:'#1D4ED8', return:'var(--g-soft)' }[t] || 'var(--t3)');
+  const movTypeBadge = t => {
+    const cls = { in:'bg', out:'br', adjustment:'ba', transfer:'bb', return:'bt' }[t] || 'bt';
+    return `<span class="badge ${cls}">${t}</span>`;
+  };
+
+  const thisMonth = monthTotals.reduce((acc, r) => { acc[r.movement_type] = r; return acc; }, {});
+
+  pg.innerHTML = `
+    <div class="ptitle"><i class="ti ti-chart-pie-2" style="color:var(--g-soft)"></i> Logistics Dashboard</div>
+    <div class="psub">${isRestricted
+      ? `Showing data for your assigned workshop: <strong>${workshops[0]?.name || ''}</strong>.`
+      : 'Cross-workshop stock overview — all workshops, stock levels, movements, and low-stock alerts.'
+    }</div>
+
+    <!-- Summary KPI cards -->
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc" style="border-top:3px solid var(--g-soft)">
+        <div class="mclbl">Workshops</div>
+        <div class="mcval" style="color:var(--g-dark)">${workshops.length}</div>
+        <div class="mcsub cg"><i class="ti ti-building-warehouse"></i>${workshops.filter(w=>w.active).length} active</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #1D4ED8">
+        <div class="mclbl">Unique items in stock</div>
+        <div class="mcval">${totalItems.toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-package"></i>${totalQty.toLocaleString()} total units</div>
+      </div>
+      <div class="mc" style="border-top:3px solid var(--amber)">
+        <div class="mclbl">Stock value</div>
+        <div class="mcval" style="font-size:18px">K ${totalValue.toLocaleString('en', {minimumFractionDigits:0, maximumFractionDigits:0})}</div>
+        <div class="mcsub cg"><i class="ti ti-currency-dollar"></i>all workshops</div>
+      </div>
+      <div class="mc" style="border-top:3px solid var(--red)">
+        <div class="mclbl">Low stock alerts</div>
+        <div class="mcval" style="color:${lowStock.length > 0 ? 'var(--red)' : 'var(--green)'}">${lowStock.length}</div>
+        <div class="mcsub ${lowStock.length > 0 ? 'cr' : 'cg'}"><i class="ti ti-alert-triangle"></i>items at/below minimum</div>
+      </div>
+    </div>
+
+    <!-- This month movement totals -->
+    <div class="cards" style="margin-bottom:1.25rem">
+      ${['in','out','transfer','adjustment'].map(t => {
+        const m = thisMonth[t] || { cnt: 0, total_qty: 0 };
+        const labels = { in:'Stock In', out:'Stock Out', transfer:'Transfers', adjustment:'Adjustments' };
+        return `<div class="mc">
+          <div class="mclbl">${labels[t]} this month</div>
+          <div class="mcval" style="color:${movTypeColor(t)}">${Number(m.cnt || 0)}</div>
+          <div class="mcsub cg"><i class="ti ti-arrows-exchange"></i>${Number(m.total_qty || 0).toLocaleString()} units</div>
+        </div>`;
+      }).join('')}
+    </div>
+
+    <!-- Per-workshop cards -->
+    <div style="font-weight:600;font-size:13px;color:var(--t1);margin-bottom:.75rem"><i class="ti ti-building-warehouse" style="color:var(--g-soft)"></i> Workshop Stock Summary</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-bottom:1.5rem">
+      ${workshops.length ? workshops.map(w => {
+        const val = Number(w.stock_value || 0);
+        return `<div style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:1.25rem;border-top:3px solid var(--g-soft)">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem;margin-bottom:.875rem">
+            <div>
+              <div style="font-weight:700;font-size:15px;color:var(--g-dark)">${w.name}</div>
+              <div style="font-size:11px;color:var(--t3);margin-top:2px"><i class="ti ti-map-pin" style="font-size:10px"></i> ${w.location || 'No location'}</div>
+            </div>
+            <span class="badge ${w.active ? 'bg' : 'br'}">${w.active ? 'Active' : 'Inactive'}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem">
+            <div style="background:var(--bg2);border-radius:6px;padding:.625rem">
+              <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Items</div>
+              <div style="font-weight:700;font-family:var(--fm);font-size:18px;color:var(--t1)">${Number(w.item_count || 0)}</div>
+            </div>
+            <div style="background:var(--bg2);border-radius:6px;padding:.625rem">
+              <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Total units</div>
+              <div style="font-weight:700;font-family:var(--fm);font-size:18px;color:var(--t1)">${Number(w.total_qty || 0).toLocaleString()}</div>
+            </div>
+          </div>
+          <div style="margin-top:.75rem;padding:.5rem .625rem;background:var(--g-light);border-radius:6px;border:1px solid rgba(30,95,54,.15)">
+            <div style="font-size:10px;color:var(--g-dark);text-transform:uppercase;letter-spacing:.04em">Stock value</div>
+            <div style="font-weight:700;font-family:var(--fm);color:var(--g-dark)">K ${val.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          </div>
+        </div>`;
+      }).join('')
+      : `<div style="grid-column:1/-1;text-align:center;padding:2rem;color:var(--t3)">No workshops found.</div>`}
+    </div>
+
+    <!-- Low stock alerts -->
+    ${lowStock.length ? `
+    <div class="card" style="padding:0;margin-bottom:1.25rem">
+      <div style="display:flex;align-items:center;gap:.625rem;padding:.875rem 1.25rem;background:rgba(239,68,68,.05);border-bottom:1px solid rgba(239,68,68,.15);border-radius:8px 8px 0 0">
+        <i class="ti ti-alert-triangle" style="color:var(--red)"></i>
+        <span style="font-weight:600;font-size:13px;color:var(--red)">${lowStock.length} low-stock alert${lowStock.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Item</th><th>Category</th><th>Workshop</th><th>Current stock</th><th>Minimum</th><th>UOM</th></tr></thead>
+        <tbody>
+          ${lowStock.map(r => `<tr>
+            <td style="font-weight:600">${r.name}</td>
+            <td><span class="badge bt">${r.category}</span></td>
+            <td style="color:var(--t3)">${r.warehouse_name || '—'}</td>
+            <td style="font-family:var(--fm);font-weight:700;color:var(--red)">${r.total_stock}</td>
+            <td style="font-family:var(--fm);color:var(--t3)">${r.min_stock}</td>
+            <td style="color:var(--t3)">${r.uom}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>` : ''}
+
+    <!-- Recent movements -->
+    <div class="card" style="padding:0">
+      <div style="padding:.875rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-arrows-exchange"></i>Recent stock movements</h3>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Date/Time</th><th>Item</th><th>Workshop</th><th>Type</th><th>Qty</th><th>By</th></tr></thead>
+        <tbody>
+          ${recentMovements.length ? recentMovements.map(r => `<tr>
+            <td style="font-size:12px;color:var(--t3);font-family:var(--fm)">${r.created_at}</td>
+            <td style="font-weight:500">${r.item_name}<br><span style="font-size:11px;color:var(--t3)">${r.category}</span></td>
+            <td style="color:var(--t3);font-size:12px">${r.workshop_name || '—'}</td>
+            <td>${movTypeBadge(r.movement_type)}</td>
+            <td style="font-family:var(--fm);font-weight:600">${Number(r.quantity)} ${r.uom}</td>
+            <td style="color:var(--t3);font-size:12px">${r.created_by || '—'}</td>
+          </tr>`).join('')
+          : `<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:2rem">No movements yet.</td></tr>`}
+        </tbody>
+      </table></div>
+    </div>`;
+}
+
+// ── Workshops ─────────────────────────────────────────────────────────────────
+
 async function renderWarehouses() {
   const res = await UFCL.warehousesList(STORAGE.user.id);
   if (!res.ok) return renderDenied('warehouses', res.error);
   const rows = res.rows || [];
+  const isRestricted = !!res.user_workshop_id;
+  const canManage = ['admin', 'ceo', 'operations', 'logistics'].includes(STORAGE.user?.role);
 
   const whActive = rows.filter(r=>r.active).length;
   const whCap    = rows.reduce((s,r)=>s+Number(r.capacity||0),0);
@@ -2892,105 +3212,152 @@ async function renderWarehouses() {
   $('page-warehouses').innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
-        <div class="ptitle">Warehouses</div>
-        <div class="psub">Manage your storage network — add locations, track capacities, and activate or deactivate sites.</div>
+        <div class="ptitle"><i class="ti ti-building-warehouse" style="color:var(--g-soft)"></i> Workshops</div>
+        <div class="psub">${isRestricted ? `You are assigned to: <strong>${rows[0]?.name || 'your workshop'}</strong>. Only your workshop data is shown.` : 'Manage workshops — independent stock locations. Assign users to a workshop so they only see that workshop\'s stock.'}</div>
       </div>
-      <button class="bp1" id="whAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>Add warehouse</button>
+      ${canManage ? `<div style="display:flex;gap:.5rem;flex-shrink:0">
+        <button class="bp1" id="whQuickUser"><i class="ti ti-user-plus"></i>Add workshop user</button>
+        <button class="appbtn" id="whAdd"><i class="ti ti-plus" style="font-size:12px"></i> Add workshop</button>
+      </div>` : ''}
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
-      <div class="mc"><div class="mclbl">Locations</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-building-warehouse"></i>total</div></div>
-      <div class="mc"><div class="mclbl">Active</div><div class="mcval">${whActive}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>in use</div></div>
+      <div class="mc" style="border-top:3px solid var(--g-soft)"><div class="mclbl">Workshops</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-building-warehouse"></i>total</div></div>
+      <div class="mc"><div class="mclbl">Active</div><div class="mcval" style="color:var(--green)">${whActive}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>in use</div></div>
       <div class="mc"><div class="mclbl">Inactive</div><div class="mcval">${rows.length-whActive}</div><div class="mcsub ca"><i class="ti ti-circle-x"></i>offline</div></div>
-      <div class="mc"><div class="mclbl">Total capacity</div><div class="mcval">${whCap.toLocaleString()}</div><div class="mcsub bp"><i class="ti ti-database"></i>units</div></div>
+      <div class="mc"><div class="mclbl">Total capacity</div><div class="mcval">${whCap.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-database"></i>units</div></div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:1rem">
       ${rows.length ? rows.map(r => `
-        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:1.25rem;display:flex;flex-direction:column;gap:.75rem">
+        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:1.25rem;display:flex;flex-direction:column;gap:.75rem;border-top:3px solid var(--g-soft)">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
             <div>
-              <div style="font-weight:600;font-size:15px">${r.name}</div>
-              <div style="font-size:12px;color:var(--t3);margin-top:2px">${r.location||'No location set'}</div>
+              <div style="font-weight:700;font-size:16px;color:var(--g-dark)">${r.name}</div>
+              <div style="font-size:12px;color:var(--t3);margin-top:3px"><i class="ti ti-map-pin" style="font-size:11px"></i> ${r.location||'No location set'}</div>
             </div>
             <span class="badge ${r.active?'bg':'br'}">${r.active?'Active':'Inactive'}</span>
           </div>
           <div style="display:flex;gap:1.5rem">
-            <div><div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Capacity</div><div style="font-weight:600;font-family:var(--fm)">${r.capacity?Number(r.capacity).toLocaleString():'—'}</div></div>
+            <div><div style="font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.04em">Capacity</div><div style="font-weight:600;font-family:var(--fm)">${r.capacity?Number(r.capacity).toLocaleString()+'  units':'—'}</div></div>
           </div>
           ${r.notes?`<div style="font-size:12px;color:var(--t3);padding:.5rem .75rem;background:var(--bg2);border-radius:5px">${r.notes}</div>`:''}
-          <div style="display:flex;gap:.5rem;margin-top:auto;padding-top:.25rem;border-top:1px solid var(--bdr)">
+          ${canManage ? `<div style="display:flex;gap:.5rem;margin-top:auto;padding-top:.25rem;border-top:1px solid var(--bdr)">
             <button class="bs1 wh-edit" data-id="${r.id}" style="flex:1;justify-content:center"><i class="ti ti-edit"></i>Edit</button>
             <button class="bs1 wh-del" data-id="${r.id}" style="color:var(--red);padding:6px 10px"><i class="ti ti-trash"></i></button>
-          </div>
+          </div>` : ''}
         </div>`).join('')
-      : `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--t3)"><i class="ti ti-building-warehouse" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No warehouses yet. Click <strong>Add warehouse</strong> to create your first location.</div>`}
+      : `<div style="grid-column:1/-1;text-align:center;padding:3rem;color:var(--t3)"><i class="ti ti-building-warehouse" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No workshops yet. Click <strong>Add workshop</strong> to create your first location.</div>`}
     </div>
   `;
 
-  $('whAdd').onclick = () => openOverlay('Add warehouse', null, `
-    <div class="frow">
-      <div class="fg"><label>Name *</label><input id="wh-name" type="text" placeholder="e.g. Main Warehouse"></div>
-      <div class="fg"><label>Location</label><input id="wh-location" type="text" placeholder="Site or address"></div>
-    </div>
-    <div class="frow">
-      <div class="fg"><label>Capacity (units)</label><input id="wh-cap" type="number" min="0" placeholder="0"></div>
-      <div class="fg"><label>Notes</label><input id="wh-notes" type="text"></div>
-    </div>
-    <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
-    <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
-    const res2 = await UFCL.warehousesCreate(STORAGE.user.id, {
-      name: $('wh-name').value.trim(),
-      location: $('wh-location').value.trim(),
-      capacity: $('wh-cap').value,
-      notes: $('wh-notes').value.trim()
+  if (canManage) {
+    $('whAdd').onclick = () => openOverlay('Add Workshop', null, `
+      <div class="frow">
+        <div class="fg"><label>Workshop name *</label><input id="wh-name" type="text" placeholder="e.g. Gatare Workshop"></div>
+        <div class="fg"><label>Location</label><input id="wh-location" type="text" placeholder="Site or address"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Capacity (units)</label><input id="wh-cap" type="number" min="0" placeholder="0"></div>
+        <div class="fg"><label>Notes</label><input id="wh-notes" type="text"></div>
+      </div>
+      <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
+      <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
+      const res2 = await UFCL.warehousesCreate(STORAGE.user.id, {
+        name: $('wh-name').value.trim(),
+        location: $('wh-location').value.trim(),
+        capacity: $('wh-cap').value,
+        notes: $('wh-notes').value.trim()
+      });
+      if (!res2.ok) { showOverlayError(res2.error); return; }
+      showOverlaySuccess('Workshop added.');
+      await renderWarehouses();
     });
-    if (!res2.ok) { showOverlayError(res2.error); return; }
-    showOverlaySuccess('Warehouse added.');
-    await renderWarehouses();
-  });
 
-  document.querySelectorAll('.wh-del').forEach(btn => {
-    btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
-      if (!r) return;
-      confirmDelete(`Delete warehouse <strong>${r.name}</strong>? All stock levels in this warehouse will also be removed.`, async () => {
-        const res2 = await UFCL.warehousesDelete(STORAGE.user.id, r.id);
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Warehouse deleted.'); await renderWarehouses();
-      });
-    };
-  });
-
-  document.querySelectorAll('.wh-edit').forEach(btn => {
-    btn.onclick = () => {
-      const row = rows.find(r => r.id === Number(btn.dataset.id));
-      if (!row) return;
-      openOverlay('Edit warehouse', row.name, `
-        <div class="frow">
-          <div class="fg"><label>Name *</label><input id="whe-name" type="text" value="${row.name}"></div>
-          <div class="fg"><label>Location</label><input id="whe-location" type="text" value="${row.location||''}"></div>
+    const workshopOpts = rows.map(r => `<option value="${r.id}">${r.name}</option>`).join('');
+    $('whQuickUser').onclick = () => openOverlay('Register Workshop User', 'Quickly add a user with access limited to one workshop.', `
+      <div class="frow">
+        <div class="fg"><label>Full name *</label><input id="wu-name" type="text" placeholder="Full name"></div>
+        <div class="fg"><label>Username *</label><input id="wu-user" type="text" placeholder="Login username"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Password *</label><input id="wu-pass" type="password" value="UFCL@1234" placeholder="Initial password"></div>
+        <div class="fg"><label>Role</label>
+          <select id="wu-role">
+            <option value="storekeeper">Storekeeper</option>
+            <option value="supervisor">Supervisor</option>
+            <option value="logistics">Logistics Manager</option>
+          </select>
         </div>
-        <div class="frow">
-          <div class="fg"><label>Capacity</label><input id="whe-cap" type="number" min="0" value="${row.capacity||''}"></div>
-          <div class="fg"><label>Notes</label><input id="whe-notes" type="text" value="${row.notes||''}"></div>
-        </div>
-        <div class="fg"><label>Status</label>
-          <select id="whe-active"><option value="true" ${row.active?'selected':''}>Active</option><option value="false" ${!row.active?'selected':''}>Inactive</option></select>
-        </div>
-        <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
-        <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
-        const res2 = await UFCL.warehousesUpdate(STORAGE.user.id, row.id, {
-          name: $('whe-name').value.trim(),
-          location: $('whe-location').value.trim(),
-          capacity: $('whe-cap').value,
-          notes: $('whe-notes').value.trim(),
-          active: $('whe-active').value === 'true'
+      </div>
+      <div class="fg"><label>Assign to workshop *</label>
+        <select id="wu-workshop"><option value="">— select workshop —</option>${workshopOpts}</select>
+      </div>
+      <div class="fg"><label>Department</label><input id="wu-dept" type="text" placeholder="e.g. Logistics, Forestry"></div>
+      <div style="font-size:12px;color:var(--t3);padding:.625rem .75rem;background:var(--bg2);border-radius:6px;margin-bottom:.75rem">
+        <i class="ti ti-info-circle" style="color:var(--amber)"></i>
+        This user will <strong>only</strong> see stock and movements from the assigned workshop.
+        The storekeeper role sees all workshops regardless of assignment.
+      </div>
+      <div class="brow">
+        <button class="bp1" id="ovSave"><i class="ti ti-user-plus"></i>Register user</button>
+        <button class="bs1" id="ovCancel">Cancel</button>
+      </div>`,
+      async () => {
+        const r2 = await UFCL.usersCreate(STORAGE.user.id, {
+          name:        $('wu-name').value.trim(),
+          username:    $('wu-user').value.trim(),
+          password:    $('wu-pass').value,
+          role:        $('wu-role').value,
+          department:  $('wu-dept').value.trim() || null,
+          workshop_id: $('wu-workshop').value || null
         });
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Warehouse updated.');
-        await renderWarehouses();
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Workshop user registered.');
       });
-    };
-  });
+
+    document.querySelectorAll('.wh-del').forEach(btn => {
+      btn.onclick = () => {
+        const r = rows.find(x => x.id === Number(btn.dataset.id));
+        if (!r) return;
+        confirmDelete(`Delete workshop <strong>${r.name}</strong>? All stock levels in this workshop will also be removed.`, async () => {
+          const res2 = await UFCL.warehousesDelete(STORAGE.user.id, r.id);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Workshop deleted.'); await renderWarehouses();
+        });
+      };
+    });
+
+    document.querySelectorAll('.wh-edit').forEach(btn => {
+      btn.onclick = () => {
+        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        if (!row) return;
+        openOverlay('Edit Workshop', row.name, `
+          <div class="frow">
+            <div class="fg"><label>Name *</label><input id="whe-name" type="text" value="${row.name}"></div>
+            <div class="fg"><label>Location</label><input id="whe-location" type="text" value="${row.location||''}"></div>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Capacity</label><input id="whe-cap" type="number" min="0" value="${row.capacity||''}"></div>
+            <div class="fg"><label>Notes</label><input id="whe-notes" type="text" value="${row.notes||''}"></div>
+          </div>
+          <div class="fg"><label>Status</label>
+            <select id="whe-active"><option value="true" ${row.active?'selected':''}>Active</option><option value="false" ${!row.active?'selected':''}>Inactive</option></select>
+          </div>
+          <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
+          <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
+          const res2 = await UFCL.warehousesUpdate(STORAGE.user.id, row.id, {
+            name: $('whe-name').value.trim(),
+            location: $('whe-location').value.trim(),
+            capacity: $('whe-cap').value,
+            notes: $('whe-notes').value.trim(),
+            active: $('whe-active').value === 'true'
+          });
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Workshop updated.');
+          await renderWarehouses();
+        });
+      };
+    });
+  }
 }
 
 // ── Stock Catalog ─────────────────────────────────────────────────────────────
@@ -4203,10 +4570,11 @@ async function renderMachines() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} machine${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canManage?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Code</th><th>Name</th><th>Plate/Fleet No.</th><th>Category</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canManage?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r => `<tr>
           <td style="font-family:var(--fm);font-weight:600">${r.machine_code}</td>
           <td style="font-weight:500">${r.name}</td>
+          <td style="font-family:var(--fm);color:var(--g-dark)">${r.plate_number || '—'}</td>
           <td><span class="badge bt">${r.category_name}</span></td>
           <td><span class="badge ${statusCls(r.status)}">${r.status}</span></td>
           <td style="font-family:var(--fm)">${r.production_capacity ? Number(r.production_capacity).toLocaleString()+' '+r.capacity_unit+'/day' : '—'}</td>
@@ -4219,7 +4587,7 @@ async function renderMachines() {
             <button class="bs1 mch-maint" data-id="${r.id}" title="Maintenance schedules"><i class="ti ti-calendar"></i></button>
           </td>` : ''}
         </tr>`).join('')
-        : `<tr><td colspan="${canManage?8:7}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
+        : `<tr><td colspan="${canManage?9:8}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
@@ -4254,8 +4622,9 @@ async function renderMachines() {
       </div>
       <div class="frow">
         <div class="fg"><label>Date Acquired</label><input id="mch-acquired" type="date" value="${r&&r.date_acquired?String(r.date_acquired).slice(0,10):''}"></div>
-        <div class="fg"><label>Notes</label><input id="mch-notes" type="text" value="${r?r.notes||'':''}"></div>
+        <div class="fg"><label>Plate / Fleet Number</label><input id="mch-plate" type="text" value="${r?r.plate_number||'':''}" placeholder="e.g. RAA 001A or FL-003"></div>
       </div>
+      <div class="fg"><label>Notes</label><input id="mch-notes" type="text" value="${r?r.notes||'':''}"></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`;
   }
 
@@ -4275,6 +4644,7 @@ async function renderMachines() {
         serial_number: $('mch-serial').value.trim(),
         year_manufactured: $('mch-year').value || null,
         date_acquired: $('mch-acquired').value || null,
+        plate_number: $('mch-plate').value.trim() || null,
         notes: $('mch-notes').value.trim()
       });
       if (!r2.ok) { showOverlayError(r2.error); return; }
@@ -4300,6 +4670,7 @@ async function renderMachines() {
             serial_number: $('mch-serial').value.trim(),
             year_manufactured: $('mch-year').value || null,
             date_acquired: $('mch-acquired').value || null,
+            plate_number: $('mch-plate').value.trim() || null,
             notes: $('mch-notes').value.trim()
           });
           if (!r2.ok) { showOverlayError(r2.error); return; }
@@ -4377,8 +4748,10 @@ async function renderMachineLogs() {
 
   const rows = res.rows || [];
   const machines = res.machines || [];
+  const itemCategories = res.itemCategories || [];
   const canDelete = ['admin', 'operations'].includes(STORAGE.user?.role);
   const canAdd = ['admin', 'operations', 'supervisor'].includes(STORAGE.user?.role);
+  const canManageCats = ['admin', 'operations', 'supervisor'].includes(STORAGE.user?.role);
 
   const totalHours = rows.reduce((s, r) => s + Number(r.hours_worked), 0);
   const totalDowntime = rows.reduce((s, r) => s + Number(r.downtime_hours), 0);
@@ -4393,9 +4766,12 @@ async function renderMachineLogs() {
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Machine Daily Logs</div>
-        <div class="psub">Log daily production, hours worked, downtime, and fuel consumption for each machine.</div>
+        <div class="psub">Log daily production, hours worked, downtime, fuel consumption, and item category for each machine.</div>
       </div>
-      ${canAdd ? `<button class="bp1" id="mlAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>Add log entry</button>` : ''}
+      <div style="display:flex;gap:.5rem;flex-shrink:0">
+        ${canManageCats ? `<button class="bs1" id="mlManageCats"><i class="ti ti-tag"></i>Categories</button>` : ''}
+        ${canAdd ? `<button class="bp1" id="mlAdd"><i class="ti ti-plus"></i>Add log entry</button>` : ''}
+      </div>
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
       <div class="mc"><div class="mclbl">Entries This Month</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-list-details"></i>${defaultMonth}</div></div>
@@ -4409,7 +4785,7 @@ async function renderMachineLogs() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} entr${rows.length!==1?'ies':'y'}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Machine</th><th>Category</th><th>Shift</th><th>Hrs Worked</th><th>Downtime</th><th>Production</th><th>Capacity</th><th>Efficiency</th><th>Fuel (L)</th>${canDelete?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Date</th><th>Machine</th><th>Machine Cat.</th><th>Item Category</th><th>Shift</th><th>Hrs Worked</th><th>Downtime</th><th>Production</th><th>Capacity</th><th>Efficiency</th><th>Fuel (L)</th>${canDelete?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r => {
           const eff = Number(r.capacity_per_day) > 0
             ? Math.round((Number(r.daily_production) / Number(r.capacity_per_day)) * 100)
@@ -4419,6 +4795,7 @@ async function renderMachineLogs() {
             <td>${new Date(r.log_date+'T12:00:00').toLocaleDateString('en-GB')}</td>
             <td style="font-weight:500">${r.machine_code} — ${r.machine_name}</td>
             <td><span class="badge bt">${r.category_name}</span></td>
+            <td>${r.item_category ? `<span class="badge bg" style="font-size:11px">${r.item_category}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
             <td>${r.shift}</td>
             <td style="font-family:var(--fm)">${Number(r.hours_worked).toFixed(1)}</td>
             <td style="font-family:var(--fm);${Number(r.downtime_hours)>0?'color:var(--amber)':''}">${Number(r.downtime_hours).toFixed(1)}</td>
@@ -4432,7 +4809,7 @@ async function renderMachineLogs() {
             </td>` : ''}
           </tr>`;
         }).join('')
-        : `<tr><td colspan="${canDelete?11:10}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-list-details" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No log entries for this month.</td></tr>`}
+        : `<tr><td colspan="${canDelete?12:11}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-list-details" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No log entries for this month.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
@@ -4440,28 +4817,38 @@ async function renderMachineLogs() {
   function logForm(r) {
     const mOpts = machines.map(m => `<option value="${m.id}" ${r&&Number(r.machine_id)===m.id?'selected':''}>${m.machine_code} — ${m.name} (${m.category_name})</option>`).join('');
     const sOpts = ['Full Day','Day Shift','Night Shift'].map(s => `<option ${r&&r.shift===s?'selected':''}>${s}</option>`).join('');
+    // Item category: default to the existing value (edit) or first category (new entry)
+    const defaultCat = r?.item_category || (itemCategories[0]?.name || '');
+    const catOpts = itemCategories.map(c =>
+      `<option value="${c.name}" ${(r?r.item_category:defaultCat)===c.name?'selected':''}>${c.name}</option>`
+    ).join('');
     return `
       <div class="frow">
         <div class="fg"><label>Machine *</label><select id="ml-machine" ${r?'disabled':''}>${mOpts}</select></div>
         <div class="fg"><label>Date *</label><input id="ml-date" type="date" value="${r?String(r.log_date).slice(0,10):today.toISOString().slice(0,10)}"></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Item Category *</label>
+          <select id="ml-cat">
+            ${catOpts || '<option value="">No categories yet</option>'}
+          </select>
+        </div>
         <div class="fg"><label>Shift</label><select id="ml-shift">${sOpts}</select></div>
-        <div class="fg"><label>Hours Worked</label><input id="ml-hours" type="number" min="0" step="0.25" value="${r?r.hours_worked:0}"></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Hours Worked</label><input id="ml-hours" type="number" min="0" step="0.25" value="${r?r.hours_worked:0}"></div>
         <div class="fg"><label>Downtime (hrs)</label><input id="ml-dt" type="number" min="0" step="0.25" value="${r?r.downtime_hours:0}"></div>
+      </div>
+      <div class="frow">
         <div class="fg"><label>Downtime Reason</label><input id="ml-dtr" type="text" value="${r?r.downtime_reason||'':''}" placeholder="Reason if any"></div>
+        <div class="fg"><label>Fuel Consumed (L)</label><input id="ml-fuel" type="number" min="0" step="0.1" value="${r?r.fuel_consumed:0}"></div>
       </div>
       <div class="frow">
         <div class="fg"><label>Daily Production</label><input id="ml-prod" type="number" min="0" step="0.1" value="${r?r.daily_production:0}"></div>
         <div class="fg"><label>Capacity for Day</label><input id="ml-cap" type="number" min="0" step="0.1" value="${r?r.capacity_per_day:0}"></div>
       </div>
-      <div class="frow">
-        <div class="fg"><label>Product Type</label><input id="ml-ptype" type="text" value="${r?r.product_type||'':''}" placeholder="e.g. Sawn Timber, Poles"></div>
-        <div class="fg"><label>Fuel Consumed (L)</label><input id="ml-fuel" type="number" min="0" step="0.1" value="${r?r.fuel_consumed:0}"></div>
-      </div>
-      <div style="font-size:12px;color:var(--t3);font-weight:600;margin-bottom:.5rem;margin-top:.25rem">Log Loader fields (fill if applicable)</div>
+      <div class="fg"><label>Product Type</label><input id="ml-ptype" type="text" value="${r?r.product_type||'':''}" placeholder="e.g. Sawn Timber, Poles"></div>
+      <div style="font-size:12px;color:var(--t3);font-weight:600;margin-bottom:.5rem;margin-top:.5rem">Log Loader fields <span style="font-weight:400">(fill if applicable)</span></div>
       <div class="frow">
         <div class="fg"><label>Logs Loaded (m³)</label><input id="ml-loaded" type="number" min="0" step="0.1" value="${r?r.logs_loaded:0}"></div>
         <div class="fg"><label>Logs Unloaded (m³)</label><input id="ml-unloaded" type="number" min="0" step="0.1" value="${r?r.logs_unloaded:0}"></div>
@@ -4475,6 +4862,7 @@ async function renderMachineLogs() {
     return {
       machine_id: $('ml-machine').value,
       log_date: $('ml-date').value,
+      item_category: $('ml-cat')?.value || null,
       shift: $('ml-shift').value,
       hours_worked: $('ml-hours').value,
       downtime_hours: $('ml-dt').value,
@@ -4488,6 +4876,69 @@ async function renderMachineLogs() {
       loading_trips: $('ml-trips').value,
       remarks: $('ml-remarks').value.trim() || null
     };
+  }
+
+  if (canManageCats) {
+    $('mlManageCats')?.addEventListener('click', async () => {
+      const catRes = await UFCL.machineLogCatsList(STORAGE.user.id);
+      const cats = catRes.ok ? (catRes.rows || []) : [];
+      const catTableRows = cats.length
+        ? cats.map(c => `<tr>
+            <td style="font-weight:500">${c.name}</td>
+            <td><span class="badge ${c.active?'bg':'br'}">${c.active?'Active':'Inactive'}</span></td>
+            <td><button class="bs1 cat-del" data-id="${c.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-trash"></i></button></td>
+          </tr>`).join('')
+        : `<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:1rem">No categories yet.</td></tr>`;
+
+      openOverlay('Manage Item Categories', 'Create and remove item categories used in machine daily logs.', `
+        <div class="tw" style="margin-bottom:1.25rem"><table class="dt" style="min-width:0">
+          <thead><tr><th>Category name</th><th>Status</th><th></th></tr></thead>
+          <tbody id="cat-table-body">${catTableRows}</tbody>
+        </table></div>
+        <div style="border-top:1px solid var(--bdr);padding-top:1rem">
+          <div style="font-weight:600;font-size:13px;margin-bottom:.625rem">Add new category</div>
+          <div class="frow" style="align-items:flex-end;gap:.625rem">
+            <div class="fg" style="flex:1"><label>Category name *</label><input id="new-cat-name" type="text" placeholder="e.g. Bearings, Filters, Belts"></div>
+            <button class="bp1" id="cat-add-btn" style="flex-shrink:0;margin-bottom:0"><i class="ti ti-plus"></i>Add</button>
+          </div>
+        </div>
+        <div class="brow"><button class="bs1" id="ovCancel">Close</button></div>`,
+        async () => {}
+      );
+
+      // Inline add handler (not using ovSave — it would close the overlay)
+      $('cat-add-btn')?.addEventListener('click', async () => {
+        const name = $('new-cat-name')?.value?.trim();
+        if (!name) { showOverlayError('Category name is required'); return; }
+        const r2 = await UFCL.machineLogCatsCreate(STORAGE.user.id, { name });
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        // Re-render category list inside overlay
+        const updated = await UFCL.machineLogCatsList(STORAGE.user.id);
+        const updatedCats = updated.ok ? (updated.rows || []) : [];
+        const tbody = $('cat-table-body');
+        if (tbody) tbody.innerHTML = updatedCats.map(c => `<tr>
+          <td style="font-weight:500">${c.name}</td>
+          <td><span class="badge ${c.active?'bg':'br'}">${c.active?'Active':'Inactive'}</span></td>
+          <td><button class="bs1 cat-del" data-id="${c.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-trash"></i></button></td>
+        </tr>`).join('');
+        if ($('new-cat-name')) $('new-cat-name').value = '';
+        bindCatDelete();
+        // Re-render the main page in background so new category is available
+        renderMachineLogs();
+      });
+
+      function bindCatDelete() {
+        document.querySelectorAll('.cat-del').forEach(btn => {
+          btn.onclick = async () => {
+            const r2 = await UFCL.machineLogCatsDelete(STORAGE.user.id, Number(btn.dataset.id));
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            btn.closest('tr').remove();
+            renderMachineLogs();
+          };
+        });
+      }
+      bindCatDelete();
+    });
   }
 
   if (canAdd) {
@@ -4749,6 +5200,868 @@ async function renderMachineKpi() {
           });
       };
     }
+  }
+}
+
+// ── Compartments ─────────────────────────────────────────────────────────────
+
+async function renderCompartments() {
+  $('page-compartments').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+  const res = await UFCL.compartmentsList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('compartments', res.error);
+  const rows = res.rows || [];
+  const today = new Date().toISOString().split('T')[0];
+  const totalArea = rows.reduce((s, r) => s + Number(r.area_ha || 0), 0);
+  const totalVol  = rows.reduce((s, r) => s + Number(r.volume_m3 || 0), 0);
+  const totalHarvVol = rows.reduce((s, r) => s + Number(r.volume_harvested_m3 || 0), 0);
+  const activeCount = rows.filter(r => r.status === 'Active').length;
+
+  $('page-compartments').innerHTML = `
+    <div class="ptitle"><i class="ti ti-map-pin" style="color:var(--g-soft)"></i> Compartments</div>
+    <div class="psub">Forest compartments (blocks). Each compartment has a calculated volume based on 219 m³/ha. Once fully harvested it is automatically marked Completed.</div>
+    <div class="cards">
+      <div class="mc" style="border-top:3px solid #2E8B57">
+        <div class="mclbl">Active compartments</div>
+        <div class="mcval" style="color:var(--green)">${activeCount}</div>
+        <div class="mcsub cg"><i class="ti ti-map-pin"></i>${rows.length} total</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Total area</div>
+        <div class="mcval">${totalArea.toFixed(1)} ha</div>
+        <div class="mcsub cg"><i class="ti ti-trees"></i>all compartments</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Total standing volume</div>
+        <div class="mcval">${totalVol.toFixed(1)} m³</div>
+        <div class="mcsub cg"><i class="ti ti-cube"></i>@ 219 m³/ha</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Volume harvested</div>
+        <div class="mcval" style="color:var(--green)">${totalHarvVol.toFixed(1)} m³</div>
+        <div class="mcsub cg"><i class="ti ti-axe"></i>from felled trees</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <h3 style="margin-bottom:0"><i class="ti ti-map-pin"></i>Compartment list</h3>
+        <button class="appbtn" id="newCompt"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Add compartment</button>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Name</th><th>Sub-name</th><th>Species</th><th>Area (ha)</th><th>Expected Volume (m³)</th><th>Harvested (m³)</th><th>Progress</th><th>Status</th><th>Date</th><th>Action</th></tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:2rem">No compartments yet. Click "Add compartment" to create one.</td></tr>'
+            : rows.map(r => {
+                const pct = Number(r.volume_m3) > 0 ? Math.min(100, Math.round(Number(r.volume_harvested_m3) / Number(r.volume_m3) * 100)) : 0;
+                const statusBadge = r.status === 'Active' ? '<span class="badge bg">Active</span>' : '<span class="badge ba">Completed</span>';
+                return `<tr>
+                  <td style="font-weight:600;color:var(--g-dark)">${r.compt_name}</td>
+                  <td style="color:var(--t3)">${r.sub_name || '—'}</td>
+                  <td><span class="badge bt">${r.species}</span></td>
+                  <td style="font-family:var(--fm)">${Number(r.area_ha).toFixed(2)}</td>
+                  <td style="font-family:var(--fm)">${Number(r.volume_m3).toFixed(1)}</td>
+                  <td style="font-family:var(--fm);color:var(--green)">${Number(r.volume_harvested_m3 || 0).toFixed(1)}</td>
+                  <td style="min-width:90px">
+                    <div style="background:var(--bdr);border-radius:4px;height:8px;overflow:hidden">
+                      <div style="background:var(--g-soft);height:100%;width:${pct}%;transition:width .3s"></div>
+                    </div>
+                    <div style="font-size:11px;color:var(--t3);margin-top:2px">${pct}%</div>
+                  </td>
+                  <td>${statusBadge}</td>
+                  <td style="color:var(--t3)">${r.entry_date}</td>
+                  <td style="white-space:nowrap">
+                    <button class="bs1 compt-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
+                    <button class="bs1 compt-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                  </td>
+                </tr>`;
+              }).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  $('newCompt').onclick = () => openOverlay('Add Compartment', 'Volume is auto-calculated at 219 m³/ha', `
+    <div class="frow">
+      <div class="fg"><label>Entry date *</label><input type="date" id="cp-date" value="${today}"></div>
+      <div class="fg"><label>User</label><input type="text" id="cp-user" value="${STORAGE.user.name}" readonly style="background:var(--surf)"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Compartment name *</label><input type="text" id="cp-name" placeholder="e.g. Compt A1"></div>
+      <div class="fg"><label>Sub name <span style="color:var(--t3);font-weight:400">(optional)</span></label><input type="text" id="cp-sub" placeholder="e.g. Block 1, Sub A"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Species *</label><input type="text" id="cp-species" placeholder="e.g. Eucalyptus, Pine"></div>
+      <div class="fg"><label>Area (ha) *</label><input type="number" id="cp-area" step="0.001" min="0.001" placeholder="0.000"></div>
+    </div>
+    <div class="fg" style="background:var(--g-light);border:1px solid rgba(30,95,54,.2);border-radius:6px;padding:.6rem .75rem;margin-bottom:.75rem">
+      <div style="font-size:12px;color:var(--g-dark);font-weight:600">Calculated volume</div>
+      <div id="cp-vol-preview" style="font-size:22px;font-weight:700;color:var(--g-soft);margin-top:4px">— m³</div>
+      <div style="font-size:11px;color:var(--t3)">= Area (ha) × 219 m³/ha</div>
+    </div>
+    <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+    async () => {
+      const r = await UFCL.compartmentsCreate(STORAGE.user.id, {
+        entry_date: $('cp-date').value,
+        compt_name: $('cp-name').value.trim(),
+        sub_name: $('cp-sub').value.trim() || null,
+        species: $('cp-species').value.trim(),
+        area_ha: $('cp-area').value
+      });
+      if (!r.ok) { showOverlayError(r.error); return; }
+      showOverlaySuccess('Compartment saved.'); await renderCompartments();
+    }
+  );
+  const areaEl = document.getElementById('cp-area');
+  const volPrev = document.getElementById('cp-vol-preview');
+  if (areaEl && volPrev) {
+    areaEl.oninput = () => {
+      const v = Number(areaEl.value);
+      volPrev.textContent = v > 0 ? (v * 219).toFixed(1) + ' m³' : '— m³';
+    };
+  }
+
+  document.querySelectorAll('.compt-edit').forEach(btn => {
+    btn.onclick = () => {
+      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      if (!r) return;
+      const isoDate = r.entry_date.split('/').reverse().join('-');
+      openOverlay('Edit Compartment', r.compt_name, `
+        <div class="frow">
+          <div class="fg"><label>Entry date *</label><input type="date" id="cp-date" value="${isoDate}"></div>
+          <div class="fg"><label>Status</label><select id="cp-status"><option value="Active" ${r.status==='Active'?'selected':''}>Active</option><option value="Completed" ${r.status==='Completed'?'selected':''}>Completed</option></select></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Compartment name *</label><input type="text" id="cp-name" value="${r.compt_name}"></div>
+          <div class="fg"><label>Sub name</label><input type="text" id="cp-sub" value="${r.sub_name||''}"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Species *</label><input type="text" id="cp-species" value="${r.species}"></div>
+          <div class="fg"><label>Area (ha) *</label><input type="number" id="cp-area" step="0.001" value="${r.area_ha}"></div>
+        </div>
+        <div class="fg" style="background:var(--g-light);border:1px solid rgba(30,95,54,.2);border-radius:6px;padding:.6rem .75rem;margin-bottom:.75rem">
+          <div style="font-size:12px;color:var(--g-dark);font-weight:600">Volume (auto-calculated)</div>
+          <div id="cp-vol-preview" style="font-size:22px;font-weight:700;color:var(--g-soft);margin-top:4px">${Number(r.area_ha) * 219} m³</div>
+        </div>
+        <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+        async () => {
+          const res2 = await UFCL.compartmentsUpdate(STORAGE.user.id, r.id, {
+            entry_date: $('cp-date').value, compt_name: $('cp-name').value.trim(),
+            sub_name: $('cp-sub').value.trim() || null, species: $('cp-species').value.trim(),
+            area_ha: $('cp-area').value, status: $('cp-status').value
+          });
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Compartment updated.'); await renderCompartments();
+        }
+      );
+      const aEl = document.getElementById('cp-area');
+      const vEl = document.getElementById('cp-vol-preview');
+      if (aEl && vEl) aEl.oninput = () => { const v = Number(aEl.value); vEl.textContent = v > 0 ? (v * 219).toFixed(1) + ' m³' : '— m³'; };
+    };
+  });
+
+  document.querySelectorAll('.compt-del').forEach(btn => {
+    btn.onclick = () => {
+      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      if (!r) return;
+      confirmDelete(`Delete compartment <strong>${r.compt_name}</strong>? This will unlink all associated harvest logs.`, async () => {
+        const res2 = await UFCL.compartmentsDelete(STORAGE.user.id, r.id);
+        if (!res2.ok) { showOverlayError(res2.error); return; }
+        showOverlaySuccess('Compartment deleted.'); await renderCompartments();
+      });
+    };
+  });
+}
+
+// ── Log Transport ─────────────────────────────────────────────────────────────
+
+async function renderLogTransport() {
+  $('page-log-transport').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+  const [res, comptsRes] = await Promise.all([
+    UFCL.logTransportList(STORAGE.user.id),
+    UFCL.compartmentsForDropdown(STORAGE.user.id)
+  ]);
+  if (!res.ok) return renderDenied('log-transport', res.error);
+  const rows = res.rows || [];
+  const totals = res.totals || {};
+  const compts = comptsRes.ok ? comptsRes.rows : [];
+  const today = new Date().toISOString().split('T')[0];
+  const logsM3 = (totals.totalLogsHarvested / 4.4).toFixed(1);
+  const transportedM3 = (totals.totalLogsTransported / 4.4).toFixed(1);
+  const remainingM3 = ((totals.remainingLogs) / 4.4).toFixed(1);
+
+  $('page-log-transport').innerHTML = `
+    <div class="ptitle"><i class="ti ti-truck-loading" style="color:var(--g-soft)"></i> Log Transport</div>
+    <div class="psub">Track logs transported from forest to sawmill. Totals reflect all harvest entries (1 tree = 2 logs).</div>
+    <div class="cards">
+      <div class="mc" style="border-top:3px solid #2E8B57">
+        <div class="mclbl">Total logs harvested</div>
+        <div class="mcval" style="color:var(--green)">${totals.totalLogsHarvested.toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-trees"></i>${logsM3} m³ (÷ 4.4)</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #1D4ED8">
+        <div class="mclbl">Logs transported</div>
+        <div class="mcval" style="color:#1D4ED8">${totals.totalLogsTransported.toLocaleString()}</div>
+        <div class="mcsub bp"><i class="ti ti-truck"></i>${transportedM3} m³ loaded</div>
+      </div>
+      <div class="mc" style="border-top:3px solid ${totals.remainingLogs < 0 ? '#DC2626' : '#D97706'}">
+        <div class="mclbl">Remaining logs</div>
+        <div class="mcval" style="color:${totals.remainingLogs < 0 ? 'var(--red)' : 'var(--amber)'}">${totals.remainingLogs.toLocaleString()}</div>
+        <div class="mcsub ca"><i class="ti ti-stack-2"></i>${remainingM3} m³ at site</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Total harvest volume</div>
+        <div class="mcval">${totals.totalVolumeM3.toFixed(1)} m³</div>
+        <div class="mcsub cg"><i class="ti ti-cube"></i>trees × 2 ÷ 4.4</div>
+      </div>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <h3 style="margin-bottom:0"><i class="ti ti-truck-loading"></i>Transport entries</h3>
+        <button class="appbtn" id="newLT"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Log transport</button>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Date</th><th>Compartment</th><th>Sub name</th><th>Logs transported</th><th>Volume total (m³)</th><th>Tractor plate</th><th>Loggers no.</th><th>Notes</th><th>Logged by</th><th>Action</th></tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:2rem">No transport entries yet. Click "Log transport" to record a load.</td></tr>'
+            : rows.map(r => `<tr>
+                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}</td>
+                <td style="font-weight:500;color:var(--g-dark)">${r.compt_name || '—'}</td>
+                <td style="color:var(--t3)">${r.sub_name || '—'}</td>
+                <td style="font-family:var(--fm);font-weight:600;color:#1D4ED8">${Number(r.qty_transported).toLocaleString()}</td>
+                <td style="font-family:var(--fm);color:var(--green)">${(Number(r.qty_transported) / 4.4).toFixed(2)}</td>
+                <td style="font-family:var(--fm);color:var(--t3)">${r.tractor_plate || '—'}</td>
+                <td style="color:var(--t3)">${r.loggers_number || '—'}</td>
+                <td style="color:var(--t3)">${r.notes || '—'}</td>
+                <td>${r.logged_by_name || '—'}</td>
+                <td>
+                  <button class="bs1 lt-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  $('newLT').onclick = () => {
+    const comptOpts = compts.map(c => `<option value="${c.id}" data-sub="${c.sub_name||''}" data-species="${c.species}" data-status="${c.status}">${c.compt_name}${c.sub_name ? ' / '+c.sub_name : ''} [${c.status}]</option>`).join('');
+    openOverlay('Log Transport Entry', 'Record logs transported from forest to sawmill', `
+      <div class="frow">
+        <div class="fg"><label>Date *</label><input type="date" id="lt-date" value="${today}"></div>
+        <div class="fg"><label>User</label><input type="text" id="lt-user" value="${STORAGE.user.name}" readonly style="background:var(--surf)"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Compartment</label><select id="lt-compt"><option value="">— Select compartment —</option>${comptOpts}</select></div>
+        <div class="fg" id="lt-sub-row" style="display:none"><label>Sub name</label><select id="lt-sub"><option value="">—</option></select></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Logs transported *</label><input type="number" id="lt-qty" min="1" placeholder="0"></div>
+        <div class="fg"><label>Volume total (auto m³)</label><input type="text" id="lt-vol" readonly style="background:var(--surf)" placeholder="0.00 m³"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Tractor plate number</label><input type="text" id="lt-tractor" placeholder="e.g. RAA 123B (if used)"></div>
+        <div class="fg"><label>Loggers' number</label><input type="text" id="lt-loggers" placeholder="e.g. 3 or L-007 (if used)"></div>
+      </div>
+      <div class="fg"><label>Notes</label><input type="text" id="lt-notes" placeholder="Route, driver, additional details…"></div>
+      <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+      async () => {
+        const r = await UFCL.logTransportCreate(STORAGE.user.id, {
+          transport_date: $('lt-date').value,
+          compt_id: $('lt-compt').value || null,
+          sub_name: $('lt-sub')?.value || null,
+          qty_transported: $('lt-qty').value,
+          tractor_plate: $('lt-tractor').value.trim() || null,
+          loggers_number: $('lt-loggers').value.trim() || null,
+          notes: $('lt-notes').value.trim() || null
+        });
+        if (!r.ok) { showOverlayError(r.error); return; }
+        showOverlaySuccess('Transport entry saved.'); await renderLogTransport();
+      }
+    );
+    const comptSel = document.getElementById('lt-compt');
+    const subRow = document.getElementById('lt-sub-row');
+    const subSel = document.getElementById('lt-sub');
+    const qtyEl = document.getElementById('lt-qty');
+    const volEl = document.getElementById('lt-vol');
+    if (comptSel) {
+      comptSel.onchange = () => {
+        const opt = comptSel.options[comptSel.selectedIndex];
+        const sub = opt?.dataset?.sub || '';
+        if (sub && subRow && subSel) {
+          subRow.style.display = '';
+          subSel.innerHTML = `<option value="">—</option><option value="${sub}">${sub}</option>`;
+        } else if (subRow) {
+          subRow.style.display = 'none';
+        }
+      };
+    }
+    if (qtyEl && volEl) {
+      qtyEl.oninput = () => {
+        const v = Number(qtyEl.value);
+        volEl.value = v > 0 ? (v / 4.4).toFixed(2) + ' m³' : '';
+      };
+    }
+  };
+
+  document.querySelectorAll('.lt-del').forEach(btn => {
+    btn.onclick = () => {
+      confirmDelete('Delete this transport entry?', async () => {
+        const res2 = await UFCL.logTransportDelete(STORAGE.user.id, Number(btn.dataset.id));
+        if (!res2.ok) { showOverlayError(res2.error); return; }
+        showOverlaySuccess('Entry deleted.'); await renderLogTransport();
+      });
+    };
+  });
+}
+
+// ── Value-Added Timber ─────────────────────────────────────────────────────────
+
+async function renderValueAddedTimber() {
+  $('page-value-added-timber').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+  const [res, productsRes] = await Promise.all([
+    UFCL.valueAddedTimberList(STORAGE.user.id),
+    UFCL.productsActiveForForm(STORAGE.user.id, 'Timber')
+  ]);
+  if (!res.ok) return renderDenied('value-added-timber', res.error);
+  const rows = res.rows || [];
+  const tProducts = productsRes.ok ? productsRes.rows : [];
+  const today = new Date().toISOString().split('T')[0];
+  const totalKiln = rows.filter(r => r.type_value_added === 'Kiln-dried timber').reduce((s, r) => s + Number(r.num_timber), 0);
+  const totalCCA  = rows.filter(r => r.type_value_added === 'CCA treated timber').reduce((s, r) => s + Number(r.num_timber), 0);
+  const totalAll  = rows.reduce((s, r) => s + Number(r.num_timber), 0);
+
+  // Build per-size summary
+  const bySize = {};
+  for (const r of rows) {
+    if (!bySize[r.product_size]) bySize[r.product_size] = { kiln: 0, cca: 0, total: 0 };
+    if (r.type_value_added === 'Kiln-dried timber') bySize[r.product_size].kiln += Number(r.num_timber);
+    else bySize[r.product_size].cca += Number(r.num_timber);
+    bySize[r.product_size].total += Number(r.num_timber);
+  }
+
+  $('page-value-added-timber').innerHTML = `
+    <div class="ptitle"><i class="ti ti-certificate" style="color:var(--g-soft)"></i> Value-Added Timber</div>
+    <div class="psub">Track kiln-dried and CCA treated timber production.</div>
+    <div class="cards">
+      <div class="mc" style="border-top:3px solid #D97706">
+        <div class="mclbl">Kiln-dried timber</div>
+        <div class="mcval" style="color:#D97706">${totalKiln.toLocaleString()}</div>
+        <div class="mcsub ca"><i class="ti ti-flame"></i>pieces</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #2E8B57">
+        <div class="mclbl">CCA treated timber</div>
+        <div class="mcval" style="color:var(--g-soft)">${totalCCA.toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-droplet"></i>pieces</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Total value-added</div>
+        <div class="mcval" style="color:var(--green)">${totalAll.toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-trees"></i>all types</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Size variants</div>
+        <div class="mcval">${Object.keys(bySize).length}</div>
+        <div class="mcsub cg"><i class="ti ti-ruler"></i>product sizes</div>
+      </div>
+    </div>
+    ${Object.keys(bySize).length > 0 ? `
+    <div class="card">
+      <h3><i class="ti ti-chart-bar"></i>Analysis by product size</h3>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Product size</th><th>Kiln-dried</th><th>CCA treated</th><th>Total pieces</th></tr></thead>
+        <tbody>
+          ${Object.entries(bySize).sort((a,b) => b[1].total - a[1].total).map(([size, d]) => `<tr>
+            <td style="font-weight:600;color:var(--g-dark)">${size}</td>
+            <td style="color:#D97706;font-weight:500">${d.kiln.toLocaleString()}</td>
+            <td style="color:var(--g-soft);font-weight:500">${d.cca.toLocaleString()}</td>
+            <td style="font-weight:600">${d.total.toLocaleString()}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>` : ''}
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <h3 style="margin-bottom:0"><i class="ti ti-certificate"></i>Value-added entries</h3>
+        <button class="appbtn" id="newVAT"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Add entry</button>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Date</th><th>Type</th><th>Product size</th><th>No. of timber</th><th>Recorded by</th><th>Action</th></tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:2rem">No entries yet. Click "Add entry" to record value-added timber.</td></tr>'
+            : rows.map(r => `<tr>
+                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}</td>
+                <td><span class="badge ${r.type_value_added === 'Kiln-dried timber' ? 'ba' : 'bg'}">${r.type_value_added}</span></td>
+                <td style="font-weight:600;color:var(--g-dark)">${r.product_size}</td>
+                <td style="font-family:var(--fm);font-weight:600;color:var(--green)">${Number(r.num_timber).toLocaleString()}</td>
+                <td>${r.created_by_name || '—'}</td>
+                <td>
+                  <button class="bs1 vat-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  $('newVAT').onclick = () => {
+    const sizeOpts = tProducts.length
+      ? tProducts.map(p => `<option value="${p.size}">${p.size}</option>`).join('')
+      : '<option value="" disabled>No active timber products — add in Product Catalog first</option>';
+    openOverlay('Add Value-Added Timber Entry', null, `
+      <div class="frow">
+        <div class="fg"><label>Date *</label><input type="date" id="vat-date" value="${today}"></div>
+        <div class="fg"><label>User</label><input type="text" id="vat-user" value="${STORAGE.user.name}" readonly style="background:var(--surf)"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Type of value-added *</label>
+          <select id="vat-type">
+            <option value="">— Select type —</option>
+            <option value="Kiln-dried timber">Kiln-dried timber</option>
+            <option value="CCA treated timber">CCA treated timber</option>
+          </select>
+        </div>
+        <div class="fg"><label>Select size *</label>
+          <select id="vat-size"><option value="">— Select product size —</option>${sizeOpts}</select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Number of timber *</label><input type="number" id="vat-num" min="1" placeholder="0"></div>
+      </div>
+      <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+      async () => {
+        const r = await UFCL.valueAddedTimberCreate(STORAGE.user.id, {
+          entry_date: $('vat-date').value,
+          type_value_added: $('vat-type').value,
+          product_size: $('vat-size').value,
+          num_timber: $('vat-num').value
+        });
+        if (!r.ok) { showOverlayError(r.error); return; }
+        showOverlaySuccess('Entry saved.'); await renderValueAddedTimber();
+      }
+    );
+  };
+
+  document.querySelectorAll('.vat-del').forEach(btn => {
+    btn.onclick = () => confirmDelete('Delete this value-added timber entry?', async () => {
+      const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
+      if (!res2.ok) { showOverlayError(res2.error); return; }
+      showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber();
+    });
+  });
+}
+
+// ── Machine Fuel Logs ─────────────────────────────────────────────────────────
+
+async function renderMachineFuelLogs() {
+  const pg = $('page-machine-fuel');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+
+  const [logsRes, machRes] = await Promise.all([
+    UFCL.machineFuelLogsList(STORAGE.user.id),
+    UFCL.machinesForDropdown(STORAGE.user.id)
+  ]);
+  if (!logsRes.ok) return renderDenied('machine-fuel', logsRes.error);
+
+  const rows = logsRes.rows || [];
+  const machines = machRes.ok ? (machRes.rows || []) : [];
+  const today = new Date().toISOString().split('T')[0];
+  const canManage = ['admin', 'ceo', 'operations', 'logistics', 'supervisor'].includes(STORAGE.user?.role);
+
+  const totalLiters = rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  const fuelTypes = [...new Set(rows.map(r => r.fuel_type))];
+
+  const machOpts = machines.map(m =>
+    `<option value="${m.id}">${m.machine_code} — ${m.machine_name}${m.plate_number ? ' [' + m.plate_number + ']' : ''}</option>`
+  ).join('');
+
+  const fuelDropOpts = ['Diesel', 'Petroleum/Essence', 'Petrol', 'Chain Oil', 'Engine Oil']
+    .map(f => `<option value="${f}">${f}</option>`).join('');
+
+  pg.innerHTML = `
+    <div class="ptitle"><i class="ti ti-droplet" style="color:var(--g-soft)"></i> Machine Fuel Logs</div>
+    <div class="psub">Track daily fuel and oil consumption per machine.</div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc" style="border-top:3px solid var(--g-soft)">
+        <div class="mclbl">Total entries</div>
+        <div class="mcval">${rows.length}</div>
+        <div class="mcsub cg"><i class="ti ti-list"></i>all time</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Total consumption</div>
+        <div class="mcval">${totalLiters.toFixed(1)} L</div>
+        <div class="mcsub cg"><i class="ti ti-droplet"></i>all entries</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Fuel types tracked</div>
+        <div class="mcval">${fuelTypes.length}</div>
+        <div class="mcsub cg"><i class="ti ti-list-details"></i>${fuelTypes.slice(0,3).join(', ') || '—'}</div>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-droplet"></i>Fuel Consumption Log</h3>
+        ${canManage ? `<button class="appbtn" id="newFuelLog"><i class="ti ti-plus" style="font-size:12px"></i> Add entry</button>` : ''}
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Date</th><th>Machine</th><th>Plate No.</th><th>Operator</th><th>Fuel Type</th><th>Quantity (L)</th><th>Notes</th><th>Logged by</th>${canManage ? '<th>Action</th>' : ''}</tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="${canManage ? 9 : 8}" style="text-align:center;color:var(--t3);padding:2rem">No fuel logs yet.</td></tr>`
+            : rows.map(r => `<tr>
+                <td style="font-family:var(--fm);font-weight:500">${r.log_date}</td>
+                <td style="font-weight:600">${r.machine_code || '—'}<br><span style="font-size:11px;font-weight:400;color:var(--t3)">${r.machine_name || ''}</span></td>
+                <td style="font-family:var(--fm);color:var(--t3)">${r.plate_number || '—'}</td>
+                <td>${r.operator || '—'}</td>
+                <td><span class="badge bt">${r.fuel_type}</span></td>
+                <td style="font-family:var(--fm);font-weight:600;color:var(--g-dark)">${Number(r.quantity).toFixed(1)}</td>
+                <td style="color:var(--t3);font-size:12px">${r.notes || '—'}</td>
+                <td style="color:var(--t3);font-size:12px">${r.logged_by_name || '—'}</td>
+                ${canManage ? `<td><button class="bs1 mfl-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button></td>` : ''}
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  if (canManage) {
+    $('newFuelLog')?.addEventListener('click', () => openOverlay('Log Fuel / Oil Consumption', null, `
+      <div class="frow">
+        <div class="fg"><label>Date *</label><input type="date" id="mfl-date" value="${today}"></div>
+        <div class="fg"><label>Operator</label><input type="text" id="mfl-operator" placeholder="Name of operator"></div>
+      </div>
+      <div class="fg"><label>Machine *</label>
+        <select id="mfl-machine"><option value="">— select machine —</option>${machOpts}</select>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Fuel type *</label>
+          <select id="mfl-fuel"><option value="">— select type —</option>${fuelDropOpts}</select>
+        </div>
+        <div class="fg"><label>Quantity (litres) *</label>
+          <input type="number" id="mfl-qty" step="0.1" min="0.1" placeholder="0.0">
+        </div>
+      </div>
+      <div class="fg"><label>Notes</label><input type="text" id="mfl-notes" placeholder="Optional notes"></div>
+      <div class="brow">
+        <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button>
+        <button class="bs1" id="ovCancel">Cancel</button>
+      </div>`,
+      async () => {
+        const res2 = await UFCL.machineFuelLogsCreate(STORAGE.user.id, {
+          log_date:   $('mfl-date').value,
+          machine_id: $('mfl-machine').value || null,
+          operator:   $('mfl-operator').value.trim() || null,
+          fuel_type:  $('mfl-fuel').value,
+          quantity:   $('mfl-qty').value,
+          notes:      $('mfl-notes').value.trim() || null
+        });
+        if (!res2.ok) { showOverlayError(res2.error); return; }
+        showOverlaySuccess('Fuel log saved.'); await renderMachineFuelLogs();
+      }));
+
+    pg.querySelectorAll('.mfl-del').forEach(btn => {
+      btn.onclick = () => confirmDelete('Delete this fuel log entry?', async () => {
+        const r2 = await UFCL.machineFuelLogsDelete(STORAGE.user.id, Number(btn.dataset.id));
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Entry deleted.'); await renderMachineFuelLogs();
+      });
+    });
+  }
+}
+
+// ── Casual Labour Requests ────────────────────────────────────────────────────
+
+async function renderCasualLabourRequests() {
+  const pg = $('page-casual-requests');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+
+  const res = await UFCL.casualLabourRequestsList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('casual-requests', res.error);
+
+  const rows = res.rows || [];
+  const today = new Date().toISOString().split('T')[0];
+  const canManage = ['admin', 'ceo', 'operations', 'supervisor'].includes(STORAGE.user?.role);
+  const canReview = ['admin', 'ceo', 'operations'].includes(STORAGE.user?.role);
+
+  const pending = rows.filter(r => r.status === 'Pending').length;
+  const approved = rows.filter(r => r.status === 'Approved').length;
+  const totalCasuals = rows.filter(r => r.status === 'Approved').reduce((s, r) => s + Number(r.num_casuals || 0), 0);
+
+  const statusBadge = s => {
+    const cls = s === 'Approved' ? 'bg' : s === 'Rejected' ? 'br' : 'ba';
+    return `<span class="badge ${cls}">${s}</span>`;
+  };
+
+  pg.innerHTML = `
+    <div class="ptitle"><i class="ti ti-users" style="color:var(--g-soft)"></i> Casual Labour Requests</div>
+    <div class="psub">Submit and manage requests for casual labour workers.</div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc" style="border-top:3px solid var(--amber)">
+        <div class="mclbl">Pending requests</div>
+        <div class="mcval" style="color:var(--amber)">${pending}</div>
+        <div class="mcsub ca"><i class="ti ti-clock"></i>awaiting review</div>
+      </div>
+      <div class="mc" style="border-top:3px solid var(--g-soft)">
+        <div class="mclbl">Approved requests</div>
+        <div class="mcval" style="color:var(--green)">${approved}</div>
+        <div class="mcsub cg"><i class="ti ti-check"></i>all time</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Casuals approved</div>
+        <div class="mcval">${totalCasuals}</div>
+        <div class="mcsub cg"><i class="ti ti-users"></i>total headcount</div>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-users"></i>Requests</h3>
+        ${canManage ? `<button class="appbtn" id="newCasReq"><i class="ti ti-plus" style="font-size:12px"></i> New request</button>` : ''}
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Start Date</th><th>End Date</th><th>Task</th><th># Casuals</th><th>Description</th><th>Comments</th><th>Status</th><th>Submitted by</th>${canReview ? '<th>Review</th>' : ''}<th>Action</th></tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="${canReview ? 10 : 9}" style="text-align:center;color:var(--t3);padding:2rem">No requests yet.</td></tr>`
+            : rows.map(r => `<tr>
+                <td style="font-family:var(--fm);font-weight:500">${r.start_date}</td>
+                <td style="font-family:var(--fm)">${r.end_date}</td>
+                <td style="font-weight:600">${r.task}</td>
+                <td style="font-family:var(--fm);font-weight:700;color:var(--g-dark)">${r.num_casuals}</td>
+                <td style="color:var(--t3);font-size:12px">${r.description || '—'}</td>
+                <td style="color:var(--t3);font-size:12px">${r.comments || '—'}</td>
+                <td>${statusBadge(r.status)}</td>
+                <td style="font-size:12px;color:var(--t3)">${r.created_by_name || '—'}</td>
+                ${canReview && r.status === 'Pending' ? `
+                <td style="white-space:nowrap">
+                  <button class="bp1 clr-approve" data-id="${r.id}" style="padding:4px 10px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
+                  <button class="bs1 clr-reject" data-id="${r.id}" style="padding:4px 10px;font-size:12px;color:var(--red)"><i class="ti ti-x"></i>Reject</button>
+                </td>` : canReview ? `<td style="color:var(--t3);font-size:12px">${r.reviewed_by_name || '—'}</td>` : ''}
+                <td>
+                  <button class="bs1 clr-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  if (canManage) {
+    $('newCasReq')?.addEventListener('click', () => openOverlay('New Casual Labour Request', null, `
+      <div class="frow">
+        <div class="fg"><label>Starting date *</label><input type="date" id="clr-start" value="${today}"></div>
+        <div class="fg"><label>Ending date *</label><input type="date" id="clr-end"></div>
+      </div>
+      <div class="fg"><label>Task / Work description *</label><input type="text" id="clr-task" placeholder="e.g. Tree planting, loading logs"></div>
+      <div class="fg"><label>Number of casuals needed *</label><input type="number" id="clr-num" min="1" step="1" placeholder="0"></div>
+      <div class="fg"><label>Description</label><textarea id="clr-desc" rows="2" placeholder="Additional details about the work"></textarea></div>
+      <div class="fg"><label>Comments</label><textarea id="clr-comments" rows="2" placeholder="Any other comments"></textarea></div>
+      <div class="brow">
+        <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Submit request</button>
+        <button class="bs1" id="ovCancel">Cancel</button>
+      </div>`,
+      async () => {
+        const r2 = await UFCL.casualLabourRequestsCreate(STORAGE.user.id, {
+          start_date:   $('clr-start').value,
+          end_date:     $('clr-end').value,
+          task:         $('clr-task').value.trim(),
+          num_casuals:  $('clr-num').value,
+          description:  $('clr-desc').value.trim() || null,
+          comments:     $('clr-comments').value.trim() || null
+        });
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Request submitted.'); await renderCasualLabourRequests();
+      }));
+  }
+
+  if (canReview) {
+    pg.querySelectorAll('.clr-approve').forEach(btn => {
+      btn.onclick = async () => {
+        const r2 = await UFCL.casualLabourRequestsReview(STORAGE.user.id, Number(btn.dataset.id), 'Approved');
+        if (!r2.ok) { alert(r2.error); return; }
+        await renderCasualLabourRequests();
+      };
+    });
+    pg.querySelectorAll('.clr-reject').forEach(btn => {
+      btn.onclick = async () => {
+        const r2 = await UFCL.casualLabourRequestsReview(STORAGE.user.id, Number(btn.dataset.id), 'Rejected');
+        if (!r2.ok) { alert(r2.error); return; }
+        await renderCasualLabourRequests();
+      };
+    });
+  }
+
+  pg.querySelectorAll('.clr-del').forEach(btn => {
+    btn.onclick = () => confirmDelete('Delete this casual labour request?', async () => {
+      const r2 = await UFCL.casualLabourRequestsDelete(STORAGE.user.id, Number(btn.dataset.id));
+      if (!r2.ok) { showOverlayError(r2.error); return; }
+      showOverlaySuccess('Request deleted.'); await renderCasualLabourRequests();
+    });
+  });
+}
+
+// ── Casuals ───────────────────────────────────────────────────────────────────
+
+async function renderCasuals() {
+  const pg = $('page-casuals');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+
+  const res = await UFCL.casualsList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('casuals', res.error);
+
+  const rows = res.rows || [];
+  const today = new Date().toISOString().split('T')[0];
+  const canManage = ['admin', 'ceo', 'operations', 'supervisor'].includes(STORAGE.user?.role);
+
+  const active = rows.filter(r => r.active).length;
+  const depts = [...new Set(rows.map(r => r.department).filter(Boolean))];
+
+  const genderOpts = ['Male', 'Female', 'Other'].map(g => `<option value="${g}">${g}</option>`).join('');
+
+  function casualForm(prefix, d = {}) {
+    return `
+      <div style="font-weight:600;font-size:12px;color:var(--g-dark);text-transform:uppercase;letter-spacing:.5px;margin:.75rem 0 .5rem">Personal Information</div>
+      <div class="frow">
+        <div class="fg"><label>Full Name *</label><input type="text" id="${prefix}-name" value="${d.full_name || ''}" placeholder="Full name"></div>
+        <div class="fg"><label>National ID</label><input type="text" id="${prefix}-nid" value="${d.national_id || ''}" placeholder="National ID number"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Phone</label><input type="text" id="${prefix}-phone" value="${d.phone || ''}" placeholder="Phone number"></div>
+        <div class="fg"><label>Gender</label>
+          <select id="${prefix}-gender">
+            <option value="">— select —</option>
+            ${['Male','Female','Other'].map(g => `<option value="${g}"${d.gender===g?' selected':''}>${g}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Date of birth</label><input type="date" id="${prefix}-dob" value="${d.date_of_birth || ''}"></div>
+        <div class="fg"><label>Address</label><input type="text" id="${prefix}-addr" value="${d.address || ''}" placeholder="Residential address"></div>
+      </div>
+      <div style="font-weight:600;font-size:12px;color:var(--g-dark);text-transform:uppercase;letter-spacing:.5px;margin:.75rem 0 .5rem">Employment Details</div>
+      <div class="frow">
+        <div class="fg"><label>Department</label><input type="text" id="${prefix}-dept" value="${d.department || ''}" placeholder="e.g. Forestry, Sawmill"></div>
+        <div class="fg"><label>Work Location</label><input type="text" id="${prefix}-loc" value="${d.work_location || ''}" placeholder="e.g. Compartment A, Mill"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Job Role</label><input type="text" id="${prefix}-role" value="${d.job_role || ''}" placeholder="e.g. Log loader, Planter"></div>
+        <div class="fg"><label>Supervisor</label><input type="text" id="${prefix}-sup" value="${d.supervisor || ''}" placeholder="Supervisor name"></div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Start date</label><input type="date" id="${prefix}-start" value="${d.start_date || today}"></div>
+        <div class="fg"><label>End date</label><input type="date" id="${prefix}-end" value="${d.end_date || ''}"></div>
+      </div>
+      <div style="font-weight:600;font-size:12px;color:var(--g-dark);text-transform:uppercase;letter-spacing:.5px;margin:.75rem 0 .5rem">Emergency Contact</div>
+      <div class="frow">
+        <div class="fg"><label>Contact name</label><input type="text" id="${prefix}-ename" value="${d.emergency_name || ''}" placeholder="Emergency contact full name"></div>
+        <div class="fg"><label>Relationship</label><input type="text" id="${prefix}-erel" value="${d.emergency_relationship || ''}" placeholder="e.g. Spouse, Parent"></div>
+      </div>
+      <div class="fg"><label>Emergency phone</label><input type="text" id="${prefix}-ephone" value="${d.emergency_phone || ''}" placeholder="Emergency contact phone"></div>
+      <div style="font-weight:600;font-size:12px;color:var(--g-dark);text-transform:uppercase;letter-spacing:.5px;margin:.75rem 0 .5rem">Salary</div>
+      <div class="fg"><label>Salary per action (ZMW)</label><input type="number" id="${prefix}-sal" step="0.01" min="0" value="${d.salary_per_action || ''}" placeholder="e.g. 50.00"></div>
+    `;
+  }
+
+  function payloadFrom(prefix) {
+    return {
+      full_name:               $(`${prefix}-name`)?.value.trim(),
+      national_id:             $(`${prefix}-nid`)?.value.trim() || null,
+      phone:                   $(`${prefix}-phone`)?.value.trim() || null,
+      gender:                  $(`${prefix}-gender`)?.value || null,
+      date_of_birth:           $(`${prefix}-dob`)?.value || null,
+      address:                 $(`${prefix}-addr`)?.value.trim() || null,
+      department:              $(`${prefix}-dept`)?.value.trim() || null,
+      work_location:           $(`${prefix}-loc`)?.value.trim() || null,
+      job_role:                $(`${prefix}-role`)?.value.trim() || null,
+      supervisor:              $(`${prefix}-sup`)?.value.trim() || null,
+      start_date:              $(`${prefix}-start`)?.value || null,
+      end_date:                $(`${prefix}-end`)?.value || null,
+      emergency_name:          $(`${prefix}-ename`)?.value.trim() || null,
+      emergency_relationship:  $(`${prefix}-erel`)?.value.trim() || null,
+      emergency_phone:         $(`${prefix}-ephone`)?.value.trim() || null,
+      salary_per_action:       $(`${prefix}-sal`)?.value || null
+    };
+  }
+
+  pg.innerHTML = `
+    <div class="ptitle"><i class="ti ti-user-check" style="color:var(--g-soft)"></i> Casuals</div>
+    <div class="psub">Register and manage casual workers — personal info, employment details, emergency contact, and salary per action.</div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc" style="border-top:3px solid var(--g-soft)">
+        <div class="mclbl">Active casuals</div>
+        <div class="mcval" style="color:var(--green)">${active}</div>
+        <div class="mcsub cg"><i class="ti ti-user-check"></i>${rows.length} total</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl">Departments</div>
+        <div class="mcval">${depts.length}</div>
+        <div class="mcsub cg"><i class="ti ti-building"></i>${depts.slice(0,2).join(', ') || '—'}</div>
+      </div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-user-check"></i>Casual Workers</h3>
+        ${canManage ? `<button class="appbtn" id="newCasual"><i class="ti ti-plus" style="font-size:12px"></i> Register casual</button>` : ''}
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Name</th><th>National ID</th><th>Phone</th><th>Gender</th><th>Department</th><th>Job Role</th><th>Supervisor</th><th>Start Date</th><th>End Date</th><th>Salary/Action</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:2rem">No casuals registered yet.</td></tr>`
+            : rows.map(r => `<tr>
+                <td style="font-weight:600">${r.full_name}</td>
+                <td style="font-family:var(--fm);color:var(--t3)">${r.national_id || '—'}</td>
+                <td style="color:var(--t3)">${r.phone || '—'}</td>
+                <td>${r.gender || '—'}</td>
+                <td><span class="badge bt">${r.department || '—'}</span></td>
+                <td style="color:var(--t3);font-size:12px">${r.job_role || '—'}</td>
+                <td style="color:var(--t3);font-size:12px">${r.supervisor || '—'}</td>
+                <td style="font-family:var(--fm)">${r.start_date || '—'}</td>
+                <td style="font-family:var(--fm)">${r.end_date || '—'}</td>
+                <td style="font-family:var(--fm);font-weight:600;color:var(--g-dark)">${r.salary_per_action ? 'K' + Number(r.salary_per_action).toFixed(2) : '—'}</td>
+                <td><span class="badge ${r.active ? 'bg' : 'br'}">${r.active ? 'Active' : 'Inactive'}</span></td>
+                <td style="white-space:nowrap">
+                  ${canManage ? `<button class="bs1 cas-edit" data-id="${r.id}" style="font-size:12px"><i class="ti ti-edit"></i>Edit</button>` : ''}
+                  ${canManage ? `<button class="bs1 cas-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>` : ''}
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  if (canManage) {
+    $('newCasual')?.addEventListener('click', () => openOverlay('Register Casual Worker', null, `
+      ${casualForm('cas')}
+      <div class="brow">
+        <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Register</button>
+        <button class="bs1" id="ovCancel">Cancel</button>
+      </div>`,
+      async () => {
+        const r2 = await UFCL.casualsCreate(STORAGE.user.id, payloadFrom('cas'));
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Casual registered.'); await renderCasuals();
+      }));
+
+    pg.querySelectorAll('.cas-edit').forEach(btn => {
+      btn.onclick = () => {
+        const casualId = Number(btn.dataset.id);
+        const d = rows.find(r => r.id === casualId);
+        if (!d) return;
+        openOverlay('Edit Casual Worker', d.full_name, `
+          ${casualForm('ced', d)}
+          <div class="brow">
+            <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save changes</button>
+            <button class="bs1" id="ovCancel">Cancel</button>
+          </div>`,
+          async () => {
+            const r2 = await UFCL.casualsUpdate(STORAGE.user.id, casualId, payloadFrom('ced'));
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Record updated.'); await renderCasuals();
+          });
+      };
+    });
+
+    pg.querySelectorAll('.cas-del').forEach(btn => {
+      btn.onclick = () => confirmDelete('Delete this casual worker record?', async () => {
+        const r2 = await UFCL.casualsDelete(STORAGE.user.id, Number(btn.dataset.id));
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Record deleted.'); await renderCasuals();
+      });
+    });
   }
 }
 

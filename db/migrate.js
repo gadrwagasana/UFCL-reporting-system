@@ -78,6 +78,30 @@ async function ensureSchema() {
   await pool.query(`alter table daily_logs add column if not exists timber_kiln_dried int not null default 0`);
   await pool.query(`alter table daily_logs add column if not exists timber_cca_treated int not null default 0`);
   await pool.query(`alter table daily_logs add column if not exists timber_untreated int not null default 0`);
+  // Sawmill logs received tracking
+  await pool.query(`alter table daily_logs add column if not exists logs_received int not null default 0`);
+  // Harvest logs compartment link
+  await pool.query(`alter table harvest_logs add column if not exists compt_id bigint references compartments(id)`);
+  await pool.query(`alter table harvest_logs add column if not exists sub_name text`);
+  // Harvest logs — actual log counts (trees may produce more than 2 logs for tall trees)
+  await pool.query(`alter table harvest_logs add column if not exists logs_crosscut int not null default 0`);
+  await pool.query(`alter table harvest_logs add column if not exists logs_handrolled int not null default 0`);
+  // Machine plate number
+  await pool.query(`alter table machines add column if not exists plate_number text`);
+  // Log transport extra fields
+  await pool.query(`alter table log_transport add column if not exists tractor_plate text`);
+  await pool.query(`alter table log_transport add column if not exists loggers_number text`);
+  // Rename expense category 'Labor' → 'Casuals'
+  await pool.query(`update expense_categories set name='Casuals', description='Casual labour wages' where name='Labor'`);
+  // Workshop assignment for users
+  await pool.query(`alter table app_users add column if not exists workshop_id bigint references warehouses(id)`);
+  // Machine log item category
+  await pool.query(`alter table machine_daily_logs add column if not exists item_category text`);
+  // Seed default machine log categories (idempotent)
+  const defaultCats = ['Spare Parts','Lubricants','Fuel','Tools','Consumables','Maintenance','Other'];
+  for (const name of defaultCats) {
+    await pool.query(`insert into machine_log_categories(name) values($1) on conflict(name) do nothing`, [name]);
+  }
 }
 
 async function seedProductCatalog() {
@@ -258,22 +282,29 @@ async function updateRolePermissions() {
     admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
             'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch',
             'harvest', 'timber-inventory', 'transport',
-            'machines', 'machine-logs', 'machine-kpi'],
+            'machines', 'machine-logs', 'machine-kpi',
+            'compartments', 'daily-harvest', 'daily-timber', 'daily-poles',
+            'log-transport', 'value-added-timber',
+            'machine-fuel', 'casual-requests', 'casuals'],
     ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
           'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
-          'machines', 'machine-kpi'],
+          'machines', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber',
+          'casual-requests', 'casuals'],
     operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
                  'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
                  'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'transport',
-                 'machines', 'machine-logs', 'machine-kpi'],
+                 'machines', 'machine-logs', 'machine-kpi',
+                 'compartments', 'log-transport', 'value-added-timber',
+                 'machine-fuel', 'casual-requests', 'casuals'],
     sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
     finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
     logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
                 'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'transport',
-                'machines'],
+                'machines', 'log-transport', 'machine-fuel'],
     supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
                  'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
-                 'machine-logs'],
+                 'machine-logs', 'compartments', 'log-transport', 'value-added-timber',
+                 'machine-fuel', 'casual-requests', 'casuals'],
     storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
                   'warehouses', 'stock-items', 'stock-movements']
   };

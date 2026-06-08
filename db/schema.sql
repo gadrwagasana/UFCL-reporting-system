@@ -10,6 +10,7 @@ create table if not exists app_users (
   user_responsibilities jsonb not null default '[]'::jsonb,
   password_hash text not null,
   active boolean not null default true,
+  workshop_id bigint,
   created_at timestamptz not null default now()
 );
 
@@ -178,4 +179,416 @@ create index if not exists idx_notifications_created_at on notifications(created
 create index if not exists idx_audit_created_at on audit_log(created_at desc);
 create index if not exists idx_weekly_expenses_month on weekly_expenses(month, week_number);
 create index if not exists idx_kpi_budgets_month on kpi_budgets(month);
+
+-- ── Inventory Management ─────────────────────────────────────────────────────
+
+create table if not exists warehouses (
+  id bigserial primary key,
+  name text not null,
+  location text,
+  capacity int,
+  notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists stock_catalog (
+  id bigserial primary key,
+  category text not null,
+  name text not null,
+  sku text,
+  uom text not null,
+  unit_cost numeric(14,2) not null default 0,
+  min_stock int not null default 0,
+  max_stock int,
+  notes text,
+  active boolean not null default true,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists stock_levels (
+  id bigserial primary key,
+  item_id bigint not null references stock_catalog(id) on delete cascade,
+  warehouse_id bigint not null references warehouses(id) on delete cascade,
+  quantity int not null default 0,
+  updated_at timestamptz not null default now(),
+  unique(item_id, warehouse_id)
+);
+
+create table if not exists stock_movements (
+  id bigserial primary key,
+  item_id bigint not null references stock_catalog(id),
+  warehouse_id bigint references warehouses(id),
+  to_warehouse_id bigint references warehouses(id),
+  movement_type text not null,
+  quantity int not null,
+  reference text,
+  notes text,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Fleet & Logistics ─────────────────────────────────────────────────────────
+
+create table if not exists vehicles (
+  id bigserial primary key,
+  registration text not null unique,
+  make text,
+  model text,
+  vehicle_type text,
+  status text not null default 'Active',
+  fuel_type text,
+  insurance_expiry date,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists fuel_logs (
+  id bigserial primary key,
+  vehicle_id bigint not null references vehicles(id),
+  liters numeric(10,2) not null,
+  cost_per_liter numeric(10,2),
+  total_cost numeric(14,2),
+  odometer int,
+  log_date date not null,
+  logged_by bigint references app_users(id),
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists maintenance_records (
+  id bigserial primary key,
+  vehicle_id bigint not null references vehicles(id),
+  maintenance_type text not null,
+  description text not null,
+  cost numeric(14,2),
+  maintenance_date date not null,
+  next_due_date date,
+  performed_by text,
+  notes text,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists delivery_orders (
+  id bigserial primary key,
+  order_number text not null unique,
+  sales_order_id bigint references sales_orders(id),
+  vehicle_id bigint references vehicles(id),
+  driver_name text,
+  delivery_date date,
+  status text not null default 'Pending',
+  route text,
+  notes text,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists dispatch_requests (
+  id bigserial primary key,
+  request_number text not null unique,
+  delivery_order_id bigint references delivery_orders(id),
+  status text not null default 'Pending',
+  notes text,
+  approved_by bigint references app_users(id),
+  approved_at timestamptz,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Forestry & Timber ─────────────────────────────────────────────────────────
+
+create table if not exists harvest_logs (
+  id bigserial primary key,
+  location text not null,
+  species text not null,
+  harvest_date date not null,
+  quantity int not null,
+  uom text not null default 'units',
+  notes text,
+  logged_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Third-Party Transport ─────────────────────────────────────────────────────
+
+create table if not exists transport_companies (
+  id bigserial primary key,
+  name text not null,
+  contact_person text,
+  phone text,
+  email text,
+  rate_per_km numeric(10,2),
+  notes text,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists transport_jobs (
+  id bigserial primary key,
+  job_number text not null unique,
+  transport_company_id bigint not null references transport_companies(id),
+  sales_order_id bigint references sales_orders(id),
+  delivery_order_id bigint references delivery_orders(id),
+  job_type text not null default 'Delivery',
+  origin text,
+  destination text,
+  job_date date not null,
+  quantity int,
+  uom text,
+  cost numeric(14,2),
+  waybill_ref text,
+  status text not null default 'Scheduled',
+  notes text,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Supervisor Pending-Edit Approvals ────────────────────────────────────────
+
+create table if not exists pending_edits (
+  id bigserial primary key,
+  action_type text not null,      -- 'edit' or 'delete'
+  entity_type text not null,      -- 'daily_log', 'harvest_log', 'logistics_item', etc.
+  entity_id bigint not null,
+  entity_ref text,                -- human-readable label (date, name, order #)
+  payload jsonb,                  -- new field values for edits; null for deletes
+  status text not null default 'Pending', -- Pending / Approved / Rejected
+  review_notes text,
+  submitted_by bigint references app_users(id),
+  submitted_at timestamptz not null default now(),
+  reviewed_by bigint references app_users(id),
+  reviewed_at timestamptz
+);
+
+create index if not exists idx_pending_edits_status on pending_edits(status, submitted_at desc);
+
+create index if not exists idx_stock_movements_created_at on stock_movements(created_at desc);
+create index if not exists idx_delivery_orders_created_at on delivery_orders(created_at desc);
+create index if not exists idx_harvest_logs_date on harvest_logs(harvest_date desc);
+create index if not exists idx_transport_jobs_created_at on transport_jobs(created_at desc);
+
+-- ── Machine Management & KPI Performance ─────────────────────────────────────
+
+create table if not exists machine_categories (
+  id bigserial primary key,
+  name text not null unique,
+  description text,
+  icon text not null default 'ti-tool',
+  created_at timestamptz not null default now()
+);
+
+create table if not exists machines (
+  id bigserial primary key,
+  machine_code text not null unique,
+  name text not null,
+  category_id bigint not null references machine_categories(id),
+  status text not null default 'Available',
+  production_capacity numeric(10,2) not null default 0,
+  capacity_unit text not null default 'm³',
+  fuel_consumption_rate numeric(10,2) not null default 0,
+  fuel_type text,
+  manufacturer text,
+  model_number text,
+  serial_number text,
+  year_manufactured int,
+  date_acquired date,
+  notes text,
+  active boolean not null default true,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists machine_kpi_definitions (
+  id bigserial primary key,
+  category_id bigint references machine_categories(id),
+  kpi_code text not null,
+  kpi_name text not null,
+  unit text not null default '',
+  higher_is_better boolean not null default true,
+  weight numeric(5,2) not null default 1.0,
+  description text,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists machine_kpi_targets (
+  id bigserial primary key,
+  machine_id bigint not null references machines(id),
+  kpi_id bigint not null references machine_kpi_definitions(id),
+  target_value numeric(12,2) not null,
+  effective_month text not null,
+  set_by bigint references app_users(id),
+  reason text,
+  created_at timestamptz not null default now(),
+  unique(machine_id, kpi_id, effective_month)
+);
+
+create table if not exists machine_daily_logs (
+  id bigserial primary key,
+  machine_id bigint not null references machines(id),
+  log_date date not null,
+  shift text not null default 'Full Day',
+  hours_worked numeric(5,2) not null default 0,
+  downtime_hours numeric(5,2) not null default 0,
+  downtime_reason text,
+  fuel_consumed numeric(8,2) not null default 0,
+  daily_production numeric(10,2) not null default 0,
+  capacity_per_day numeric(10,2) not null default 0,
+  product_type text,
+  logs_loaded numeric(10,2) not null default 0,
+  logs_unloaded numeric(10,2) not null default 0,
+  loading_trips int not null default 0,
+  remarks text,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now(),
+  unique(machine_id, log_date, shift)
+);
+
+create table if not exists machine_log_categories (
+  id bigserial primary key,
+  name text not null unique,
+  active boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists machine_maintenance_schedules (
+  id bigserial primary key,
+  machine_id bigint not null references machines(id),
+  maintenance_type text not null,
+  frequency_days int not null default 30,
+  last_performed date,
+  next_due date,
+  estimated_hours numeric(5,2) not null default 1,
+  notes text,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_machine_daily_logs_date on machine_daily_logs(log_date desc);
+create index if not exists idx_machine_kpi_targets_month on machine_kpi_targets(effective_month);
+
+-- ── Forestry Compartments ─────────────────────────────────────────────────────
+
+create table if not exists compartments (
+  id bigserial primary key,
+  compt_name text not null unique,
+  sub_name text,
+  species text not null,
+  area_ha numeric(10,3) not null,
+  volume_m3 numeric(10,3) not null, -- area_ha * 219 m³/ha
+  entry_date date not null,
+  status text not null default 'Active', -- Active / Completed
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- Link harvest_logs to compartments
+alter table harvest_logs add column if not exists compt_id bigint references compartments(id);
+alter table harvest_logs add column if not exists sub_name text;
+-- trees_felled = quantity (already exists), num_logs and volume_m3 computed in queries
+
+-- Alter daily_logs to track logs received at sawmill
+alter table daily_logs add column if not exists logs_received int not null default 0;
+alter table daily_logs add column if not exists timber_kiln_dried int not null default 0;
+alter table daily_logs add column if not exists timber_cca_treated int not null default 0;
+alter table daily_logs add column if not exists timber_untreated int not null default 0;
+alter table daily_logs add column if not exists product_size text;
+alter table daily_logs add column if not exists machine text;
+
+-- ── Log Transport ─────────────────────────────────────────────────────────────
+
+create table if not exists log_transport (
+  id bigserial primary key,
+  transport_date date not null,
+  compt_id bigint references compartments(id),
+  sub_name text,
+  qty_transported int not null,
+  unit text not null default 'logs',
+  notes text,
+  logged_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Value-Added Timber ───────────────────────────────────────────────────────
+
+create table if not exists value_added_timber (
+  id bigserial primary key,
+  entry_date date not null,
+  type_value_added text not null, -- 'Kiln-dried timber' | 'CCA treated timber'
+  product_size text not null,
+  num_timber int not null,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_compartments_status on compartments(status);
+create index if not exists idx_log_transport_date on log_transport(transport_date desc);
+create index if not exists idx_value_added_timber_date on value_added_timber(entry_date desc);
+
+-- ── Machine Fuel / Consumption Logs ──────────────────────────────────────────
+
+create table if not exists machine_fuel_logs (
+  id bigserial primary key,
+  log_date date not null,
+  machine_id bigint references machines(id),
+  operator text,
+  fuel_type text not null, -- diesel / petroleum / petrol / chain oil / engine oil
+  quantity numeric(10,2) not null default 0,
+  unit text not null default 'liters',
+  notes text,
+  logged_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_machine_fuel_logs_date on machine_fuel_logs(log_date desc);
+
+-- ── Casual Labour Requests ────────────────────────────────────────────────────
+
+create table if not exists casual_labour_requests (
+  id bigserial primary key,
+  start_date date not null,
+  end_date date not null,
+  task text not null,
+  num_casuals int not null,
+  description text,
+  comments text,
+  status text not null default 'Pending', -- Pending / Approved / Rejected
+  reviewed_by bigint references app_users(id),
+  reviewed_at timestamptz,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- ── Casuals ───────────────────────────────────────────────────────────────────
+
+create table if not exists casuals (
+  id bigserial primary key,
+  full_name text not null,
+  national_id text,
+  phone text,
+  gender text,
+  date_of_birth date,
+  address text,
+  department text,
+  work_location text,
+  job_role text,
+  supervisor text,
+  start_date date,
+  end_date date,
+  emergency_name text,
+  emergency_relationship text,
+  emergency_phone text,
+  salary_per_action numeric(10,2),
+  active boolean not null default true,
+  created_by bigint references app_users(id),
+  created_at timestamptz not null default now()
+);
+
+-- New columns on existing tables
+alter table harvest_logs add column if not exists logs_crosscut int not null default 0;
+alter table harvest_logs add column if not exists logs_handrolled int not null default 0;
+alter table machines add column if not exists plate_number text;
+alter table log_transport add column if not exists tractor_plate text;
+alter table log_transport add column if not exists loggers_number text;
 

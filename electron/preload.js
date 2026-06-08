@@ -156,6 +156,11 @@ contextBridge.exposeInMainWorld('UFCL', {
   machinesCreate: (userId, payload) => ipcRenderer.invoke('machines:create', { userId, payload }),
   machinesUpdate: (userId, machineId, payload) => ipcRenderer.invoke('machines:update', { userId, machineId, payload }),
 
+  // Machine Log Item Categories
+  machineLogCatsList:   (userId) => ipcRenderer.invoke('machine-log-cats:list', { userId }),
+  machineLogCatsCreate: (userId, payload) => ipcRenderer.invoke('machine-log-cats:create', { userId, payload }),
+  machineLogCatsDelete: (userId, id) => ipcRenderer.invoke('machine-log-cats:delete', { userId, id }),
+
   // Machine Daily Logs
   machineLogsList:   (userId, machineId, month) => ipcRenderer.invoke('machine-logs:list', { userId, machineId, month }),
   machineLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-logs:create', { userId, payload }),
@@ -172,6 +177,43 @@ contextBridge.exposeInMainWorld('UFCL', {
   // Machine Maintenance Schedules
   machineMaintList:   (userId, machineId) => ipcRenderer.invoke('machine-maint:list', { userId, machineId }),
   machineMaintCreate: (userId, payload) => ipcRenderer.invoke('machine-maint:create', { userId, payload }),
-  machineMaintUpdate: (userId, schedId, payload) => ipcRenderer.invoke('machine-maint:update', { userId, schedId, payload })
+  machineMaintUpdate: (userId, schedId, payload) => ipcRenderer.invoke('machine-maint:update', { userId, schedId, payload }),
+
+  // Compartments
+  compartmentsList:        (userId) => ipcRenderer.invoke('compartments:list', { userId }),
+  compartmentsCreate:      (userId, payload) => ipcRenderer.invoke('compartments:create', { userId, payload }),
+  compartmentsUpdate:      (userId, comptId, payload) => ipcRenderer.invoke('compartments:update', { userId, comptId, payload }),
+  compartmentsDelete:      (userId, comptId) => ipcRenderer.invoke('compartments:delete', { userId, comptId }),
+  compartmentsForDropdown: (userId) => ipcRenderer.invoke('compartments:for-dropdown', { userId }),
+
+  // Log Transport
+  logTransportList:   (userId) => ipcRenderer.invoke('log-transport:list', { userId }),
+  logTransportCreate: (userId, payload) => ipcRenderer.invoke('log-transport:create', { userId, payload }),
+  logTransportDelete: (userId, id) => ipcRenderer.invoke('log-transport:delete', { userId, id }),
+
+  // Value-Added Timber
+  valueAddedTimberList:   (userId) => ipcRenderer.invoke('value-added-timber:list', { userId }),
+  valueAddedTimberCreate: (userId, payload) => ipcRenderer.invoke('value-added-timber:create', { userId, payload }),
+  valueAddedTimberDelete: (userId, id) => ipcRenderer.invoke('value-added-timber:delete', { userId, id }),
+
+  // Logistics Dashboard
+  logisticsDashboard: (userId) => ipcRenderer.invoke('logistics:dashboard', { userId }),
+
+  // Machine Fuel Logs
+  machineFuelLogsList:   (userId) => ipcRenderer.invoke('machine-fuel:list', { userId }),
+  machineFuelLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-fuel:create', { userId, payload }),
+  machineFuelLogsDelete: (userId, id) => ipcRenderer.invoke('machine-fuel:delete', { userId, id }),
+
+  // Casual Labour Requests
+  casualLabourRequestsList:   (userId) => ipcRenderer.invoke('casual-requests:list', { userId }),
+  casualLabourRequestsCreate: (userId, payload) => ipcRenderer.invoke('casual-requests:create', { userId, payload }),
+  casualLabourRequestsReview: (userId, requestId, status) => ipcRenderer.invoke('casual-requests:review', { userId, requestId, status }),
+  casualLabourRequestsDelete: (userId, id) => ipcRenderer.invoke('casual-requests:delete', { userId, id }),
+
+  // Casuals
+  casualsList:   (userId) => ipcRenderer.invoke('casuals:list', { userId }),
+  casualsCreate: (userId, payload) => ipcRenderer.invoke('casuals:create', { userId, payload }),
+  casualsUpdate: (userId, casualId, payload) => ipcRenderer.invoke('casuals:update', { userId, casualId, payload }),
+  casualsDelete: (userId, casualId) => ipcRenderer.invoke('casuals:delete', { userId, casualId })
 });
 
