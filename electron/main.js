@@ -303,3 +303,5 @@ ipcMain.handle('casuals:create', async (_evt, { userId, payload }) => data.casua
 ipcMain.handle('casuals:update', async (_evt, { userId, casualId, payload }) => data.casualsUpdate(userId, casualId, payload));
 ipcMain.handle('casuals:delete', async (_evt, { userId, casualId }) => data.casualsDelete(userId, casualId));
 
+ipcMain.handle('ceo:overview', async (_evt, { userId }) => data.getCeoOverview(userId));
+

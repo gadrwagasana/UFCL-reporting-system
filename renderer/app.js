@@ -8,42 +8,62 @@ const STORAGE = {
 };
 
 const NAV = [
-  { id: 'dashboard', icon: 'ti-layout-dashboard', label: 'Dashboard', sec: 'Overview' },
-  { id: 'daily-timber',  icon: 'ti-trees',         label: 'Sawmill Timber Daily Production', sec: 'Production' },
-  { id: 'daily-poles',   icon: 'ti-align-center',  label: 'Poles Daily Production',           sec: 'Production' },
-  { id: 'daily-harvest', icon: 'ti-axe',            label: 'Harvesting Daily Production',      sec: 'Production' },
-  { id: 'value-added-timber', icon: 'ti-certificate', label: 'Value-Added Timber', sec: 'Production' },
-  { id: 'sales', icon: 'ti-shopping-cart', label: 'Sales orders', sec: 'Commercial' },
-  { id: 'products', icon: 'ti-package', label: 'Product catalog', sec: 'Commercial' },
-  { id: 'weekly-cost', icon: 'ti-cash', label: 'Weekly cost report', sec: 'Reports' },
-  { id: 'weekly-perf', icon: 'ti-chart-bar', label: 'Weekly performance', sec: 'Reports' },
-  { id: 'monthly', icon: 'ti-report-analytics', label: 'Monthly dashboard', sec: 'Reports' },
-  { id: 'sage', icon: 'ti-refresh', label: 'Sage reconciliation', sec: 'Finance' },
-  { id: 'kpi', icon: 'ti-target', label: 'KPI scorecard', sec: 'Executive' },
-  { id: 'changes', icon: 'ti-git-pull-request', label: 'Change requests', sec: 'Governance' },
-  { id: 'notifications', icon: 'ti-bell', label: 'Notifications', sec: 'Governance' },
-  { id: 'audit', icon: 'ti-shield-check', label: 'Audit trail', sec: 'Governance' },
-  { id: 'export', icon: 'ti-file-export', label: 'Exports', sec: 'Tools' },
-  { id: 'users', icon: 'ti-users', label: 'Users', sec: 'System' },
-  { id: 'logistics-dashboard', icon: 'ti-chart-pie-2', label: 'Logistics Dashboard', sec: 'Logistics' },
-  { id: 'inventory',      icon: 'ti-stack',              label: 'Inventory',             sec: 'Logistics' },
-  { id: 'logistics',      icon: 'ti-box',                label: 'Spare Parts',           sec: 'Logistics' },
-  { id: 'warehouses',     icon: 'ti-building-warehouse', label: 'Workshops',             sec: 'Logistics' },
-  { id: 'stock-items',    icon: 'ti-package',            label: 'Stock Catalog',         sec: 'Logistics' },
-  { id: 'stock-movements',icon: 'ti-arrows-exchange',    label: 'Stock Movements',       sec: 'Logistics' },
-  { id: 'vehicles',       icon: 'ti-truck',              label: 'Vehicle Fleet',         sec: 'Logistics' },
-  { id: 'deliveries',     icon: 'ti-truck-delivery',     label: 'Delivery Orders',       sec: 'Logistics' },
-  { id: 'dispatch',       icon: 'ti-send',               label: 'Dispatch',              sec: 'Logistics' },
-  { id: 'transport',      icon: 'ti-truck-loading',      label: 'Third-Party Transport', sec: 'Logistics' },
-  { id: 'timber-inventory', icon: 'ti-trees', label: 'Timber inventory', sec: 'Forestry' },
-  { id: 'compartments', icon: 'ti-map-pin', label: 'Compartments', sec: 'Forestry' },
-  { id: 'log-transport', icon: 'ti-truck-loading', label: 'Log Transport', sec: 'Logistics' },
-  { id: 'machines',     icon: 'ti-settings-2',  label: 'Machine Registry',   sec: 'Logistics' },
-  { id: 'machine-logs', icon: 'ti-list-details', label: 'Machine Daily Logs', sec: 'Production' },
-  { id: 'machine-kpi',  icon: 'ti-chart-line',   label: 'KPI Performance',    sec: 'Executive' },
-  { id: 'machine-fuel', icon: 'ti-droplet', label: 'Machine Fuel Logs', sec: 'Logistics' },
-  { id: 'casual-requests', icon: 'ti-users', label: 'Casual Labour Request', sec: 'Production' },
-  { id: 'casuals', icon: 'ti-user-check', label: 'Casuals', sec: 'Production' }
+  // ── Overview ──────────────────────────────────────────────────────
+  { id: 'dashboard',          icon: 'ti-layout-dashboard',   label: 'Dashboard',            sec: 'Overview'        },
+  { id: 'ceo',                icon: 'ti-crown',              label: 'CEO Overview',         sec: 'Overview'        },
+
+  // ── Production (forest → mill → product, daily logs) ─────────────
+  { id: 'daily-harvest',      icon: 'ti-axe',                label: 'Harvesting Daily',     sec: 'Production'      },
+  { id: 'daily-timber',       icon: 'ti-trees',              label: 'Timber Daily',         sec: 'Production'      },
+  { id: 'daily-poles',        icon: 'ti-align-center',       label: 'Poles Daily',          sec: 'Production'      },
+  { id: 'value-added-timber', icon: 'ti-certificate',        label: 'Value-Added Timber',   sec: 'Production'      },
+  { id: 'machine-logs',       icon: 'ti-list-details',       label: 'Machine Daily Logs',   sec: 'Production'      },
+
+  // ── Forestry ──────────────────────────────────────────────────────
+  { id: 'timber-inventory',   icon: 'ti-database',           label: 'Timber Inventory',     sec: 'Forestry'        },
+  { id: 'compartments',       icon: 'ti-map-pin',            label: 'Compartments',         sec: 'Forestry'        },
+  { id: 'log-transport',      icon: 'ti-truck-loading',      label: 'Log Transport',        sec: 'Forestry'        },
+
+  // ── Labour ────────────────────────────────────────────────────────
+  { id: 'casual-requests',    icon: 'ti-clipboard',          label: 'Labour Requests',      sec: 'Labour'          },
+  { id: 'casuals',            icon: 'ti-user-check',         label: 'Casuals',              sec: 'Labour'          },
+
+  // ── Workshop & Stock ──────────────────────────────────────────────
+  { id: 'warehouses',         icon: 'ti-building-warehouse', label: 'Workshops',            sec: 'Workshop & Stock' },
+  { id: 'stock-items',        icon: 'ti-package',            label: 'Stock Catalog',        sec: 'Workshop & Stock' },
+  { id: 'inventory',          icon: 'ti-stack',              label: 'Inventory',            sec: 'Workshop & Stock' },
+  { id: 'stock-movements',    icon: 'ti-arrows-exchange',    label: 'Stock Movements',      sec: 'Workshop & Stock' },
+  { id: 'logistics',          icon: 'ti-tools',              label: 'Spare Parts',          sec: 'Workshop & Stock' },
+
+  // ── Fleet & Machines ──────────────────────────────────────────────
+  { id: 'machines',           icon: 'ti-settings-2',         label: 'Machine Registry',     sec: 'Fleet & Machines' },
+  { id: 'machine-fuel',       icon: 'ti-droplet',            label: 'Fuel Logs',            sec: 'Fleet & Machines' },
+  { id: 'vehicles',           icon: 'ti-truck',              label: 'Vehicle Fleet',        sec: 'Fleet & Machines' },
+
+  // ── Logistics ─────────────────────────────────────────────────────
+  { id: 'logistics-dashboard',icon: 'ti-chart-pie-2',        label: 'Logistics Dashboard',  sec: 'Logistics'       },
+  { id: 'deliveries',         icon: 'ti-truck-delivery',     label: 'Delivery Orders',      sec: 'Logistics'       },
+  { id: 'dispatch',           icon: 'ti-send',               label: 'Dispatch',             sec: 'Logistics'       },
+  { id: 'transport',          icon: 'ti-building',           label: 'Third-Party Transport',sec: 'Logistics'       },
+
+  // ── Commercial ────────────────────────────────────────────────────
+  { id: 'sales',              icon: 'ti-shopping-cart',      label: 'Sales Orders',         sec: 'Commercial'      },
+  { id: 'products',           icon: 'ti-tag',                label: 'Product Catalog',      sec: 'Commercial'      },
+
+  // ── Reports & Analytics ───────────────────────────────────────────
+  { id: 'weekly-cost',        icon: 'ti-cash',               label: 'Weekly Cost Report',   sec: 'Reports'         },
+  { id: 'weekly-perf',        icon: 'ti-chart-bar',          label: 'Weekly Performance',   sec: 'Reports'         },
+  { id: 'monthly',            icon: 'ti-report-analytics',   label: 'Monthly Dashboard',    sec: 'Reports'         },
+  { id: 'kpi',                icon: 'ti-target',             label: 'KPI Scorecard',        sec: 'Reports'         },
+  { id: 'machine-kpi',        icon: 'ti-chart-line',         label: 'KPI Performance',      sec: 'Reports'         },
+  { id: 'sage',               icon: 'ti-calculator',         label: 'Sage Reconciliation',  sec: 'Reports'         },
+
+  // ── System ────────────────────────────────────────────────────────
+  { id: 'users',              icon: 'ti-users',              label: 'Users',                sec: 'System'          },
+  { id: 'changes',            icon: 'ti-git-pull-request',   label: 'Change Requests',      sec: 'System'          },
+  { id: 'notifications',      icon: 'ti-bell',               label: 'Notifications',        sec: 'System'          },
+  { id: 'audit',              icon: 'ti-shield-check',       label: 'Audit Trail',          sec: 'System'          },
+  { id: 'export',             icon: 'ti-file-export',        label: 'Exports',              sec: 'System'          },
 ];
 
 function $(id) {
@@ -324,6 +344,8 @@ async function showPage(id) {
   switch (id) {
     case 'dashboard':
       return renderDashboard();
+    case 'ceo':
+      return renderCeoOverview();
     case 'daily':
       return renderDaily();
     case 'daily-timber':
@@ -647,6 +669,73 @@ async function renderDashboard() {
   const gn = $('db-go-notif');      if (gn) gn.onclick = () => showPage('notifications');
 }
 
+// ── CEO Overview ──────────────────────────────────────────────────────────────
+
+async function renderCeoOverview() {
+  const pg = $('page-ceo');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2 ti-spin"></i> Loading…</div>`;
+  const res = await window.api.ceoOverview(STORAGE.user.id);
+  if (!res.ok) { pg.innerHTML = `<div class="lerr" style="display:block">${res.error}</div>`; return; }
+
+  const p  = res.production;
+  const h  = res.harvest;
+  const s  = res.sales;
+  const m  = res.machines;
+
+  function kpi(icon, label, value, sub, color = '') {
+    return `<div class="mc" style="${color ? `border-top:3px solid ${color}` : ''}">
+      <div class="mclbl"><i class="ti ${icon}" style="margin-right:4px"></i>${label}</div>
+      <div class="mcval" style="${color ? `color:${color}` : ''}">${value}</div>
+      ${sub ? `<div class="mcsub">${sub}</div>` : ''}
+    </div>`;
+  }
+
+  const fmtRev = (v) => {
+    const n = Number(v);
+    return n >= 1000 ? `$${(n/1000).toFixed(1)}k` : `$${n.toFixed(0)}`;
+  };
+
+  pg.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem;flex-wrap:wrap;gap:.5rem">
+      <div>
+        <div class="ptitle"><i class="ti ti-crown" style="color:#D97706;margin-right:6px"></i>CEO Overview</div>
+        <div class="psub">Operational snapshot · ${res.month}</div>
+      </div>
+      <button class="bs1" id="ceo-refresh"><i class="ti ti-refresh"></i>Refresh</button>
+    </div>
+
+    <div class="psub" style="font-weight:600;color:var(--t2);margin-bottom:.5rem;text-transform:uppercase;font-size:11px;letter-spacing:.06em">
+      <i class="ti ti-hammer" style="margin-right:5px"></i>Production This Month
+    </div>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:1.5rem">
+      ${kpi('ti-trees','Timber Produced', Number(p.timber_units).toLocaleString()+' units', `${p.entries} production entries`, '#1E5F36')}
+      ${kpi('ti-align-center','Poles Produced', Number(p.poles_units).toLocaleString()+' units', '&nbsp;')}
+      ${kpi('ti-axe','Trees Felled', Number(h.trees).toLocaleString()+' trees', `${Number(h.logs).toLocaleString()} logs cross-cut`)}
+      ${kpi('ti-clock-off','Machine Downtime', Number(p.downtime_hours).toFixed(1)+' hrs', p.downtime_hours > 8 ? 'Review required' : 'Within target', p.downtime_hours > 8 ? '#DC2626' : '')}
+    </div>
+
+    <div class="psub" style="font-weight:600;color:var(--t2);margin-bottom:.5rem;text-transform:uppercase;font-size:11px;letter-spacing:.06em">
+      <i class="ti ti-settings-2" style="margin-right:5px"></i>Operations Snapshot
+    </div>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:1.5rem">
+      ${kpi('ti-settings-2','Machines', `${m.total} active`, `${m.available} available · ${m.in_use} in use · ${m.maintenance} maint.`)}
+      ${kpi('ti-truck','Vehicle Fleet', `${res.vehicles} active`, '&nbsp;')}
+      ${kpi('ti-user-check','Active Casuals', `${res.casuals}`, '&nbsp;')}
+      ${kpi('ti-clipboard','Labour Requests', `${res.pendingLabour} pending`, '&nbsp;', res.pendingLabour > 0 ? '#D97706' : '')}
+    </div>
+
+    <div class="psub" style="font-weight:600;color:var(--t2);margin-bottom:.5rem;text-transform:uppercase;font-size:11px;letter-spacing:.06em">
+      <i class="ti ti-shopping-cart" style="margin-right:5px"></i>Commercial &amp; Governance
+    </div>
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr));margin-bottom:1.5rem">
+      ${kpi('ti-shopping-cart','Sales Orders', `${Number(s.total_orders).toLocaleString()}`, 'This month', '#1D4ED8')}
+      ${kpi('ti-cash','Revenue', fmtRev(s.revenue), 'This month', '#1E5F36')}
+      ${kpi('ti-git-pull-request','Change Requests', `${res.pendingChanges} pending`, '&nbsp;', res.pendingChanges > 0 ? '#D97706' : '')}
+    </div>`;
+
+  $('ceo-refresh').onclick = renderCeoOverview;
+}
+
 // Daily production page — sub-type remembered across re-renders
 let _dailySubType = null;
 
@@ -726,7 +815,10 @@ async function renderPageDailyTimber() {
     <div style="display:flex;align-items:center;gap:10px;padding:2rem;color:var(--t3);font-size:13px">
       <i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…
     </div>`;
-  const res = await UFCL.dailyList(STORAGE.user.id);
+  const [res, productsRes] = await Promise.all([
+    UFCL.dailyList(STORAGE.user.id),
+    UFCL.productsActiveForForm(STORAGE.user.id, 'Timber')
+  ]);
   if (!res.ok) return renderDenied('daily-timber', res.error);
   const rows = (res.rows || []).filter(r =>
     Number(r.timber_units || 0) > 0 ||
@@ -734,8 +826,9 @@ async function renderPageDailyTimber() {
     Number(r.timber_cca_treated || 0) > 0 ||
     Number(r.timber_untreated || 0) > 0
   );
+  const timberProducts = productsRes.ok ? productsRes.rows : [];
   $('page-daily-timber').innerHTML = '<div id="daily-content"></div>';
-  renderDailyTimber(res.stock || {}, rows, 'page-daily-timber', renderPageDailyTimber);
+  renderDailyTimber(res.stock || {}, rows, 'page-daily-timber', renderPageDailyTimber, res.transport || {}, timberProducts);
   await insertPendingPanel($('page-daily-timber'), ['daily_log'], renderPageDailyTimber);
 }
 
@@ -765,46 +858,54 @@ async function renderPageDailyHarvest() {
 }
 
 // ── Sawmill Timber sub-view ───────────────────────────────────────────────────
-function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null) {
+function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null, transport = {}, products = []) {
   const today = new Date().toISOString().split('T')[0];
   const refresh = onRefresh || (() => renderDaily('timber'));
 
   // Compute m³ produced from logs received
   const totalLogsReceived = rows.reduce((s, r) => s + Number(r.logs_received || 0), 0);
-  const timberM3 = (totalLogsReceived / 4.4 * 0.5).toFixed(2);
   const totalTimberPcs = rows.reduce((s, r) => s + Number(r.timber_units || 0), 0);
+
+  // Group by size for per-size production cards — seed from registered products first
+  const bySizeMap = {};
+  products.forEach(p => { if (p.size) bySizeMap[p.size] = { logs: 0, units: 0 }; });
+  rows.forEach(r => {
+    const sz = r.product_size;
+    if (!sz) return;
+    if (!bySizeMap[sz]) bySizeMap[sz] = { logs: 0, units: 0 };
+    bySizeMap[sz].logs  += Number(r.logs_received || 0);
+    bySizeMap[sz].units += Number(r.timber_units  || 0);
+  });
+  const sizeEntries = Object.entries(bySizeMap).sort((a, b) => b[1].units - a[1].units);
+  const remainingLogs    = Math.max(0, Number(transport.annualTransported || 0) - totalLogsReceived);
+  const remainingVolM3   = (remainingLogs / 3.4).toFixed(2);
+  const totalVolExpected = (totalLogsReceived / 3.4 * 0.5).toFixed(2);
+
   const totalWaste = rows.reduce((s, r) => s + Number(r.timber_waste || 0), 0);
   const wastePct = (totalTimberPcs + totalWaste) > 0
     ? ((totalWaste / (totalTimberPcs + totalWaste)) * 100).toFixed(1)
     : '0.0';
 
   $(cid).innerHTML = `
+    <div class="ptitle"><i class="ti ti-trees" style="font-size:18px;vertical-align:-2px;margin-right:6px;color:var(--green)"></i>Timber Daily</div>
+    <div class="psub">Sawmill production records — timber output by size, stock levels, and transport received.</div>
     <div class="cards">
-      <div class="mc" style="border-top:3px solid #D97706">
-        <div class="mclbl">Kiln-dried in stock</div>
-        <div class="mcval" style="color:${stock.kilnDriedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.kilnDriedStock || 0).toLocaleString()}</div>
-        <div class="mcsub ca"><i class="ti ti-flame"></i>${Number(stock.kilnDriedProduced || 0).toLocaleString()} prod · ${Number(stock.kilnDriedSold || 0).toLocaleString()} sold</div>
+      <div class="mc" style="border-top:3px solid #0369A1">
+        <div class="mclbl">Logs Received</div>
+        <div class="mcval" style="color:#0369A1">${Number(transport.annualTransported || 0).toLocaleString()}</div>
+        <div class="mcsub bp"><i class="ti ti-truck-loading"></i>${(Number(transport.annualTransported || 0) / 3.4).toFixed(1)} m³ &nbsp;|&nbsp; today: ${Number(transport.todayTransported || 0).toLocaleString()} · ${(Number(transport.todayTransported || 0) / 3.4).toFixed(2)} m³</div>
       </div>
-      <div class="mc" style="border-top:3px solid #2E8B57">
-        <div class="mclbl">CCA-treated in stock</div>
-        <div class="mcval" style="color:${stock.ccaTreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.ccaTreatedStock || 0).toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-droplet"></i>${Number(stock.ccaTreatedProduced || 0).toLocaleString()} prod · ${Number(stock.ccaTreatedSold || 0).toLocaleString()} sold</div>
+      <div class="mc" style="border-top:3px solid #16A34A">
+        <div class="mclbl">Remaining Logs</div>
+        <div class="mcval" style="color:#16A34A">${remainingLogs.toLocaleString()}</div>
+        <div class="mcsub cg"><i class="ti ti-stack-2"></i>Vol. Expected: ${remainingVolM3} m³ &nbsp;|&nbsp; processed: ${totalLogsReceived.toLocaleString()} · ${totalVolExpected} m³</div>
       </div>
-      <div class="mc" style="border-top:3px solid #0F766E">
-        <div class="mclbl">Untreated in stock</div>
-        <div class="mcval" style="color:${stock.untreatedStock < 0 ? 'var(--red)' : 'inherit'}">${Number(stock.untreatedStock || 0).toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-tree"></i>${Number(stock.untreatedProduced || 0).toLocaleString()} prod · ${Number(stock.untreatedSold || 0).toLocaleString()} sold</div>
-      </div>
-      <div class="mc">
-        <div class="mclbl">Total timber in stock</div>
-        <div class="mcval" style="color:${stock.timberStock < 0 ? 'var(--red)' : 'var(--green)'}">${Number(stock.timberStock || 0).toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-trees"></i>all types</div>
-      </div>
-      <div class="mc" style="border-top:3px solid #1D4ED8">
-        <div class="mclbl">Timber produced (m³)</div>
-        <div class="mcval" style="color:#1D4ED8">${timberM3}</div>
-        <div class="mcsub bp"><i class="ti ti-cube"></i>logs ÷ 4.4 × 50%</div>
-      </div>
+      ${sizeEntries.map(([sz, d]) => `
+        <div class="mc" style="border-top:3px solid #1D4ED8">
+          <div class="mclbl" style="font-size:11px">${sz}</div>
+          <div class="mcval" style="color:${d.units > 0 ? '#1D4ED8' : 'var(--t3)'}">${d.units.toLocaleString()}</div>
+          <div class="mcsub bp"><i class="ti ti-stack-2"></i>pcs produced</div>
+        </div>`).join('')}
       <div class="mc" style="border-top:3px solid ${Number(wastePct) > 20 ? '#DC2626' : '#D97706'}">
         <div class="mclbl">Waste %</div>
         <div class="mcval" style="color:${Number(wastePct) > 20 ? 'var(--red)' : 'var(--amber)'}">${wastePct}%</div>
@@ -817,13 +918,13 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
         <button class="appbtn" id="newTimber"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Add timber entry</button>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Operators/Supervisor</th><th>Machine</th><th>Logs received</th><th>Volume expected (m³)</th><th>Timber produced</th><th>Size</th><th>Waste %</th><th>Downtime</th><th>Notes</th><th>Action</th></tr></thead>
+        <thead><tr><th>Date</th><th>Operators/Supervisor</th><th>Machine</th><th>Logs used</th><th>Volume expected (m³)</th><th>Timber produced</th><th>Size</th><th>Waste %</th><th>Downtime</th><th>Notes</th><th>Action</th></tr></thead>
         <tbody>
           ${rows.length === 0
             ? '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:2rem">No entries yet. Click "Add timber entry" to log production.</td></tr>'
             : rows.map(r => {
                 const rLogs = Number(r.logs_received || 0);
-                const rVolExp = rLogs > 0 ? (rLogs / 4.4 * 0.5).toFixed(2) : '—';
+                const rVolExp = rLogs > 0 ? (rLogs / 3.4 * 0.5).toFixed(2) : '—';
                 const rTotal = Number(r.timber_units || 0);
                 const rWaste = Number(r.timber_waste || 0);
                 const rWastePct = (rTotal + rWaste) > 0 ? ((rWaste / (rTotal + rWaste)) * 100).toFixed(1) : '0.0';
@@ -868,10 +969,6 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
         <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Logs received *</label><input type="number" id="dl-logs" placeholder="0" min="0"></div>
-        <div class="fg"><label>Volume expected (auto m³)</label><input type="text" id="dl-vol-exp" readonly style="background:var(--surf)" placeholder="0.00 m³"></div>
-      </div>
-      <div class="frow">
         <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" placeholder="0" min="0"></div>
         <div class="fg"><label>Select size</label><select id="dl-ps"><option value="">— Select product size —</option>${productOpts}</select></div>
       </div>
@@ -887,7 +984,6 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
           date: $('dl-date').value, supervisor: $('dl-sup').value || STORAGE.user.name,
           product_size: $('dl-ps').value || null,
           machine: $('dl-machine').value || null,
-          logs_received: $('dl-logs').value || 0,
           timber_units: units,
           timber_kiln_dried: 0, timber_cca_treated: 0, timber_untreated: units,
           timber_waste: 0, poles_units: 0, poles_waste: 0,
@@ -898,12 +994,6 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
         showOverlaySuccess('Timber entry saved.'); await refresh();
       }
     );
-    const logsEl = document.getElementById('dl-logs');
-    const volExp = document.getElementById('dl-vol-exp');
-    if (logsEl && volExp) logsEl.oninput = () => {
-      const v = Number(logsEl.value || 0);
-      volExp.value = v > 0 ? (v / 4.4 * 0.5).toFixed(2) + ' m³' : '';
-    };
   };
 
   document.querySelectorAll('.dl-edit').forEach(btn => {
@@ -930,10 +1020,6 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
           <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
         </div>
         <div class="frow">
-          <div class="fg"><label>Logs received *</label><input type="number" id="dl-logs" value="${r.logs_received||0}" min="0"></div>
-          <div class="fg"><label>Volume expected (auto m³)</label><input type="text" id="dl-vol-exp" readonly style="background:var(--surf)" value="${r.logs_received ? (Number(r.logs_received)/4.4*0.5).toFixed(2)+' m³' : ''}"></div>
-        </div>
-        <div class="frow">
           <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" value="${r.timber_units||0}" min="0"></div>
           <div class="fg"><label>Select size</label><select id="dl-ps"><option value="">— Select product size —</option>${productOpts}${r.product_size && !tProducts.find(p=>p.size===r.product_size) ? `<option value="${r.product_size}" selected>${r.product_size} (inactive)</option>` : ''}</select></div>
         </div>
@@ -949,7 +1035,6 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
             date: $('dl-date').value, supervisor: $('dl-sup').value,
             product_size: $('dl-ps').value || null,
             machine: $('dl-machine').value || null,
-            logs_received: $('dl-logs').value || 0,
             timber_units: units,
             timber_kiln_dried: r.timber_kiln_dried || 0,
             timber_cca_treated: r.timber_cca_treated || 0,
@@ -977,7 +1062,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null)
       const editVolExp = document.getElementById('dl-vol-exp');
       if (editLogsEl && editVolExp) editLogsEl.oninput = () => {
         const v = Number(editLogsEl.value || 0);
-        editVolExp.value = v > 0 ? (v / 4.4 * 0.5).toFixed(2) + ' m³' : '';
+        editVolExp.value = v > 0 ? (v / 3.4 * 0.5).toFixed(2) + ' m³' : '';
       };
     };
   });
@@ -1200,10 +1285,13 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
 function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = null, compartments = []) {
   const today = new Date().toISOString().split('T')[0];
   const refresh = onRefresh || (() => renderDaily('harvest'));
-  const totalTrees = rows.reduce((s, r) => s + Number(r.quantity), 0);
-  const totalLogs = totalTrees * 2;
-  const totalVolumeM3 = (totalLogs / 4.4).toFixed(2);
-  const activeCompts = compartments.filter(c => c.status === 'Active');
+
+  const totalTrees      = rows.reduce((s, r) => s + Number(r.quantity), 0);
+  const totalCrosscut   = rows.reduce((s, r) => s + Number(r.logs_crosscut || 0), 0);
+  const totalHandrolled = rows.reduce((s, r) => s + Number(r.logs_handrolled || 0), 0);
+  const totalRemaining  = Math.max(0, totalCrosscut - totalHandrolled);
+  const totalVolumeM3   = (totalCrosscut / 3.4).toFixed(2);
+  const activeCompts    = compartments.filter(c => c.status === 'Active');
 
   // Build compartment dropdown options — disable exhausted compartments
   function buildComptOpts(selected = '') {
@@ -1217,53 +1305,91 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
   }
 
   $(cid).innerHTML = `
-    <div class="cards">
-      <div class="mc"><div class="mclbl">Trees felled</div><div class="mcval">${totalTrees.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-axe"></i>trees</div></div>
-      <div class="mc"><div class="mclbl">Total logs (×2)</div><div class="mcval">${totalLogs.toLocaleString()}</div><div class="mcsub cg"><i class="ti ti-stack-2"></i>logs</div></div>
-      <div class="mc"><div class="mclbl">Volume harvested</div><div class="mcval" style="color:var(--green)">${totalVolumeM3} m³</div><div class="mcsub cg"><i class="ti ti-cube"></i>÷ 4.4 logs/m³</div></div>
-      <div class="mc"><div class="mclbl">Active compartments</div><div class="mcval">${activeCompts.length}</div><div class="mcsub cg"><i class="ti ti-map-pin"></i>available</div></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+      <div>
+        <div class="ptitle"><i class="ti ti-axe" style="color:#2E8B57;margin-right:6px"></i>Harvesting Daily</div>
+        <div class="psub">Record trees felled and actual logs produced per compartment</div>
+      </div>
+      <button class="appbtn" id="newHarvest"><i class="ti ti-plus" style="font-size:12px"></i> Log Harvest</button>
     </div>
+
+    <div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(145px,1fr));margin-bottom:1.25rem">
+      <div class="mc">
+        <div class="mclbl"><i class="ti ti-axe" style="margin-right:4px"></i>Trees Felled</div>
+        <div class="mcval">${totalTrees.toLocaleString()}</div>
+        <div class="mcsub">all time · trees</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #1E5F36">
+        <div class="mclbl"><i class="ti ti-stack-2" style="margin-right:4px"></i>Logs Cross-Cut</div>
+        <div class="mcval" style="color:#1E5F36">${totalCrosscut.toLocaleString()}</div>
+        <div class="mcsub">actual logs at site</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #1D4ED8">
+        <div class="mclbl"><i class="ti ti-truck-loading" style="margin-right:4px"></i>Hand-Rolled</div>
+        <div class="mcval" style="color:#1D4ED8">${totalHandrolled.toLocaleString()}</div>
+        <div class="mcsub">ready for transport</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #D97706">
+        <div class="mclbl"><i class="ti ti-clock" style="margin-right:4px"></i>Remaining on Site</div>
+        <div class="mcval" style="color:#D97706">${totalRemaining.toLocaleString()}</div>
+        <div class="mcsub">cross-cut − hand-rolled</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #0F766E">
+        <div class="mclbl"><i class="ti ti-cube" style="margin-right:4px"></i>Volume (m³)</div>
+        <div class="mcval" style="color:#0F766E">${totalVolumeM3}</div>
+        <div class="mcsub">cross-cut ÷ 3.4</div>
+      </div>
+      <div class="mc">
+        <div class="mclbl"><i class="ti ti-map-pin" style="margin-right:4px"></i>Active Compartments</div>
+        <div class="mcval">${activeCompts.length}</div>
+        <div class="mcsub">available for harvest</div>
+      </div>
+    </div>
+
     ${Object.keys(summary).length ? `
-    <div class="card">
-      <h3><i class="ti ti-trees"></i>Harvest by species</h3>
+    <div class="card" style="margin-bottom:1.25rem">
+      <h3 style="margin-bottom:.75rem"><i class="ti ti-trees"></i>Harvest by Species</h3>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Species</th><th>Trees felled</th><th>Logs (×2)</th><th>Volume (m³)</th></tr></thead>
-        <tbody>${Object.entries(summary).map(([sp, qty]) => `<tr>
-          <td style="font-weight:500"><span class="badge bt">${sp}</span></td>
-          <td style="font-family:var(--fm)">${Number(qty).toLocaleString()}</td>
-          <td style="font-family:var(--fm)">${(Number(qty) * 2).toLocaleString()}</td>
-          <td style="font-family:var(--fm);color:var(--green)">${(Number(qty) * 2 / 4.4).toFixed(2)}</td>
-        </tr>`).join('')}
+        <thead><tr><th>Species</th><th>Trees Felled</th><th>Logs Cross-Cut</th><th>Hand-Rolled</th><th>Remaining on Site</th><th>Volume (m³)</th></tr></thead>
+        <tbody>${Object.entries(summary).map(([sp, d]) => {
+          const rem = Math.max(0, d.crosscut - d.handrolled);
+          const vol = (d.crosscut / 3.4).toFixed(2);
+          return `<tr>
+            <td><span class="badge bt">${sp}</span></td>
+            <td style="font-family:var(--fm)">${d.trees.toLocaleString()}</td>
+            <td style="font-family:var(--fm);color:#1E5F36;font-weight:600">${d.crosscut.toLocaleString()}</td>
+            <td style="font-family:var(--fm);color:#1D4ED8">${d.handrolled.toLocaleString()}</td>
+            <td style="font-family:var(--fm);color:#D97706">${rem.toLocaleString()}</td>
+            <td style="font-family:var(--fm);color:#0F766E">${vol}</td>
+          </tr>`;
+        }).join('')}
         </tbody>
       </table></div>
     </div>` : ''}
+
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
-        <h3 style="margin-bottom:0"><i class="ti ti-axe"></i>Harvest log</h3>
-        <button class="appbtn" id="newHarvest"><i class="ti ti-plus" style="font-size:12px;vertical-align:-1px"></i> Log harvest</button>
-      </div>
+      <h3 style="margin-bottom:.75rem"><i class="ti ti-list-details"></i>Harvest Log</h3>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Compartment</th><th>Sub name</th><th>Species</th><th>Trees felled</th><th>Cross-cut</th><th>Hand-rolled</th><th>Total logs</th><th>Volume (m³)</th><th>Notes</th><th>Logged by</th><th>Action</th></tr></thead>
+        <thead><tr><th>Date</th><th>Compartment</th><th>Species</th><th>Trees</th><th>Cross-Cut Logs</th><th>Hand-Rolled</th><th>Remaining on Site</th><th>Volume (m³)</th><th>Notes</th><th>By</th><th></th></tr></thead>
         <tbody>
           ${rows.length === 0
-            ? '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:2rem">No harvest records yet. Click "Log harvest" to record a harvest.</td></tr>'
+            ? '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:2rem">No harvest records yet. Click "Log Harvest" to start.</td></tr>'
             : rows.map(r => {
-                const xcut = Number(r.logs_crosscut || 0);
+                const xcut  = Number(r.logs_crosscut || 0);
                 const hroll = Number(r.logs_handrolled || 0);
-                const totalLogs = (xcut + hroll) > 0 ? (xcut + hroll) : Number(r.quantity) * 2;
-                const volM3 = (totalLogs / 4.4).toFixed(2);
+                const rem   = Math.max(0, xcut - hroll);
+                const vol   = xcut > 0 ? (xcut / 3.4).toFixed(2) : '—';
                 return `<tr>
-                  <td style="font-weight:500">${r.harvest_date}</td>
-                  <td style="font-weight:500;color:var(--g-dark)">${r.compt_name || r.location || '—'}</td>
-                  <td style="color:var(--t3)">${r.sub_name || '—'}</td>
+                  <td style="font-weight:500;white-space:nowrap">${r.harvest_date}</td>
+                  <td style="color:var(--g-dark);font-weight:500">${r.compt_name || r.location || '—'}${r.sub_name ? `<div style="font-size:11px;color:var(--t3)">${r.sub_name}</div>` : ''}</td>
                   <td><span class="badge bt">${r.species}</span></td>
                   <td style="font-family:var(--fm);font-weight:600">${Number(r.quantity).toLocaleString()}</td>
-                  <td style="font-family:var(--fm);color:var(--t3)">${xcut > 0 ? xcut.toLocaleString() : '—'}</td>
-                  <td style="font-family:var(--fm);color:var(--t3)">${hroll > 0 ? hroll.toLocaleString() : '—'}</td>
-                  <td style="font-family:var(--fm);font-weight:600;color:#1D4ED8">${totalLogs.toLocaleString()}</td>
-                  <td style="font-family:var(--fm);color:var(--green)">${volM3}</td>
-                  <td style="color:var(--t3)">${r.notes || '—'}</td>
-                  <td>${r.logged_by || '—'}</td>
+                  <td style="font-family:var(--fm);color:#1E5F36;font-weight:600">${xcut > 0 ? xcut.toLocaleString() : '—'}</td>
+                  <td style="font-family:var(--fm);color:#1D4ED8">${hroll > 0 ? hroll.toLocaleString() : '—'}</td>
+                  <td style="font-family:var(--fm);color:#D97706">${xcut > 0 ? rem.toLocaleString() : '—'}</td>
+                  <td style="font-family:var(--fm);color:#0F766E">${vol}</td>
+                  <td style="color:var(--t3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.notes || '—'}</td>
+                  <td style="color:var(--t3);white-space:nowrap">${r.logged_by || '—'}</td>
                   <td style="white-space:nowrap">
                     <button class="bs1 hv2-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
                     <button class="bs1 hv2-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
@@ -1303,24 +1429,29 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
     </div>
     <div class="frow">
       <div class="fg"><label>Species *</label><input id="hv-species" type="text" placeholder="Auto-filled from compartment"></div>
-      <div class="fg"><label>Trees felled *</label><input id="hv-qty" type="number" min="1" placeholder="0"></div>
+      <div class="fg"><label>Trees Felled *</label><input id="hv-qty" type="number" min="1" placeholder="0"></div>
     </div>
-    <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:6px;padding:.75rem;margin-bottom:.75rem">
-      <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.5rem">Actual log counts (enter manually — a 12m tree = 3 logs, 8m = 2 logs)</div>
+    <div style="background:var(--surf);border:1px solid var(--border);border-radius:8px;padding:.85rem;margin-bottom:.75rem">
+      <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.6rem">Actual Log Counts</div>
       <div class="frow">
-        <div class="fg"><label>Logs cross-cutted</label><input id="hv-crosscut" type="number" min="0" placeholder="0"></div>
-        <div class="fg"><label>Hand-rolled logs</label><input id="hv-handrolled" type="number" min="0" placeholder="0"></div>
+        <div class="fg">
+          <label>Logs Cross-Cut</label>
+          <input id="hv-crosscut" type="number" min="0" placeholder="0">
+          <div style="font-size:11px;color:var(--t3);margin-top:3px">Total logs at site after felling</div>
+        </div>
+        <div class="fg">
+          <label>Hand-Rolled Logs</label>
+          <input id="hv-handrolled" type="number" min="0" placeholder="0">
+          <div style="font-size:11px;color:var(--t3);margin-top:3px">Logs moved to transport area</div>
+        </div>
       </div>
     </div>
-    <div class="fg" style="background:var(--g-light);border:1px solid rgba(30,95,54,.2);border-radius:6px;padding:.6rem .75rem;margin-bottom:.75rem">
-      <div style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Calculated totals</div>
-      <div style="display:flex;gap:1.5rem;margin-top:.35rem">
-        <span style="font-size:13px"><strong id="hv-logs-preview">0</strong> total logs</span>
-        <span style="font-size:13px;color:var(--green)"><strong id="hv-vol-preview">0.00</strong> m³ (÷4.4)</span>
-      </div>
-      <div style="font-size:11px;color:var(--t3);margin-top:4px">If logs not entered, fallback: trees × 2</div>
+    <div style="background:var(--g-light);border:1px solid rgba(30,95,54,.2);border-radius:8px;padding:.7rem .85rem;margin-bottom:.75rem;display:flex;gap:2rem;flex-wrap:wrap">
+      <div><div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Cross-Cut Logs</div><div style="font-size:18px;font-weight:700;color:#1E5F36" id="hv-logs-preview">0</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Remaining on Site</div><div style="font-size:18px;font-weight:700;color:#D97706" id="hv-remaining-preview">0</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.07em">Volume (m³)</div><div style="font-size:18px;font-weight:700;color:#0F766E" id="hv-vol-preview">0.00</div></div>
     </div>
-    <div class="fg"><label>Notes</label><input id="hv-notes" type="text"></div>
+    <div class="fg"><label>Notes</label><input id="hv-notes" type="text" placeholder="Optional"></div>
     <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
     async () => {
       const r = await UFCL.harvestCreate(STORAGE.user.id, {
@@ -1345,17 +1476,18 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
     document.getElementById('hv-species')
   );
   function updateHarvestPreview() {
-    const trees = Number(document.getElementById('hv-qty')?.value || 0);
     const xcut  = Number(document.getElementById('hv-crosscut')?.value || 0);
     const hroll = Number(document.getElementById('hv-handrolled')?.value || 0);
-    const totalLogs = (xcut + hroll) > 0 ? (xcut + hroll) : trees * 2;
-    const volM3 = (totalLogs / 4.4).toFixed(2);
+    const remaining = Math.max(0, xcut - hroll);
+    const volM3     = (xcut / 3.4).toFixed(2);
     const lp = document.getElementById('hv-logs-preview');
+    const rp = document.getElementById('hv-remaining-preview');
     const vp = document.getElementById('hv-vol-preview');
-    if (lp) lp.textContent = totalLogs.toLocaleString();
+    if (lp) lp.textContent = xcut.toLocaleString();
+    if (rp) rp.textContent = remaining.toLocaleString();
     if (vp) vp.textContent = volM3;
   }
-  ['hv-qty','hv-crosscut','hv-handrolled'].forEach(id => {
+  ['hv-crosscut','hv-handrolled'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.oninput = updateHarvestPreview;
   });
@@ -5384,33 +5516,33 @@ async function renderLogTransport() {
   const totals = res.totals || {};
   const compts = comptsRes.ok ? comptsRes.rows : [];
   const today = new Date().toISOString().split('T')[0];
-  const logsM3 = (totals.totalLogsHarvested / 4.4).toFixed(1);
-  const transportedM3 = (totals.totalLogsTransported / 4.4).toFixed(1);
-  const remainingM3 = ((totals.remainingLogs) / 4.4).toFixed(1);
+  const logsM3 = (totals.totalLogsHarvested / 3.4).toFixed(1);
+  const transportedM3 = (totals.totalLogsTransported / 3.4).toFixed(1);
+  const remainingM3 = ((totals.remainingLogs) / 3.4).toFixed(1);
 
   $('page-log-transport').innerHTML = `
     <div class="ptitle"><i class="ti ti-truck-loading" style="color:var(--g-soft)"></i> Log Transport</div>
-    <div class="psub">Track logs transported from forest to sawmill. Totals reflect all harvest entries (1 tree = 2 logs).</div>
+    <div class="psub">Track logs transported from forest to sawmill. Totals based on hand-rolled logs (transport-ready).</div>
     <div class="cards">
       <div class="mc" style="border-top:3px solid #2E8B57">
-        <div class="mclbl">Total logs harvested</div>
+        <div class="mclbl">Total Logs (Hand-Rolled)</div>
         <div class="mcval" style="color:var(--green)">${totals.totalLogsHarvested.toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-trees"></i>${logsM3} m³ (÷ 4.4)</div>
+        <div class="mcsub cg"><i class="ti ti-truck-loading"></i>${logsM3} m³ · ready for transport</div>
       </div>
       <div class="mc" style="border-top:3px solid #1D4ED8">
-        <div class="mclbl">Logs transported</div>
+        <div class="mclbl">Logs Transported</div>
         <div class="mcval" style="color:#1D4ED8">${totals.totalLogsTransported.toLocaleString()}</div>
         <div class="mcsub bp"><i class="ti ti-truck"></i>${transportedM3} m³ loaded</div>
       </div>
       <div class="mc" style="border-top:3px solid ${totals.remainingLogs < 0 ? '#DC2626' : '#D97706'}">
-        <div class="mclbl">Remaining logs</div>
+        <div class="mclbl">Remaining Logs</div>
         <div class="mcval" style="color:${totals.remainingLogs < 0 ? 'var(--red)' : 'var(--amber)'}">${totals.remainingLogs.toLocaleString()}</div>
-        <div class="mcsub ca"><i class="ti ti-stack-2"></i>${remainingM3} m³ at site</div>
+        <div class="mcsub ca"><i class="ti ti-stack-2"></i>${remainingM3} m³ · hand-rolled − transported</div>
       </div>
       <div class="mc">
-        <div class="mclbl">Total harvest volume</div>
+        <div class="mclbl">Hand-Rolled Volume</div>
         <div class="mcval">${totals.totalVolumeM3.toFixed(1)} m³</div>
-        <div class="mcsub cg"><i class="ti ti-cube"></i>trees × 2 ÷ 4.4</div>
+        <div class="mcsub cg"><i class="ti ti-cube"></i>hand-rolled ÷ 3.4</div>
       </div>
     </div>
     <div class="card">
@@ -5428,7 +5560,7 @@ async function renderLogTransport() {
                 <td style="font-weight:500;color:var(--g-dark)">${r.compt_name || '—'}</td>
                 <td style="color:var(--t3)">${r.sub_name || '—'}</td>
                 <td style="font-family:var(--fm);font-weight:600;color:#1D4ED8">${Number(r.qty_transported).toLocaleString()}</td>
-                <td style="font-family:var(--fm);color:var(--green)">${(Number(r.qty_transported) / 4.4).toFixed(2)}</td>
+                <td style="font-family:var(--fm);color:var(--green)">${(Number(r.qty_transported) / 3.4).toFixed(2)}</td>
                 <td style="font-family:var(--fm);color:var(--t3)">${r.tractor_plate || '—'}</td>
                 <td style="color:var(--t3)">${r.loggers_number || '—'}</td>
                 <td style="color:var(--t3)">${r.notes || '—'}</td>
@@ -5496,7 +5628,7 @@ async function renderLogTransport() {
     if (qtyEl && volEl) {
       qtyEl.oninput = () => {
         const v = Number(qtyEl.value);
-        volEl.value = v > 0 ? (v / 4.4).toFixed(2) + ' m³' : '';
+        volEl.value = v > 0 ? (v / 3.4).toFixed(2) + ' m³' : '';
       };
     }
   };

@@ -214,6 +214,8 @@ contextBridge.exposeInMainWorld('UFCL', {
   casualsList:   (userId) => ipcRenderer.invoke('casuals:list', { userId }),
   casualsCreate: (userId, payload) => ipcRenderer.invoke('casuals:create', { userId, payload }),
   casualsUpdate: (userId, casualId, payload) => ipcRenderer.invoke('casuals:update', { userId, casualId, payload }),
-  casualsDelete: (userId, casualId) => ipcRenderer.invoke('casuals:delete', { userId, casualId })
+  casualsDelete: (userId, casualId) => ipcRenderer.invoke('casuals:delete', { userId, casualId }),
+
+  ceoOverview: (userId) => ipcRenderer.invoke('ceo:overview', { userId })
 });
 

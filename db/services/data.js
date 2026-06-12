@@ -59,8 +59,8 @@ const ROLE_PAGES = {
           'machines', 'machine-logs', 'machine-kpi',
           'compartments', 'log-transport', 'value-added-timber',
           'machine-fuel', 'casual-requests', 'casuals'],
-  ceo: ['dashboard', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
-        'logistics-dashboard', 'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
+  ceo: ['dashboard', 'ceo', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
+        'daily-harvest', 'logistics-dashboard', 'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
         'machines', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber',
         'casual-requests', 'casuals'],
   operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
@@ -211,7 +211,7 @@ async function rolesUpdate(userId, role, payload) {
 async function dailyList(userId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
-  const [{ rows }, { rows: stockRows }] = await Promise.all([
+  const [{ rows }, { rows: stockRows }, { rows: transportRows }] = await Promise.all([
     pool.query(
       `select id, to_char(log_date,'DD/MM/YYYY') as date, machine, product_size,
               timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
@@ -221,9 +221,24 @@ async function dailyList(userId) {
        order by log_date desc, id desc
        limit 50`
     ),
-    pool.query(STOCK_SQL)
+    pool.query(STOCK_SQL),
+    pool.query(
+      `select
+         coalesce(sum(case when transport_date = current_date then qty_transported else 0 end),0)::int as today_transported,
+         coalesce(sum(case when extract(year from transport_date) = extract(year from now()) then qty_transported else 0 end),0)::int as annual_transported
+       from log_transport`
+    )
   ]);
-  return { ok: true, rows, stock: buildStock(stockRows[0] || {}) };
+  const tr = transportRows[0] || {};
+  return {
+    ok: true,
+    rows,
+    stock: buildStock(stockRows[0] || {}),
+    transport: {
+      todayTransported:  Number(tr.today_transported  || 0),
+      annualTransported: Number(tr.annual_transported || 0)
+    }
+  };
 }
 
 async function dailyCreate(userId, payload) {
@@ -231,6 +246,16 @@ async function dailyCreate(userId, payload) {
   if (!(await mustRole(user, 'daily'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.date) return { ok: false, error: 'Date is required' };
+  const logsReceived = Number(p.logs_received || 0);
+  if (logsReceived > 0) {
+    const { rows: [lt] } = await pool.query(
+      `select coalesce(sum(qty_transported),0)::int as transported from log_transport where transport_date=$1`,
+      [p.date]
+    );
+    const transported = Number(lt?.transported || 0);
+    if (transported === 0) return { ok: false, error: `No logs were transported on ${p.date}. Record a Log Transport entry first.` };
+    if (logsReceived > transported) return { ok: false, error: `Logs received (${logsReceived}) cannot exceed logs transported on this date (${transported}).` };
+  }
   const kilnDried   = Number(p.timber_kiln_dried  || 0);
   const ccaTreated  = Number(p.timber_cca_treated || 0);
   const untreated   = Number(p.timber_untreated   || 0);
@@ -1659,11 +1684,7 @@ async function harvestCreate(userId, payload) {
   if (p.compt_id) {
     const { rows: [compt] } = await pool.query(
       `select c.volume_m3,
-              coalesce(sum(
-                case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                     then (hl.logs_crosscut + hl.logs_handrolled)::numeric / 4.4
-                     else hl.quantity * 2.0 / 4.4 end
-              ),0) as harvested_m3
+              round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as harvested_m3
        from compartments c
        left join harvest_logs hl on hl.compt_id=c.id
        where c.id=$1
@@ -1730,17 +1751,10 @@ async function dailyHarvestData(userId) {
     ),
     pool.query(
       `select c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status,
-              coalesce(sum(hl.quantity),0)::int as trees_harvested,
-              coalesce(sum(
-                case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                     then hl.logs_crosscut + hl.logs_handrolled
-                     else hl.quantity * 2 end
-              ),0)::int as logs_harvested,
-              round(coalesce(sum(
-                case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                     then (hl.logs_crosscut + hl.logs_handrolled)::numeric / 4.4
-                     else hl.quantity * 2.0 / 4.4 end
-              ),0)::numeric, 2) as volume_harvested_m3
+              coalesce(sum(hl.quantity),0)::int                                        as trees_harvested,
+              coalesce(sum(hl.logs_crosscut),0)::int                                   as logs_crosscut,
+              coalesce(sum(hl.logs_handrolled),0)::int                                 as logs_handrolled,
+              round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2)      as volume_harvested_m3
        from compartments c
        left join harvest_logs hl on hl.compt_id=c.id
        group by c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status
@@ -1749,8 +1763,10 @@ async function dailyHarvestData(userId) {
   ]);
   const summary = {};
   for (const r of rows) {
-    if (!summary[r.species]) summary[r.species] = 0;
-    summary[r.species] += Number(r.quantity);
+    if (!summary[r.species]) summary[r.species] = { trees: 0, crosscut: 0, handrolled: 0 };
+    summary[r.species].trees    += Number(r.quantity);
+    summary[r.species].crosscut += Number(r.logs_crosscut || 0);
+    summary[r.species].handrolled += Number(r.logs_handrolled || 0);
   }
   return { ok: true, rows, summary, compartments: compts };
 }
@@ -2287,16 +2303,8 @@ async function compartmentsList(userId) {
             to_char(c.created_at,'DD/MM/YYYY') as created_at,
             u.name as created_by_name,
             coalesce(sum(hl.quantity),0)::int as trees_harvested,
-            coalesce(sum(
-              case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                   then hl.logs_crosscut + hl.logs_handrolled
-                   else hl.quantity * 2 end
-            ),0)::int as logs_harvested,
-            round(coalesce(sum(
-              case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                   then (hl.logs_crosscut + hl.logs_handrolled)::numeric / 4.4
-                   else hl.quantity * 2.0 / 4.4 end
-            ),0)::numeric, 2) as volume_harvested_m3
+            coalesce(sum(hl.logs_crosscut),0)::int as logs_harvested,
+            round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as volume_harvested_m3
      from compartments c
      left join app_users u on u.id=c.created_by
      left join harvest_logs hl on hl.compt_id=c.id
@@ -2360,11 +2368,7 @@ async function compartmentsForDropdown(userId) {
   const user = await getUser(userId);
   const { rows } = await pool.query(
     `select c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status,
-            round(coalesce(sum(
-              case when hl.logs_crosscut > 0 or hl.logs_handrolled > 0
-                   then (hl.logs_crosscut + hl.logs_handrolled)::numeric / 4.4
-                   else hl.quantity * 2.0 / 4.4 end
-            ),0)::numeric, 2) as volume_harvested_m3
+            round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as volume_harvested_m3
      from compartments c
      left join harvest_logs hl on hl.compt_id=c.id
      group by c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status
@@ -2395,9 +2399,9 @@ async function logTransportList(userId) {
     ),
     pool.query(
       `select
-         coalesce(sum(hl.quantity * 2),0)::int as total_logs_harvested,
-         coalesce((select sum(qty_transported) from log_transport),0)::int as total_logs_transported,
-         round(coalesce(sum(hl.quantity * 2.0 / 4.4),0)::numeric, 2) as total_volume_m3
+         coalesce(sum(hl.logs_handrolled),0)::int                              as total_logs_harvested,
+         coalesce((select sum(qty_transported) from log_transport),0)::int     as total_logs_transported,
+         round(coalesce(sum(hl.logs_handrolled::numeric / 3.4),0)::numeric, 2) as total_volume_m3
        from harvest_logs hl`
     )
   ]);
@@ -2406,7 +2410,7 @@ async function logTransportList(userId) {
     ok: true,
     rows,
     totals: {
-      totalLogsHarvested: Number(t.total_logs_harvested || 0),
+      totalLogsHarvested:  Number(t.total_logs_harvested  || 0),
       totalLogsTransported: Number(t.total_logs_transported || 0),
       remainingLogs: Number(t.total_logs_harvested || 0) - Number(t.total_logs_transported || 0),
       totalVolumeM3: Number(t.total_volume_m3 || 0)
@@ -2874,8 +2878,67 @@ module.exports = {
   casualsList,
   casualsCreate,
   casualsUpdate,
-  casualsDelete
+  casualsDelete,
+  getCeoOverview
 };
+
+// ── CEO Overview ──────────────────────────────────────────────────────────────
+
+async function getCeoOverview(userId) {
+  const user = await getUser(userId);
+  if (!['admin', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+
+  const month = new Date().toISOString().slice(0, 7);
+  const d = new Date();
+  const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+
+  const [prod, harvest, sales, mach, veh, cas, labour, chg] = await Promise.all([
+    pool.query(`
+      select coalesce(sum(timber_units),0)::int  as timber_units,
+             coalesce(sum(poles_units),0)::int   as poles_units,
+             coalesce(sum(downtime_hours),0)::numeric as downtime_hours,
+             count(*)::int                        as entries
+      from daily_logs where to_char(log_date,'YYYY-MM')=$1`, [month]),
+
+    pool.query(`
+      select coalesce(sum(quantity),0)::int       as trees,
+             coalesce(sum(logs_crosscut),0)::int  as logs
+      from harvest_logs where to_char(harvest_date,'YYYY-MM')=$1`, [month]),
+
+    pool.query(`
+      select count(*)::int                                      as total_orders,
+             coalesce(sum(quantity*unit_price),0)::numeric      as revenue
+      from sales_orders where to_char(created_at,'YYYY-MM')=$1`, [month]),
+
+    pool.query(`
+      select count(*)::int                                                 as total,
+             count(*) filter (where status='Available')::int               as available,
+             count(*) filter (where status='In Use')::int                  as in_use,
+             count(*) filter (where status='Under Maintenance')::int       as maintenance
+      from machines where active=true`),
+
+    pool.query(`select count(*)::int as total from vehicles where active=true`),
+
+    pool.query(`select count(*)::int as total from casuals where active=true`),
+
+    pool.query(`select count(*)::int as pending from casual_labour_requests where status='Pending'`),
+
+    pool.query(`select count(*)::int as pending from change_requests where status='Pending'`)
+  ]);
+
+  return {
+    ok: true,
+    month: monthLabel,
+    production: prod.rows[0],
+    harvest:    harvest.rows[0],
+    sales:      sales.rows[0],
+    machines:   mach.rows[0],
+    vehicles:   Number(veh.rows[0].total),
+    casuals:    Number(cas.rows[0].total),
+    pendingLabour:  Number(labour.rows[0].pending),
+    pendingChanges: Number(chg.rows[0].pending)
+  };
+}
 
 // ── Machine Management ────────────────────────────────────────────────────────
 
