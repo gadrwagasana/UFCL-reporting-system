@@ -1067,7 +1067,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
 
   document.querySelectorAll('.dl-edit').forEach(btn => {
     btn.onclick = async () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const isoDate = r.date.split('/').reverse().join('-');
       const [productsRes, machinesRes] = await Promise.all([
@@ -1138,7 +1138,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
 
   document.querySelectorAll('.dl-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
         confirmDelete(`Submit delete request for timber log <strong>${r.date}</strong>? A manager must approve before it is removed.`, async () => {
@@ -1264,7 +1264,7 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
 
   document.querySelectorAll('.pl-edit').forEach(btn => {
     btn.onclick = async () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const [productsRes, machinesRes] = await Promise.all([
         UFCL.productsActiveForForm(STORAGE.user.id, 'Poles'),
@@ -1327,7 +1327,7 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
 
   document.querySelectorAll('.pl-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
         confirmDelete(`Submit delete request for poles log <strong>${r.date}</strong>? A manager must approve before it is removed.`, async () => {
@@ -1563,7 +1563,7 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
 
   document.querySelectorAll('.hv2-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const isoDate = r.harvest_date.split('/').reverse().join('-');
       openOverlay('Edit Harvest Log', r.species, `
@@ -1627,7 +1627,7 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
 
   document.querySelectorAll('.hv2-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
         confirmDelete(`Submit delete request for harvest: <strong>${r.species}</strong> on ${r.harvest_date}? A manager must approve before it is removed.`, async () => {
@@ -2497,7 +2497,7 @@ async function renderLogistics() {
 
   document.querySelectorAll('.li-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       openOverlay('Edit logistics item', r.name, `
         <div class="frow">
@@ -2539,7 +2539,7 @@ async function renderLogistics() {
 
   document.querySelectorAll('.li-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
         confirmDelete(`Submit delete request for <strong>${r.name}</strong>? A manager must approve before it is removed.`, async () => {
@@ -3683,7 +3683,7 @@ async function renderWarehouses() {
 
     document.querySelectorAll('.wh-del').forEach(btn => {
       btn.onclick = () => {
-        const r = rows.find(x => x.id === Number(btn.dataset.id));
+        const r = rows.find(x => x.id === btn.dataset.id);
         if (!r) return;
         confirmDelete(`Delete workshop <strong>${r.name}</strong>? All stock levels in this workshop will also be removed.`, async () => {
           const res2 = await UFCL.warehousesDelete(STORAGE.user.id, r.id);
@@ -3695,7 +3695,7 @@ async function renderWarehouses() {
 
     document.querySelectorAll('.wh-edit').forEach(btn => {
       btn.onclick = () => {
-        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         const WTYPE_OPTS2 = ['Sawmill Workshop','Logging Equipment Workshop','Vehicle Workshop','Pole Treatment Workshop','Electrical Workshop','Central Warehouse'].map(t=>`<option value="${t}" ${row.workshop_type===t?'selected':''}>${t}</option>`).join('');
         openOverlay('Edit Workshop', row.name, `
@@ -3837,7 +3837,7 @@ async function renderStockItems() {
 
   document.querySelectorAll('.si-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete stock item <strong>${r.name}</strong>? All movement history for this item will also be removed.`, async () => {
         const res2 = await UFCL.stockItemsDelete(STORAGE.user.id, r.id);
@@ -3849,7 +3849,7 @@ async function renderStockItems() {
 
   document.querySelectorAll('.si-edit').forEach(btn => {
     btn.onclick = () => {
-      const row = rows.find(r => r.id === Number(btn.dataset.id));
+      const row = rows.find(r => r.id === btn.dataset.id);
       if (!row) return;
       openOverlay('Edit stock item', row.name, itemForm(row), async () => {
         const res2 = await UFCL.stockItemsUpdate(STORAGE.user.id, row.id, {
@@ -3935,7 +3935,7 @@ async function renderStockMovements() {
 
   document.querySelectorAll('.sm-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete stock movement: <strong>${r.movement_type}</strong> ${r.quantity} ${r.uom} of ${r.item_name}? Stock level will be reversed.`, async () => {
         const res2 = await UFCL.stockMovementsDelete(STORAGE.user.id, r.id);
@@ -4463,7 +4463,7 @@ async function renderVehicles() {
 
   document.querySelectorAll('.v-edit').forEach(btn => {
     btn.onclick = () => {
-      const row = rows.find(r => r.id === Number(btn.dataset.id));
+      const row = rows.find(r => r.id === btn.dataset.id);
       if (!row) return;
       openOverlay('Edit vehicle', row.registration, vehicleForm(row, tpCompanies), async () => {
         const p = collectVehiclePayload();
@@ -4479,7 +4479,7 @@ async function renderVehicles() {
 
   document.querySelectorAll('.v-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete vehicle <strong>${r.registration}</strong>? All fuel logs and maintenance records for this vehicle will also be removed.`, async () => {
         const res2 = await UFCL.vehiclesDelete(STORAGE.user.id, r.id);
@@ -4656,7 +4656,7 @@ async function renderDeliveries() {
 
   document.querySelectorAll('.do-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const vOpts = vehicles.map(v=>`<option value="${v.id}" ${r.vehicle_registration===v.registration?'selected':''}>${v.registration}</option>`).join('');
       openOverlay('Edit delivery order', r.order_number, `
@@ -4686,7 +4686,7 @@ async function renderDeliveries() {
 
   document.querySelectorAll('.do-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete delivery order <strong>${r.order_number}</strong>? This will also remove any linked dispatch requests.`, async () => {
         const res2 = await UFCL.deliveriesDelete(STORAGE.user.id, r.id);
@@ -4865,7 +4865,7 @@ async function renderHarvest() {
 
   document.querySelectorAll('.hv-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const isoDate = r.harvest_date.split('/').reverse().join('-');
       openOverlay('Edit harvest log', r.species, `
@@ -4894,7 +4894,7 @@ async function renderHarvest() {
 
   document.querySelectorAll('.hv-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete harvest log: <strong>${r.species}</strong> at ${r.location} on ${r.harvest_date}?`, async () => {
         const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id);
@@ -5055,7 +5055,7 @@ async function renderTransport() {
 
   document.querySelectorAll('.tc-edit').forEach(btn => {
     btn.onclick = () => {
-      const c = companies.find(x => x.id === Number(btn.dataset.id));
+      const c = companies.find(x => x.id === btn.dataset.id);
       if (!c) return;
       openOverlay('Edit transport company', c.name, companyForm(c), async () => {
         const r = await UFCL.transportCompaniesUpdate(STORAGE.user.id, c.id, {
@@ -5076,7 +5076,7 @@ async function renderTransport() {
 
   document.querySelectorAll('.tc-del').forEach(btn => {
     btn.onclick = () => {
-      const c = companies.find(x => x.id === Number(btn.dataset.id));
+      const c = companies.find(x => x.id === btn.dataset.id);
       if (!c) return;
       confirmDelete(`Delete transport company <strong>${c.name}</strong>?`, async () => {
         const res2 = await UFCL.transportCompaniesDelete(STORAGE.user.id, c.id);
@@ -5099,7 +5099,7 @@ async function renderTransport() {
 
   document.querySelectorAll('.tj-edit').forEach(btn => {
     btn.onclick = () => {
-      const j = jobs.find(x => x.id === Number(btn.dataset.id));
+      const j = jobs.find(x => x.id === btn.dataset.id);
       if (!j) return;
       const coOpts = companies.map(c => `<option value="${c.id}" ${j.company_name===c.name?'selected':''}>${c.name}</option>`).join('');
       const soOpts = `<option value="">— None —</option>` +
@@ -5143,7 +5143,7 @@ async function renderTransport() {
 
   document.querySelectorAll('.tj-del').forEach(btn => {
     btn.onclick = () => {
-      const j = jobs.find(x => x.id === Number(btn.dataset.id));
+      const j = jobs.find(x => x.id === btn.dataset.id);
       if (!j) return;
       confirmDelete(`Delete transport job <strong>${j.job_number}</strong> (${j.company_name})?`, async () => {
         const res2 = await UFCL.transportJobsDelete(STORAGE.user.id, j.id);
@@ -5415,7 +5415,7 @@ async function renderMachines() {
 
     document.querySelectorAll('.mch-edit').forEach(btn => {
       btn.onclick = () => {
-        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         openOverlay('Edit machine', row.machine_code + ' — ' + row.name, machineForm(row), async () => {
           const r2 = await UFCL.machinesUpdate(STORAGE.user.id, row.id, {
@@ -5444,7 +5444,7 @@ async function renderMachines() {
 
     document.querySelectorAll('.mch-maint').forEach(btn => {
       btn.onclick = async () => {
-        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         const mr = await UFCL.machineMaintList(STORAGE.user.id, row.id);
         const schedules = mr.ok ? (mr.rows || []) : [];
@@ -5577,7 +5577,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
     </div>`;
 
   function logForm(r) {
-    const mOpts = machines.map(m => `<option value="${m.id}" ${r&&Number(r.machine_id)===m.id?'selected':''}>${m.machine_code} — ${m.name} (${m.category_name})</option>`).join('');
+    const mOpts = machines.map(m => `<option value="${m.id}" ${r&&r.machine_id===m.id?'selected':''}>${m.machine_code} — ${m.name} (${m.category_name})</option>`).join('');
     const sOpts = ['Full Day','Day Shift','Night Shift'].map(s => `<option ${r&&r.shift===s?'selected':''}>${s}</option>`).join('');
     // Item category: default to the existing value (edit) or first category (new entry)
     const defaultCat = r?.item_category || (itemCategories[0]?.name || '');
@@ -5715,7 +5715,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
   if (canDelete) {
     document.querySelectorAll('.ml-edit').forEach(btn => {
       btn.onclick = () => {
-        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         openOverlay('Edit log entry', row.machine_code + ' · ' + new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB'), logForm(row), async () => {
           const r2 = await UFCL.machineLogsUpdate(STORAGE.user.id, row.id, collectLog());
@@ -5728,7 +5728,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
 
     document.querySelectorAll('.ml-del').forEach(btn => {
       btn.onclick = () => {
-        const row = rows.find(r => r.id === Number(btn.dataset.id));
+        const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         confirmDelete(`Delete log for <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}?`, async () => {
           const r2 = await UFCL.machineLogsDelete(STORAGE.user.id, row.id);
@@ -6083,7 +6083,7 @@ async function renderCompartments() {
 
   document.querySelectorAll('.compt-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const isoDate = r.entry_date.split('/').reverse().join('-');
       openOverlay('Edit Compartment', r.compt_name, `
@@ -6122,7 +6122,7 @@ async function renderCompartments() {
 
   document.querySelectorAll('.compt-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete compartment <strong>${r.compt_name}</strong>? This will unlink all associated harvest logs.`, async () => {
         const res2 = await UFCL.compartmentsDelete(STORAGE.user.id, r.id);
@@ -6404,7 +6404,7 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
 
   document.querySelectorAll('.vat-edit').forEach(btn => {
     btn.onclick = async () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       const isoDate = r.date_fmt.split('/').reverse().join('-');
       const sizeOpts = tProducts.map(p =>
@@ -6450,7 +6450,7 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
 
   document.querySelectorAll('.vat-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete value-added timber entry for <strong>${r.date_fmt}</strong> — ${r.type_value_added}, ${r.product_size}?`, async () => {
         const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
