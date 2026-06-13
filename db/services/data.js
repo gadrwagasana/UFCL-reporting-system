@@ -53,6 +53,27 @@ function buildStock(st) {
 
 const PROD_SUB_TOKENS = ['daily-harvest', 'daily-timber', 'daily-poles', 'value-added-timber', 'machine-logs'];
 
+// ── Module-level caches ───────────────────────────────────────────────────────
+const _userCache = new Map(); // userId → { user, expiresAt }
+const USER_CACHE_TTL = 60_000;
+const _roleCache = new Map(); // role → pages[]
+
+// Expand legacy tokens — module-level so mustRole and getBootstrap share one copy
+function expandPages(pages) {
+  if (!Array.isArray(pages)) return pages;
+  const out = [...pages];
+  if (out.includes('daily')) {
+    for (const t of ['daily-timber', 'daily-poles', 'daily-harvest'])
+      if (!out.includes(t)) out.push(t);
+  }
+  return out;
+}
+
+// Fire-and-forget refresh — stock view becomes stale for <1 s after each write
+function refreshStockView() {
+  pool.query('refresh materialized view concurrently mv_stock_summary').catch(() => {});
+}
+
 const ROLE_PAGES = {
   admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
           'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'value-added-timber', 'machine-logs',
@@ -90,27 +111,40 @@ async function getRolePages(role) {
   return perms.length ? perms : ROLE_PAGES[role] || [];
 }
 
+async function getResolvedPages(user) {
+  if (Array.isArray(user.user_permissions) && user.user_permissions.length)
+    return user.user_permissions;
+  if (_roleCache.has(user.role)) return _roleCache.get(user.role);
+  const pages = await getRolePages(user.role);
+  _roleCache.set(user.role, pages);
+  return pages;
+}
+
 async function mustRole(user, pageId) {
-  const allowed = Array.isArray(user.user_permissions) && user.user_permissions.length
-    ? user.user_permissions
-    : await getRolePages(user.role);
-  return allowed.includes(pageId);
+  return (await getResolvedPages(user)).includes(pageId);
 }
 
 async function canAccessDaily(user) {
-  return (await mustRole(user, 'daily')) ||
-         (await mustRole(user, 'daily-timber')) ||
-         (await mustRole(user, 'daily-poles'));
+  const pages = await getResolvedPages(user);
+  return pages.includes('daily') || pages.includes('daily-timber') || pages.includes('daily-poles');
 }
 
 async function getUser(userId) {
+  const now = Date.now();
+  const cached = _userCache.get(userId);
+  if (cached && cached.expiresAt > now) return cached.user;
   const { rows } = await pool.query(
     'select id, username, name, role, department, user_permissions, user_responsibilities, active, workshop_id from app_users where id=$1',
     [userId]
   );
   if (!rows.length) throw new Error('User not found');
   if (!rows[0].active) throw new Error('User inactive');
+  _userCache.set(userId, { user: rows[0], expiresAt: now + USER_CACHE_TTL });
   return rows[0];
+}
+
+function invalidateUserCache(userId) {
+  _userCache.delete(userId);
 }
 
 function isWorkshopRestricted(user) {
@@ -120,10 +154,14 @@ function isWorkshopRestricted(user) {
 
 async function logAudit(user, action, icon = 'ti-check', meta = {}) {
   if (user.role === 'ceo') return;
-  await pool.query(
-    'insert into audit_log(user_id, role, action, icon, meta) values ($1,$2,$3,$4,$5::jsonb)',
-    [user.id, user.role, action, icon, JSON.stringify(meta || {})]
-  );
+  try {
+    await pool.query(
+      'insert into audit_log(user_id, role, action, icon, meta) values ($1,$2,$3,$4,$5::jsonb)',
+      [user.id, user.role, action, icon, JSON.stringify(meta || {})]
+    );
+  } catch (e) {
+    console.error('[audit] failed:', e.message);
+  }
 }
 
 async function pushNotification({ type, title, body, roles }) {
@@ -148,20 +186,10 @@ async function unreadCount(userId) {
 
 async function getBootstrap(userId) {
   const user = await getUser(userId);
-  const { rows: appr } = await pool.query('select approved from monthly_approvals where month_key=$1', ['2024-11']);
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const { rows: appr } = await pool.query('select approved from monthly_approvals where month_key=$1', [currentMonth]);
   const approved = appr[0]?.approved || false;
   const { rows: roles } = await pool.query('select role, permissions from role_definitions');
-
-  // Expand legacy tokens so old role_definitions still work
-  function expandPages(pages) {
-    if (!Array.isArray(pages)) return pages;
-    let out = [...pages];
-    // legacy 'daily' → individual daily sub-tokens (backward compat)
-    if (out.includes('daily')) {
-      for (const t of ['daily-timber', 'daily-poles', 'daily-harvest']) if (!out.includes(t)) out.push(t);
-    }
-    return out;
-  }
 
   const rolePages = roles.reduce((acc, row) => {
     const perms = Array.isArray(row.permissions) ? row.permissions : [];
@@ -209,7 +237,8 @@ async function rolesUpdate(userId, role, payload) {
       role
     ]
   );
-  await logAudit(user, `Updated role responsibilities for ${role}`, 'ti-settings', {
+  _roleCache.delete(role);
+  logAudit(user, `Updated role responsibilities for ${role}`, 'ti-settings', {
     role,
     responsibilities: r.responsibilities,
     permissions: r.permissions
@@ -230,7 +259,7 @@ async function dailyList(userId) {
        order by log_date desc, id desc
        limit 50`
     ),
-    pool.query(STOCK_SQL),
+    pool.query('select * from mv_stock_summary'),
     pool.query(
       `select
          coalesce(sum(case when transport_date = current_date then qty_transported else 0 end),0)::int as today_transported,
@@ -292,7 +321,8 @@ async function dailyCreate(userId, payload) {
       user.id
     ]
   );
-  await logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date, timber: timberTotal, poles: Number(p.poles_units || 0) });
+  logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date, timber: timberTotal, poles: Number(p.poles_units || 0) });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -330,17 +360,29 @@ async function kpiBudgetSave(userId, payload) {
   const p = payload || {};
   if (!p.month || !Array.isArray(p.items)) return { ok: false, error: 'Missing required payload' };
 
-  const month = p.month;
-  for (const item of p.items) {
-    const amount = Number(item.budget_amount || 0);
-    await pool.query(
+  const month   = p.month;
+  const ids     = p.items.map(i => i.id);
+  const amounts = p.items.map(i => Number(i.budget_amount || 0));
+
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    await client.query(
       `insert into kpi_budgets(category_id, month, budget_amount, set_by, created_at, updated_at)
-       values ($1,$2,$3,$4,now(),now())
-       on conflict (category_id, month) do update set budget_amount=$3, set_by=$4, updated_at=now()`,
-      [item.id, month, amount, user.id]
+       select unnest($1::bigint[]), $2, unnest($3::numeric[]), $4, now(), now()
+       on conflict(category_id, month) do update
+         set budget_amount=excluded.budget_amount, set_by=excluded.set_by, updated_at=now()`,
+      [ids, month, amounts, user.id]
     );
+    await client.query('commit');
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  } finally {
+    client.release();
   }
-  await logAudit(user, `Updated KPI budgets for ${month}`, 'ti-target', { month, items: p.items });
+
+  logAudit(user, `Updated KPI budgets for ${month}`, 'ti-target', { month, items: p.items });
   return { ok: true };
 }
 
@@ -447,7 +489,7 @@ async function salesList(userId) {
        order by created_at desc, id desc
        limit 50`
     ),
-    pool.query(STOCK_SQL)
+    pool.query('select * from mv_stock_summary')
   ]);
   return { ok: true, rows, stock: buildStock(stockRows[0] || {}) };
 }
@@ -479,7 +521,8 @@ async function salesCreate(userId, payload) {
     ]
   );
   const label = p.product_sub_type ? `${p.product_sub_type} ${p.product_size}` : `${p.product_type} ${p.product_size}`;
-  await logAudit(user, `Created order ${p.order_number} — ${p.customer_name}: ${p.quantity} × ${label}`, 'ti-shopping-cart', { order_number: p.order_number, sub_type: p.product_sub_type });
+  logAudit(user, `Created order ${p.order_number} — ${p.customer_name}: ${p.quantity} × ${label}`, 'ti-shopping-cart', { order_number: p.order_number, sub_type: p.product_sub_type });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -491,7 +534,7 @@ async function salesUpdateStatus(userId, orderId, status) {
   const { rows } = await pool.query(`select order_number from sales_orders where id=$1`, [orderId]);
   if (!rows.length) return { ok: false, error: 'Order not found' };
   await pool.query(`update sales_orders set status=$1 where id=$2`, [status, orderId]);
-  await logAudit(user, `Updated order ${rows[0].order_number} status to ${status}`, 'ti-shopping-cart', { orderId, status });
+  logAudit(user, `Updated order ${rows[0].order_number} status to ${status}`, 'ti-shopping-cart', { orderId, status });
   return { ok: true };
 }
 
@@ -543,7 +586,7 @@ async function productsCreate(userId, payload) {
       user.id
     ]
   );
-  await logAudit(user, `Added product ${label}`, 'ti-package', { type: p.type, sub_type: p.sub_type, size: p.size });
+  logAudit(user, `Added product ${label}`, 'ti-package', { type: p.type, sub_type: p.sub_type, size: p.size });
   await pushNotification({
     type: 'green',
     title: `New product added — ${label}`,
@@ -570,7 +613,7 @@ async function productsToggle(userId, productId, reason) {
     productId
   ]);
 
-  await logAudit(user, `${targetActive ? 'Reactivated' : 'Deactivated'} product ${p.size}`, 'ti-shield-lock', {
+  logAudit(user, `${targetActive ? 'Reactivated' : 'Deactivated'} product ${p.size}`, 'ti-shield-lock', {
     productId,
     active: targetActive
   });
@@ -642,7 +685,7 @@ async function logisticsCreate(userId, payload) {
       user.id
     ]
   );
-  await logAudit(user, `Added logistics item ${p.name}`, 'ti-truck', { name: p.name });
+  logAudit(user, `Added logistics item ${p.name}`, 'ti-truck', { name: p.name });
   return { ok: true };
 }
 
@@ -686,7 +729,8 @@ async function notificationsList(userId) {
      limit 200`,
     [userId]
   );
-  return { ok: true, rows, unread: await unreadCount(userId) };
+  const unread = rows.filter(r => !r.read).length;
+  return { ok: true, rows, unread };
 }
 
 async function notificationsMarkRead(userId, notificationId) {
@@ -741,7 +785,7 @@ async function changesCreate(userId, payload) {
      values ($1,$2,$3,$4)`,
     [p.record_type, p.record_ref, p.request_text, user.id]
   );
-  await logAudit(user, `Submitted change request (${p.record_type})`, 'ti-send', { record_ref: p.record_ref });
+  logAudit(user, `Submitted change request (${p.record_type})`, 'ti-send', { record_ref: p.record_ref });
   await pushNotification({
     type: 'amber',
     title: 'Change request submitted',
@@ -763,7 +807,7 @@ async function changesReview(userId, changeId, status, response) {
      where id=$4`,
     [status, response || null, user.id, changeId]
   );
-  await logAudit(user, `${status} change request #${changeId}`, status === 'Approved' ? 'ti-check' : 'ti-x');
+  logAudit(user, `${status} change request #${changeId}`, status === 'Approved' ? 'ti-check' : 'ti-x');
   return { ok: true };
 }
 
@@ -777,7 +821,7 @@ async function monthlyApprove(userId, monthKey) {
      do update set approved=true, approved_by=$2, approved_at=now()`,
     [monthKey, user.id]
   );
-  await logAudit(user, `Approved monthly dashboard ${monthKey}`, 'ti-signature');
+  logAudit(user, `Approved monthly dashboard ${monthKey}`, 'ti-signature');
   await pushNotification({
     type: 'green',
     title: 'Monthly report approved',
@@ -897,7 +941,7 @@ async function weeklyExpensesSave(userId, payload) {
       `update weekly_expenses set amount=$1, reason=$2, updated_at=now() where id=$3`,
       [amount, p.reason || null, existing[0].id]
     );
-    await logAudit(user, `Updated weekly expense for category ${p.categoryId}`, 'ti-cash', {
+    logAudit(user, `Updated weekly expense for category ${p.categoryId}`, 'ti-cash', {
       categoryId: p.categoryId,
       oldAmount,
       newAmount: amount,
@@ -910,7 +954,7 @@ async function weeklyExpensesSave(userId, payload) {
        values ($1,$2,$3,$4,$5,$6)`,
       [p.categoryId, amount, p.weekNumber, p.month, user.id, p.reason || null]
     );
-    await logAudit(user, `Created weekly expense for category ${p.categoryId}`, 'ti-cash', {
+    logAudit(user, `Created weekly expense for category ${p.categoryId}`, 'ti-cash', {
       categoryId: p.categoryId,
       amount,
       week: p.weekNumber,
@@ -950,7 +994,7 @@ async function usersCreate(userId, payload) {
     [p.username, p.name, p.role, p.department || null, JSON.stringify([]), JSON.stringify([]), hash,
      p.active !== false, p.workshop_id ? Number(p.workshop_id) : null]
   );
-  await logAudit(user, `Created user ${p.username}`, 'ti-users', { username: p.username, role: p.role, department: p.department });
+  logAudit(user, `Created user ${p.username}`, 'ti-users', { username: p.username, role: p.role, department: p.department });
   return { ok: true };
 }
 
@@ -985,7 +1029,8 @@ async function usersUpdate(userId, targetUserId, payload) {
       [p.workshop_id ? Number(p.workshop_id) : null, targetUserId]
     );
   }
-  await logAudit(user, `Updated user ${targetUserId}`, 'ti-users', {
+  invalidateUserCache(targetUserId);
+  logAudit(user, `Updated user ${targetUserId}`, 'ti-users', {
     userId: targetUserId, department: p.department,
     permissions: p.permissions, workshop_id: p.workshop_id
   });
@@ -997,7 +1042,8 @@ async function usersResetPassword(userId, targetUserId, newPassword) {
   if (!['ceo', 'operations', 'admin'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const hash = await bcrypt.hash(String(newPassword || 'UFCL@1234'), 10);
   await pool.query(`update app_users set password_hash=$1 where id=$2`, [hash, targetUserId]);
-  await logAudit(user, `Reset password for user ${targetUserId}`, 'ti-key', { userId: targetUserId });
+  invalidateUserCache(targetUserId);
+  logAudit(user, `Reset password for user ${targetUserId}`, 'ti-key', { userId: targetUserId });
   return { ok: true };
 }
 
@@ -1010,6 +1056,12 @@ async function getDashboardStats(userId) {
   sevenDaysAgo.setDate(today.getDate() - 6);
   const [yr, mn] = month.split('-').map(Number);
   const lastMonth = new Date(yr, mn - 2, 1).toISOString().slice(0, 7);
+  const [lyr, lmn] = lastMonth.split('-').map(Number);
+  const monthStart     = `${month}-01`;
+  const monthEnd       = new Date(yr, mn, 0).toISOString().slice(0, 10);
+  const nextMonthStart = new Date(yr, mn, 1).toISOString().slice(0, 10);
+  const lastMonthStart = `${lastMonth}-01`;
+  const lastMonthEnd   = new Date(lyr, lmn, 0).toISOString().slice(0, 10);
 
   const [
     { rows: monthProd },
@@ -1029,12 +1081,12 @@ async function getDashboardStats(userId) {
               coalesce(sum(poles_units),0)::int as poles,
               coalesce(sum(downtime_hours),0)::numeric as downtime,
               count(*)::int as log_days
-       from daily_logs where to_char(log_date,'YYYY-MM')=$1`, [month]
+       from daily_logs where log_date >= $1 and log_date <= $2`, [monthStart, monthEnd]
     ),
     pool.query(
       `select coalesce(sum(timber_units),0)::int as timber,
               coalesce(sum(poles_units),0)::int as poles
-       from daily_logs where to_char(log_date,'YYYY-MM')=$1`, [lastMonth]
+       from daily_logs where log_date >= $1 and log_date <= $2`, [lastMonthStart, lastMonthEnd]
     ),
     pool.query(
       `select log_date,
@@ -1049,7 +1101,7 @@ async function getDashboardStats(userId) {
       `select count(*)::int as orders,
               coalesce(sum(quantity),0)::int as qty,
               coalesce(sum(quantity*unit_price),0)::numeric as revenue
-       from sales_orders where to_char(created_at,'YYYY-MM')=$1`, [month]
+       from sales_orders where created_at >= $1 and created_at < $2`, [monthStart, nextMonthStart]
     ),
     pool.query(
       `select order_number, customer_name, product_type, product_size, quantity, unit_price, created_at
@@ -1078,7 +1130,7 @@ async function getDashboardStats(userId) {
        order by a.created_at desc limit 7`,
       [user.role === 'ceo' ? ['ceo'] : ['ceo', 'admin']]
     ),
-    pool.query(STOCK_SQL)
+    pool.query('select * from mv_stock_summary')
   ]);
 
   return {
@@ -1112,8 +1164,9 @@ async function monthlyDashboard(userId, monthKey) {
 
   const month = monthKey || new Date().toISOString().slice(0, 7);
   const [year, mon] = month.split('-').map(Number);
-  const monthStart = `${month}-01`;
-  const monthEnd = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const monthStart     = `${month}-01`;
+  const monthEnd       = new Date(year, mon, 0).toISOString().slice(0, 10);
+  const nextMonthStart = new Date(year, mon, 1).toISOString().slice(0, 10);
 
   const { rows: prodRows } = await pool.query(
     `select
@@ -1133,8 +1186,8 @@ async function monthlyDashboard(userId, monthKey) {
             coalesce(sum(quantity),0)::int as total_qty,
             coalesce(sum(quantity * unit_price),0)::numeric as total_revenue
      from sales_orders
-     where to_char(created_at,'YYYY-MM')=$1`,
-    [month]
+     where created_at >= $1 and created_at < $2`,
+    [monthStart, nextMonthStart]
   );
 
   const { rows: expRows } = await pool.query(
@@ -1211,7 +1264,7 @@ async function warehousesCreate(userId, payload) {
      values ($1,$2,$3,$4,$5,true) returning id`,
     [p.name, p.location || null, p.workshop_type || null, p.capacity ? Number(p.capacity) : null, p.notes || null]
   );
-  await logAudit(user, `Created warehouse: ${p.name}`, 'ti-building-warehouse', { id: rows[0].id });
+  logAudit(user, `Created warehouse: ${p.name}`, 'ti-building-warehouse', { id: rows[0].id });
   return { ok: true };
 }
 
@@ -1224,7 +1277,7 @@ async function warehousesUpdate(userId, warehouseId, payload) {
      where id=$7`,
     [p.name, p.location || null, p.workshop_type || null, p.capacity ? Number(p.capacity) : null, p.notes || null, p.active !== false, warehouseId]
   );
-  await logAudit(user, `Updated warehouse #${warehouseId}`, 'ti-building-warehouse', { id: warehouseId });
+  logAudit(user, `Updated warehouse #${warehouseId}`, 'ti-building-warehouse', { id: warehouseId });
   return { ok: true };
 }
 
@@ -1270,7 +1323,7 @@ async function stockItemsCreate(userId, payload) {
      Number(p.min_stock || 0), p.max_stock ? Number(p.max_stock) : null,
      p.notes || null, user.id]
   );
-  await logAudit(user, `Added stock item: ${p.name}`, 'ti-package', { id: rows[0].id, category: p.category });
+  logAudit(user, `Added stock item: ${p.name}`, 'ti-package', { id: rows[0].id, category: p.category });
   return { ok: true };
 }
 
@@ -1287,7 +1340,7 @@ async function stockItemsUpdate(userId, itemId, payload) {
      Number(p.min_stock || 0), p.max_stock ? Number(p.max_stock) : null,
      p.notes || null, p.active !== false, itemId]
   );
-  await logAudit(user, `Updated stock item #${itemId}`, 'ti-package', { id: itemId });
+  logAudit(user, `Updated stock item #${itemId}`, 'ti-package', { id: itemId });
   return { ok: true };
 }
 
@@ -1389,7 +1442,7 @@ async function stockMovementsCreate(userId, payload) {
     }
   }
 
-  await logAudit(user, `Stock ${p.movement_type}${isTransfer?' (pending approval)':''}: item #${p.item_id} qty ${qty}`, 'ti-arrows-exchange', { ...p });
+  logAudit(user, `Stock ${p.movement_type}${isTransfer?' (pending approval)':''}: item #${p.item_id} qty ${qty}`, 'ti-arrows-exchange', { ...p });
   return { ok: true, pending: isTransfer, movement_id: mvRows[0].id };
 }
 
@@ -1398,45 +1451,59 @@ async function stockTransferApprove(userId, movementId, action, rejectionReason)
   if (!['admin', 'ceo', 'operations', 'logistics', 'supervisor'].includes(user.role))
     return { ok: false, error: 'Access denied — manager role required' };
 
-  const { rows } = await pool.query(
-    `select * from stock_movements where id=$1 and movement_type='transfer' and approval_status='pending'`,
-    [movementId]
-  );
-  if (!rows.length) return { ok: false, error: 'Transfer not found or already reviewed' };
-  const mv = rows[0];
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const { rows } = await client.query(
+      `select * from stock_movements
+       where id=$1 and movement_type='transfer' and approval_status='pending'
+       for update skip locked`,
+      [movementId]
+    );
+    if (!rows.length) {
+      await client.query('rollback');
+      return { ok: false, error: 'Transfer not found or already reviewed' };
+    }
+    const mv = rows[0];
 
-  if (action === 'approve') {
-    await pool.query(
-      `update stock_movements set approval_status='approved', approved_by=$1, approved_at=now() where id=$2`,
-      [user.id, movementId]
-    );
-    // Deduct from source
-    if (mv.warehouse_id) {
-      await pool.query(
-        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at) values ($1,$2,$3,now())
-         on conflict(item_id, warehouse_id) do update
-         set quantity=greatest(0, stock_levels.quantity-$3), updated_at=now()`,
-        [mv.item_id, mv.warehouse_id, mv.quantity]
+    if (action === 'approve') {
+      await client.query(
+        `update stock_movements set approval_status='approved', approved_by=$1, approved_at=now() where id=$2`,
+        [user.id, movementId]
       );
-    }
-    // Add to destination
-    if (mv.to_warehouse_id) {
-      await pool.query(
-        `insert into stock_levels(item_id, warehouse_id, quantity, updated_at) values ($1,$2,$3,now())
-         on conflict(item_id, warehouse_id) do update
-         set quantity=stock_levels.quantity+$3, updated_at=now()`,
-        [mv.item_id, mv.to_warehouse_id, mv.quantity]
+      if (mv.warehouse_id) {
+        await client.query(
+          `insert into stock_levels(item_id, warehouse_id, quantity, updated_at) values ($1,$2,$3,now())
+           on conflict(item_id, warehouse_id) do update
+           set quantity=greatest(0, stock_levels.quantity-$3), updated_at=now()`,
+          [mv.item_id, mv.warehouse_id, mv.quantity]
+        );
+      }
+      if (mv.to_warehouse_id) {
+        await client.query(
+          `insert into stock_levels(item_id, warehouse_id, quantity, updated_at) values ($1,$2,$3,now())
+           on conflict(item_id, warehouse_id) do update
+           set quantity=stock_levels.quantity+$3, updated_at=now()`,
+          [mv.item_id, mv.to_warehouse_id, mv.quantity]
+        );
+      }
+      logAudit(user, `Transfer approved #${movementId}: item #${mv.item_id} qty ${mv.quantity}`, 'ti-circle-check', { movementId });
+    } else {
+      await client.query(
+        `update stock_movements set approval_status='rejected', approved_by=$1, approved_at=now(), rejection_reason=$2 where id=$3`,
+        [user.id, rejectionReason || null, movementId]
       );
+      logAudit(user, `Transfer rejected #${movementId}`, 'ti-circle-x', { movementId, rejectionReason });
     }
-    await logAudit(user, `Transfer approved #${movementId}: item #${mv.item_id} qty ${mv.quantity}`, 'ti-circle-check', { movementId });
-  } else {
-    await pool.query(
-      `update stock_movements set approval_status='rejected', approved_by=$1, approved_at=now(), rejection_reason=$2 where id=$3`,
-      [user.id, rejectionReason || null, movementId]
-    );
-    await logAudit(user, `Transfer rejected #${movementId}`, 'ti-circle-x', { movementId, rejectionReason });
+
+    await client.query('commit');
+    return { ok: true };
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  } finally {
+    client.release();
   }
-  return { ok: true };
 }
 
 // ── Material Requests ─────────────────────────────────────────────────────────
@@ -1498,7 +1565,7 @@ async function materialRequestsCreate(userId, payload) {
      values ($1,$2,$3,$4,$5,$6)`,
     [p.item_id, workshopId, qty, p.reason || null, p.priority || 'normal', user.id]
   );
-  await logAudit(user, `Material request: item #${p.item_id} qty ${qty}`, 'ti-clipboard-list', { ...p });
+  logAudit(user, `Material request: item #${p.item_id} qty ${qty}`, 'ti-clipboard-list', { ...p });
   return { ok: true };
 }
 
@@ -1538,13 +1605,13 @@ async function materialRequestsApprove(userId, requestId, action, approvedQty, r
         [req.item_id, req.workshop_id, qty]
       );
     }
-    await logAudit(user, `Material request approved #${requestId} qty ${qty}`, 'ti-circle-check', { requestId });
+    logAudit(user, `Material request approved #${requestId} qty ${qty}`, 'ti-circle-check', { requestId });
   } else {
     await pool.query(
       `update material_requests set status='rejected', reviewed_by=$1, review_notes=$2, reviewed_at=now() where id=$3`,
       [user.id, reviewNotes || null, requestId]
     );
-    await logAudit(user, `Material request rejected #${requestId}`, 'ti-circle-x', { requestId });
+    logAudit(user, `Material request rejected #${requestId}`, 'ti-circle-x', { requestId });
   }
   return { ok: true };
 }
@@ -1686,7 +1753,7 @@ async function vehiclesCreate(userId, payload) {
       p.doc_owner_id||null, p.doc_contract||null
     ]
   );
-  await logAudit(user, `Registered vehicle: ${p.registration}`, 'ti-truck', { id: rows[0].id });
+  logAudit(user, `Registered vehicle: ${p.registration}`, 'ti-truck', { id: rows[0].id });
   return { ok: true };
 }
 
@@ -1726,7 +1793,7 @@ async function vehiclesUpdate(userId, vehicleId, payload) {
       vehicleId
     ]
   );
-  await logAudit(user, `Updated vehicle #${vehicleId}`, 'ti-truck', { id: vehicleId });
+  logAudit(user, `Updated vehicle #${vehicleId}`, 'ti-truck', { id: vehicleId });
   return { ok: true };
 }
 
@@ -1761,7 +1828,7 @@ async function fuelLogsCreate(userId, payload) {
     [p.vehicle_id, liters, costPerLiter || null, totalCost || null,
      p.odometer ? Number(p.odometer) : null, p.log_date, user.id, p.notes || null]
   );
-  await logAudit(user, `Fuel log for vehicle #${p.vehicle_id}: ${liters}L`, 'ti-gas-station', { vehicle_id: p.vehicle_id, liters });
+  logAudit(user, `Fuel log for vehicle #${p.vehicle_id}: ${liters}L`, 'ti-gas-station', { vehicle_id: p.vehicle_id, liters });
   return { ok: true };
 }
 
@@ -1794,7 +1861,7 @@ async function maintenanceCreate(userId, payload) {
     [p.vehicle_id, p.maintenance_type, p.description, p.cost ? Number(p.cost) : null,
      p.maintenance_date, p.next_due_date || null, p.performed_by || null, p.notes || null, user.id]
   );
-  await logAudit(user, `Maintenance record for vehicle #${p.vehicle_id}`, 'ti-tool', { vehicle_id: p.vehicle_id, type: p.maintenance_type });
+  logAudit(user, `Maintenance record for vehicle #${p.vehicle_id}`, 'ti-tool', { vehicle_id: p.vehicle_id, type: p.maintenance_type });
   return { ok: true };
 }
 
@@ -1841,7 +1908,7 @@ async function deliveryOrdersCreate(userId, payload) {
     [orderNum, p.sales_order_id || null, p.vehicle_id || null, p.driver_name,
      p.delivery_date || null, p.route || null, p.notes || null, user.id]
   );
-  await logAudit(user, `Created delivery order ${orderNum}`, 'ti-truck-delivery', { id: rows[0].id });
+  logAudit(user, `Created delivery order ${orderNum}`, 'ti-truck-delivery', { id: rows[0].id });
   return { ok: true };
 }
 
@@ -1851,7 +1918,7 @@ async function deliveryOrdersUpdateStatus(userId, orderId, status) {
   const valid = ['Pending', 'Assigned', 'In Transit', 'Delivered', 'Failed'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query('update delivery_orders set status=$1 where id=$2', [status, orderId]);
-  await logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
+  logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
   return { ok: true };
 }
 
@@ -1895,7 +1962,7 @@ async function dispatchCreate(userId, payload) {
      values ($1,$2,'Pending',$3,$4)`,
     [reqNum, p.delivery_order_id, p.notes || null, user.id]
   );
-  await logAudit(user, `Created dispatch request ${reqNum}`, 'ti-send', { delivery_order_id: p.delivery_order_id });
+  logAudit(user, `Created dispatch request ${reqNum}`, 'ti-send', { delivery_order_id: p.delivery_order_id });
   return { ok: true };
 }
 
@@ -1917,7 +1984,7 @@ async function dispatchReview(userId, requestId, status, notes) {
       [requestId]
     );
   }
-  await logAudit(user, `Dispatch request #${requestId} ${status}`, 'ti-send', { requestId, status });
+  logAudit(user, `Dispatch request #${requestId} ${status}`, 'ti-send', { requestId, status });
   return { ok: true };
 }
 
@@ -1977,7 +2044,7 @@ async function harvestCreate(userId, payload) {
       await pool.query(`update compartments set status='Completed' where id=$1`, [Number(p.compt_id)]);
     }
   }
-  await logAudit(user, `Harvest logged: ${p.species} at ${location}`, 'ti-tree', { ...p });
+  logAudit(user, `Harvest logged: ${p.species} at ${location}`, 'ti-tree', { ...p });
   return { ok: true };
 }
 
@@ -1988,7 +2055,7 @@ async function timberInventoryList(userId) {
   if (!(await mustRole(user, 'timber-inventory'))) return { ok: false, error: 'Access denied' };
 
   const [{ rows: stockRows }, { rows: logs7 }, { rows: harvestRows }] = await Promise.all([
-    pool.query(STOCK_SQL),
+    pool.query('select * from mv_stock_summary'),
     pool.query(
       `select to_char(log_date,'DD Mon YYYY') as date,
               timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
@@ -2086,7 +2153,7 @@ async function pendingEditsCreate(userId, payload) {
     [p.action_type, p.entity_type, p.entity_id, p.entity_ref || null,
      p.payload ? JSON.stringify(p.payload) : null, user.id]
   );
-  await logAudit(user,
+  logAudit(user,
     `Submitted ${p.action_type} request for ${p.entity_type} #${p.entity_id}`,
     'ti-send', { entity_type: p.entity_type, entity_id: p.entity_id }
   );
@@ -2117,7 +2184,7 @@ async function pendingEditsReview(userId, pendingId, status, reviewNotes) {
      where id=$4`,
     [status, reviewNotes || null, user.id, pendingId]
   );
-  await logAudit(user,
+  logAudit(user,
     `${status} ${pe.action_type} request for ${pe.entity_type} #${pe.entity_id}`,
     status === 'Approved' ? 'ti-circle-check' : 'ti-circle-x',
     { pendingId, entity_type: pe.entity_type, entity_id: pe.entity_id }
@@ -2207,7 +2274,8 @@ async function dailyUpdate(userId, logId, payload) {
      Number(p.downtime_hours || 0), p.downtime_reason || null, p.remarks || null,
      p.product_size || null, p.machine || null, Number(p.logs_received || 0), logId]
   );
-  await logAudit(user, `Updated daily log #${logId}`, 'ti-edit', { logId, date: p.date });
+  logAudit(user, `Updated daily log #${logId}`, 'ti-edit', { logId, date: p.date });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -2217,7 +2285,8 @@ async function dailyDelete(userId, logId) {
   const { rows } = await pool.query('select log_date from daily_logs where id=$1', [logId]);
   if (!rows.length) return { ok: false, error: 'Entry not found' };
   await pool.query('delete from daily_logs where id=$1', [logId]);
-  await logAudit(user, `Deleted daily log #${logId} (${rows[0].log_date})`, 'ti-trash', { logId });
+  logAudit(user, `Deleted daily log #${logId} (${rows[0].log_date})`, 'ti-trash', { logId });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -2234,7 +2303,8 @@ async function salesUpdate(userId, orderId, payload) {
     [p.order_number, p.customer_name, p.product_type, p.product_sub_type || null,
      p.product_size, Number(p.quantity), Number(p.unit_price), p.notes || null, orderId]
   );
-  await logAudit(user, `Updated sales order #${orderId}`, 'ti-edit', { orderId });
+  logAudit(user, `Updated sales order #${orderId}`, 'ti-edit', { orderId });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -2244,7 +2314,8 @@ async function salesDelete(userId, orderId) {
   const { rows } = await pool.query('select order_number from sales_orders where id=$1', [orderId]);
   if (!rows.length) return { ok: false, error: 'Order not found' };
   await pool.query('delete from sales_orders where id=$1', [orderId]);
-  await logAudit(user, `Deleted sales order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  logAudit(user, `Deleted sales order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  refreshStockView();
   return { ok: true };
 }
 
@@ -2259,7 +2330,7 @@ async function logisticsUpdate(userId, itemId, payload) {
     [p.category, p.name, p.sku || null, p.uom,
      Number(p.unit_cost || 0), Number(p.stock || 0), Number(p.min_stock || 0), itemId]
   );
-  await logAudit(user, `Updated logistics item #${itemId}`, 'ti-edit', { itemId });
+  logAudit(user, `Updated logistics item #${itemId}`, 'ti-edit', { itemId });
   return { ok: true };
 }
 
@@ -2269,7 +2340,7 @@ async function logisticsDelete(userId, itemId) {
   const { rows } = await pool.query('select name from logistics_items where id=$1', [itemId]);
   if (!rows.length) return { ok: false, error: 'Item not found' };
   await pool.query('delete from logistics_items where id=$1', [itemId]);
-  await logAudit(user, `Deleted logistics item: ${rows[0].name}`, 'ti-trash', { itemId });
+  logAudit(user, `Deleted logistics item: ${rows[0].name}`, 'ti-trash', { itemId });
   return { ok: true };
 }
 
@@ -2289,7 +2360,7 @@ async function harvestUpdate(userId, logId, payload) {
      p.compt_id ? Number(p.compt_id) : null, p.sub_name || null,
      Number(p.logs_crosscut || 0), Number(p.logs_handrolled || 0), logId]
   );
-  await logAudit(user, `Updated harvest log #${logId}`, 'ti-edit', { logId });
+  logAudit(user, `Updated harvest log #${logId}`, 'ti-edit', { logId });
   return { ok: true };
 }
 
@@ -2297,7 +2368,7 @@ async function harvestDelete(userId, logId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from harvest_logs where id=$1', [logId]);
-  await logAudit(user, `Deleted harvest log #${logId}`, 'ti-trash', { logId });
+  logAudit(user, `Deleted harvest log #${logId}`, 'ti-trash', { logId });
   return { ok: true };
 }
 
@@ -2310,7 +2381,7 @@ async function deliveryOrdersUpdate(userId, orderId, payload) {
      where id=$6`,
     [p.vehicle_id || null, p.driver_name, p.delivery_date || null, p.route || null, p.notes || null, orderId]
   );
-  await logAudit(user, `Updated delivery order #${orderId}`, 'ti-edit', { orderId });
+  logAudit(user, `Updated delivery order #${orderId}`, 'ti-edit', { orderId });
   return { ok: true };
 }
 
@@ -2321,7 +2392,7 @@ async function deliveryOrdersDelete(userId, orderId) {
   if (!rows.length) return { ok: false, error: 'Delivery order not found' };
   await pool.query('delete from dispatch_requests where delivery_order_id=$1', [orderId]);
   await pool.query('delete from delivery_orders where id=$1', [orderId]);
-  await logAudit(user, `Deleted delivery order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  logAudit(user, `Deleted delivery order ${rows[0].order_number}`, 'ti-trash', { orderId });
   return { ok: true };
 }
 
@@ -2329,7 +2400,7 @@ async function dispatchDelete(userId, requestId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'dispatch'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from dispatch_requests where id=$1', [requestId]);
-  await logAudit(user, `Deleted dispatch request #${requestId}`, 'ti-trash', { requestId });
+  logAudit(user, `Deleted dispatch request #${requestId}`, 'ti-trash', { requestId });
   return { ok: true };
 }
 
@@ -2348,7 +2419,7 @@ async function transportJobsUpdate(userId, jobId, payload) {
      p.quantity ? Number(p.quantity) : null, p.uom || null,
      p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, jobId]
   );
-  await logAudit(user, `Updated transport job #${jobId}`, 'ti-edit', { jobId });
+  logAudit(user, `Updated transport job #${jobId}`, 'ti-edit', { jobId });
   return { ok: true };
 }
 
@@ -2356,7 +2427,7 @@ async function transportJobsDelete(userId, jobId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from transport_jobs where id=$1', [jobId]);
-  await logAudit(user, `Deleted transport job #${jobId}`, 'ti-trash', { jobId });
+  logAudit(user, `Deleted transport job #${jobId}`, 'ti-trash', { jobId });
   return { ok: true };
 }
 
@@ -2364,7 +2435,7 @@ async function fuelLogsDelete(userId, logId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from fuel_logs where id=$1', [logId]);
-  await logAudit(user, `Deleted fuel log #${logId}`, 'ti-trash', { logId });
+  logAudit(user, `Deleted fuel log #${logId}`, 'ti-trash', { logId });
   return { ok: true };
 }
 
@@ -2372,7 +2443,7 @@ async function maintenanceDelete(userId, recordId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from maintenance_records where id=$1', [recordId]);
-  await logAudit(user, `Deleted maintenance record #${recordId}`, 'ti-trash', { recordId });
+  logAudit(user, `Deleted maintenance record #${recordId}`, 'ti-trash', { recordId });
   return { ok: true };
 }
 
@@ -2411,7 +2482,7 @@ async function stockMovementsDelete(userId, movementId) {
     }
   }
   await pool.query('delete from stock_movements where id=$1', [movementId]);
-  await logAudit(user, `Deleted stock movement #${movementId} (${movement_type})`, 'ti-trash', { movementId });
+  logAudit(user, `Deleted stock movement #${movementId} (${movement_type})`, 'ti-trash', { movementId });
   return { ok: true };
 }
 
@@ -2422,7 +2493,7 @@ async function warehousesDelete(userId, warehouseId) {
   if (!rows.length) return { ok: false, error: 'Warehouse not found' };
   await pool.query('delete from stock_levels where warehouse_id=$1', [warehouseId]);
   await pool.query('delete from warehouses where id=$1', [warehouseId]);
-  await logAudit(user, `Deleted warehouse: ${rows[0].name}`, 'ti-trash', { warehouseId });
+  logAudit(user, `Deleted warehouse: ${rows[0].name}`, 'ti-trash', { warehouseId });
   return { ok: true };
 }
 
@@ -2434,7 +2505,7 @@ async function stockItemsDelete(userId, itemId) {
   await pool.query('delete from stock_levels where item_id=$1', [itemId]);
   await pool.query('delete from stock_movements where item_id=$1', [itemId]);
   await pool.query('delete from stock_catalog where id=$1', [itemId]);
-  await logAudit(user, `Deleted stock item: ${rows[0].name}`, 'ti-trash', { itemId });
+  logAudit(user, `Deleted stock item: ${rows[0].name}`, 'ti-trash', { itemId });
   return { ok: true };
 }
 
@@ -2447,7 +2518,7 @@ async function vehiclesDelete(userId, vehicleId) {
   await pool.query('delete from maintenance_records where vehicle_id=$1', [vehicleId]);
   await pool.query('update delivery_orders set vehicle_id=null where vehicle_id=$1', [vehicleId]);
   await pool.query('delete from vehicles where id=$1', [vehicleId]);
-  await logAudit(user, `Deleted vehicle: ${rows[0].registration}`, 'ti-trash', { vehicleId });
+  logAudit(user, `Deleted vehicle: ${rows[0].registration}`, 'ti-trash', { vehicleId });
   return { ok: true };
 }
 
@@ -2459,7 +2530,7 @@ async function transportCompaniesDelete(userId, companyId) {
   const { rows: jobRows } = await pool.query('select count(*)::int as n from transport_jobs where transport_company_id=$1', [companyId]);
   if (jobRows[0].n > 0) return { ok: false, error: `Cannot delete — ${jobRows[0].n} job(s) recorded for this company. Deactivate it instead.` };
   await pool.query('delete from transport_companies where id=$1', [companyId]);
-  await logAudit(user, `Deleted transport company: ${rows[0].name}`, 'ti-trash', { companyId });
+  logAudit(user, `Deleted transport company: ${rows[0].name}`, 'ti-trash', { companyId });
   return { ok: true };
 }
 
@@ -2498,7 +2569,7 @@ async function transportCompaniesCreate(userId, payload) {
     [p.name, p.contact_person || null, p.phone || null, p.email || null,
      p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null]
   );
-  await logAudit(user, `Added transport company: ${p.name}`, 'ti-building', { id: rows[0].id });
+  logAudit(user, `Added transport company: ${p.name}`, 'ti-building', { id: rows[0].id });
   return { ok: true };
 }
 
@@ -2513,7 +2584,7 @@ async function transportCompaniesUpdate(userId, companyId, payload) {
     [p.name, p.contact_person || null, p.phone || null, p.email || null,
      p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null, p.active !== false, companyId]
   );
-  await logAudit(user, `Updated transport company #${companyId}`, 'ti-building', { id: companyId });
+  logAudit(user, `Updated transport company #${companyId}`, 'ti-building', { id: companyId });
   return { ok: true };
 }
 
@@ -2566,7 +2637,7 @@ async function transportJobsCreate(userId, payload) {
      p.quantity ? Number(p.quantity) : null, p.uom || null,
      p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, user.id]
   );
-  await logAudit(user, `Created transport job ${jobNum}`, 'ti-truck', {
+  logAudit(user, `Created transport job ${jobNum}`, 'ti-truck', {
     company_id: p.transport_company_id, sales_order_id: p.sales_order_id
   });
   return { ok: true, jobNum };
@@ -2578,7 +2649,7 @@ async function transportJobsUpdateStatus(userId, jobId, status) {
   const valid = ['Scheduled', 'In Transit', 'Completed', 'Cancelled'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query('update transport_jobs set status=$1 where id=$2', [status, jobId]);
-  await logAudit(user, `Transport job #${jobId} → ${status}`, 'ti-truck', { jobId, status });
+  logAudit(user, `Transport job #${jobId} → ${status}`, 'ti-truck', { jobId, status });
   return { ok: true };
 }
 
@@ -2623,7 +2694,7 @@ async function compartmentsCreate(userId, payload) {
     [p.compt_name.trim(), p.sub_name?.trim() || null, p.species.trim(),
      Number(p.area_ha), volume_m3, p.entry_date, user.id]
   );
-  await logAudit(user, `Created compartment: ${p.compt_name}`, 'ti-map-pin', { compt_name: p.compt_name, area_ha: p.area_ha });
+  logAudit(user, `Created compartment: ${p.compt_name}`, 'ti-map-pin', { compt_name: p.compt_name, area_ha: p.area_ha });
   return { ok: true, id: rows[0].id };
 }
 
@@ -2640,7 +2711,7 @@ async function compartmentsUpdate(userId, comptId, payload) {
     [p.compt_name.trim(), p.sub_name?.trim() || null, p.species, Number(p.area_ha),
      volume_m3, p.entry_date, p.status || 'Active', comptId]
   );
-  await logAudit(user, `Updated compartment #${comptId}`, 'ti-edit', { comptId });
+  logAudit(user, `Updated compartment #${comptId}`, 'ti-edit', { comptId });
   return { ok: true };
 }
 
@@ -2651,7 +2722,7 @@ async function compartmentsDelete(userId, comptId) {
   const { rows } = await pool.query('select compt_name from compartments where id=$1', [comptId]);
   if (!rows.length) return { ok: false, error: 'Compartment not found' };
   await pool.query('delete from compartments where id=$1', [comptId]);
-  await logAudit(user, `Deleted compartment: ${rows[0].compt_name}`, 'ti-trash', { comptId });
+  logAudit(user, `Deleted compartment: ${rows[0].compt_name}`, 'ti-trash', { comptId });
   return { ok: true };
 }
 
@@ -2723,7 +2794,7 @@ async function logTransportCreate(userId, payload) {
      Number(p.qty_transported), p.unit || 'logs', p.notes || null, user.id,
      p.tractor_plate?.trim() || null, p.loggers_number?.trim() || null]
   );
-  await logAudit(user, `Log transport entry: ${p.qty_transported} logs`, 'ti-truck', { ...p });
+  logAudit(user, `Log transport entry: ${p.qty_transported} logs`, 'ti-truck', { ...p });
   return { ok: true };
 }
 
@@ -2732,7 +2803,7 @@ async function logTransportDelete(userId, id) {
   if (!['admin','ceo','operations'].includes(user.role))
     return { ok: false, error: 'Access denied' };
   await pool.query('delete from log_transport where id=$1', [id]);
-  await logAudit(user, `Deleted log transport #${id}`, 'ti-trash', { id });
+  logAudit(user, `Deleted log transport #${id}`, 'ti-trash', { id });
   return { ok: true };
 }
 
@@ -2769,7 +2840,7 @@ async function valueAddedTimberCreate(userId, payload) {
      values ($1,$2,$3,$4,$5)`,
     [p.entry_date, p.type_value_added, p.product_size, Number(p.num_timber), user.id]
   );
-  await logAudit(user, `Value-added timber: ${p.num_timber} × ${p.product_size} (${p.type_value_added})`, 'ti-trees', { ...p });
+  logAudit(user, `Value-added timber: ${p.num_timber} × ${p.product_size} (${p.type_value_added})`, 'ti-trees', { ...p });
   return { ok: true };
 }
 
@@ -2778,7 +2849,7 @@ async function valueAddedTimberDelete(userId, id) {
   if (!['admin','ceo','operations'].includes(user.role))
     return { ok: false, error: 'Access denied' };
   await pool.query('delete from value_added_timber where id=$1', [id]);
-  await logAudit(user, `Deleted value-added timber #${id}`, 'ti-trash', { id });
+  logAudit(user, `Deleted value-added timber #${id}`, 'ti-trash', { id });
   return { ok: true };
 }
 
@@ -2817,7 +2888,7 @@ async function machineFuelLogsCreate(userId, payload) {
     [p.log_date, Number(p.machine_id), p.operator?.trim() || null,
      p.fuel_type, Number(p.quantity), p.unit || 'liters', p.notes?.trim() || null, user.id]
   );
-  await logAudit(user, `Machine fuel log: ${p.fuel_type} ${p.quantity}L — machine #${p.machine_id}`, 'ti-droplet', { ...p });
+  logAudit(user, `Machine fuel log: ${p.fuel_type} ${p.quantity}L — machine #${p.machine_id}`, 'ti-droplet', { ...p });
   return { ok: true };
 }
 
@@ -2826,7 +2897,7 @@ async function machineFuelLogsDelete(userId, id) {
   if (!['admin','ceo','operations','logistics'].includes(user.role))
     return { ok: false, error: 'Access denied' };
   await pool.query('delete from machine_fuel_logs where id=$1', [id]);
-  await logAudit(user, `Deleted machine fuel log #${id}`, 'ti-trash', { id });
+  logAudit(user, `Deleted machine fuel log #${id}`, 'ti-trash', { id });
   return { ok: true };
 }
 
@@ -2867,7 +2938,7 @@ async function casualLabourRequestsCreate(userId, payload) {
     [p.start_date, p.end_date, p.task.trim(), Number(p.num_casuals),
      p.description?.trim() || null, p.comments?.trim() || null, user.id]
   );
-  await logAudit(user, `Casual request: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
+  logAudit(user, `Casual request: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
   return { ok: true };
 }
 
@@ -2880,7 +2951,7 @@ async function casualLabourRequestsReview(userId, requestId, status) {
     `update casual_labour_requests set status=$1, reviewed_by=$2, reviewed_at=now() where id=$3`,
     [status, user.id, requestId]
   );
-  await logAudit(user, `Casual request #${requestId} ${status}`, 'ti-users', { requestId, status });
+  logAudit(user, `Casual request #${requestId} ${status}`, 'ti-users', { requestId, status });
   return { ok: true };
 }
 
@@ -2888,7 +2959,7 @@ async function casualLabourRequestsDelete(userId, id) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
   await pool.query('delete from casual_labour_requests where id=$1', [id]);
-  await logAudit(user, `Deleted casual request #${id}`, 'ti-trash', { id });
+  logAudit(user, `Deleted casual request #${id}`, 'ti-trash', { id });
   return { ok: true };
 }
 
@@ -2933,7 +3004,7 @@ async function casualsCreate(userId, payload) {
      p.emergency_phone?.trim() || null,
      p.salary_per_action ? Number(p.salary_per_action) : null, user.id]
   );
-  await logAudit(user, `Casual registered: ${p.full_name}`, 'ti-user-plus', { id: rows[0].id, name: p.full_name });
+  logAudit(user, `Casual registered: ${p.full_name}`, 'ti-user-plus', { id: rows[0].id, name: p.full_name });
   return { ok: true, id: rows[0].id };
 }
 
@@ -2958,7 +3029,7 @@ async function casualsUpdate(userId, casualId, payload) {
      p.salary_per_action ? Number(p.salary_per_action) : null,
      p.active !== false, casualId]
   );
-  await logAudit(user, `Updated casual #${casualId}`, 'ti-edit', { casualId });
+  logAudit(user, `Updated casual #${casualId}`, 'ti-edit', { casualId });
   return { ok: true };
 }
 
@@ -2968,7 +3039,7 @@ async function casualsDelete(userId, casualId) {
   const { rows } = await pool.query('select full_name from casuals where id=$1', [casualId]);
   if (!rows.length) return { ok: false, error: 'Casual not found' };
   await pool.query('delete from casuals where id=$1', [casualId]);
-  await logAudit(user, `Deleted casual: ${rows[0].full_name}`, 'ti-trash', { casualId });
+  logAudit(user, `Deleted casual: ${rows[0].full_name}`, 'ti-trash', { casualId });
   return { ok: true };
 }
 
@@ -3256,7 +3327,7 @@ async function machineCategoriesCreate(userId, payload) {
     `insert into machine_categories(name, description, icon) values ($1,$2,$3)`,
     [name.trim(), description || null, icon || 'ti-tool']
   );
-  await logAudit(user, `Machine category created: ${name}`, 'ti-tool', { name });
+  logAudit(user, `Machine category created: ${name}`, 'ti-tool', { name });
   return { ok: true };
 }
 
@@ -3300,7 +3371,7 @@ async function machinesCreate(userId, payload) {
      year_manufactured || null, date_acquired || null, notes || null,
      plate_number?.trim() || null, workshop_id ? Number(workshop_id) : null, userId]
   );
-  await logAudit(user, `Machine registered: ${machine_code} — ${name}`, 'ti-settings-2', { machine_code, name });
+  logAudit(user, `Machine registered: ${machine_code} — ${name}`, 'ti-settings-2', { machine_code, name });
   return { ok: true };
 }
 
@@ -3324,7 +3395,7 @@ async function machinesUpdate(userId, machineId, payload) {
      year_manufactured || null, date_acquired || null, notes || null,
      plate_number?.trim() || null, workshop_id ? Number(workshop_id) : null, machineId]
   );
-  await logAudit(user, `Machine updated: #${machineId}`, 'ti-settings-2', { machineId, status });
+  logAudit(user, `Machine updated: #${machineId}`, 'ti-settings-2', { machineId, status });
   return { ok: true };
 }
 
@@ -3345,7 +3416,7 @@ async function machineLogCategoriesCreate(userId, payload) {
     `insert into machine_log_categories(name) values($1) on conflict(name) do update set active=true`,
     [name]
   );
-  await logAudit(user, `Created machine log category: ${name}`, 'ti-tag', { name });
+  logAudit(user, `Created machine log category: ${name}`, 'ti-tag', { name });
   return { ok: true };
 }
 
@@ -3404,7 +3475,7 @@ async function machineLogsCreate(userId, payload) {
      item_category || null,
      logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, userId]
   );
-  await logAudit(user, `Machine log created: machine #${machine_id} on ${log_date}`, 'ti-list-details', { machine_id, log_date });
+  logAudit(user, `Machine log created: machine #${machine_id} on ${log_date}`, 'ti-list-details', { machine_id, log_date });
   return { ok: true };
 }
 
@@ -3425,7 +3496,7 @@ async function machineLogsUpdate(userId, logId, payload) {
      item_category || null,
      logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, logId]
   );
-  await logAudit(user, `Machine log updated: #${logId}`, 'ti-list-details', { logId });
+  logAudit(user, `Machine log updated: #${logId}`, 'ti-list-details', { logId });
   return { ok: true };
 }
 
@@ -3433,7 +3504,7 @@ async function machineLogsDelete(userId, logId) {
   const user = await getUser(userId);
   if (!['admin', 'operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
   await pool.query('delete from machine_daily_logs where id=$1', [logId]);
-  await logAudit(user, `Machine log deleted: #${logId}`, 'ti-trash', { logId });
+  logAudit(user, `Machine log deleted: #${logId}`, 'ti-trash', { logId });
   return { ok: true };
 }
 
@@ -3463,7 +3534,7 @@ async function machineKpiDefinitionsCreate(userId, payload) {
     [category_id || null, kpi_code.trim(), kpi_name.trim(),
      unit || '', higher_is_better !== false, weight || 1.0, description || null]
   );
-  await logAudit(user, `KPI definition created: ${kpi_name}`, 'ti-target', { kpi_name });
+  logAudit(user, `KPI definition created: ${kpi_name}`, 'ti-target', { kpi_name });
   return { ok: true };
 }
 
@@ -3504,7 +3575,7 @@ async function machineKpiTargetsSave(userId, payload) {
      do update set target_value=$3, set_by=$5, reason=$6, created_at=now()`,
     [machine_id, kpi_id, target_value, effective_month, userId, reason || null]
   );
-  await logAudit(user, `KPI target set: machine #${machine_id}, month ${effective_month}`, 'ti-target', { machine_id, effective_month });
+  logAudit(user, `KPI target set: machine #${machine_id}, month ${effective_month}`, 'ti-target', { machine_id, effective_month });
   return { ok: true };
 }
 
@@ -3514,6 +3585,9 @@ async function machineKpiPerformance(userId, month) {
   if (!hasPerm) return { ok: false, error: 'Access denied' };
 
   const targetMonth = month || new Date().toISOString().slice(0, 7);
+  const [kpiYr, kpiMn] = targetMonth.split('-').map(Number);
+  const kpiMonthStart = `${targetMonth}-01`;
+  const kpiMonthEnd   = new Date(kpiYr, kpiMn, 0).toISOString().slice(0, 10);
 
   const { rows: perf } = await pool.query(`
     with logs as (
@@ -3543,12 +3617,12 @@ async function machineKpiPerformance(userId, month) {
       from machines m
       join machine_categories mc on mc.id = m.category_id
       left join machine_daily_logs mdl
-        on mdl.machine_id = m.id and to_char(mdl.log_date,'YYYY-MM') = $1
+        on mdl.machine_id = m.id and mdl.log_date >= $1 and mdl.log_date <= $2
       where m.active = true
       group by m.id, m.machine_code, m.name, mc.name, m.production_capacity, m.capacity_unit, m.status
     )
     select * from logs order by category_name, machine_name
-  `, [targetMonth]);
+  `, [kpiMonthStart, kpiMonthEnd]);
 
   // Fetch KPI targets for this month alongside definitions
   const { rows: targets } = await pool.query(`
@@ -3622,7 +3696,7 @@ async function machineMaintScheduleCreate(userId, payload) {
     [machine_id, maintenance_type.trim(), frequency_days || 30,
      last_performed || null, next_due || null, estimated_hours || 1, notes || null]
   );
-  await logAudit(user, `Maintenance schedule created for machine #${machine_id}`, 'ti-calendar', { machine_id, maintenance_type });
+  logAudit(user, `Maintenance schedule created for machine #${machine_id}`, 'ti-calendar', { machine_id, maintenance_type });
   return { ok: true };
 }
 

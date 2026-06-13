@@ -15,9 +15,9 @@ const pool = new Pool({
   database: required('PGDATABASE'),
   user: required('PGUSER'),
   password: required('PGPASSWORD'),
-  max: 5,
+  max: 20,
   idleTimeoutMillis: 30_000,
-  connectionTimeoutMillis: 10_000
+  connectionTimeoutMillis: 5_000
 });
 
 module.exports = { pool };

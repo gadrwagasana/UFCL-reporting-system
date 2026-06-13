@@ -171,6 +171,53 @@ async function ensureSchema() {
   `);
   // Workshop cost center tracking on maintenance records
   await pool.query(`alter table maintenance_records add column if not exists workshop_id bigint references warehouses(id)`);
+
+  // ── Performance indexes ──────────────────────────────────────────────────────
+  await pool.query(`create index if not exists idx_stock_mv_item     on stock_movements(item_id)`);
+  await pool.query(`create index if not exists idx_stock_mv_wh       on stock_movements(warehouse_id)`);
+  await pool.query(`create index if not exists idx_stock_mv_to_wh    on stock_movements(to_warehouse_id)`);
+  await pool.query(`create index if not exists idx_stock_levels_item on stock_levels(item_id)`);
+  await pool.query(`create index if not exists idx_stock_levels_wh   on stock_levels(warehouse_id)`);
+  await pool.query(`create index if not exists idx_mdl_machine_date  on machine_daily_logs(machine_id, log_date desc)`);
+  await pool.query(`create index if not exists idx_mat_req_workshop  on material_requests(workshop_id, status)`);
+  await pool.query(`create index if not exists idx_notif_read_user   on notifications_read(user_id)`);
+
+  // ── Stock summary materialized view ──────────────────────────────────────────
+  await pool.query(`
+    create materialized view if not exists mv_stock_summary as
+    with produced as (
+      select
+        coalesce(sum(timber_units),0)::int       as timber,
+        coalesce(sum(timber_kiln_dried),0)::int  as kiln_dried,
+        coalesce(sum(timber_cca_treated),0)::int as cca_treated,
+        coalesce(sum(timber_untreated),0)::int   as untreated,
+        coalesce(sum(poles_units),0)::int        as poles
+      from daily_logs
+    ),
+    sold as (
+      select
+        coalesce(sum(case when product_type='Timber' then quantity else 0 end),0)::int                                                            as timber,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Kiln-dried'  then quantity else 0 end),0)::int as kiln_dried,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='CCA-treated' then quantity else 0 end),0)::int as cca_treated,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Untreated'   then quantity else 0 end),0)::int as untreated,
+        coalesce(sum(case when product_type='Poles'  then quantity else 0 end),0)::int                                                            as poles
+      from sales_orders
+    )
+    select
+      p.timber as timber_produced, p.poles as poles_produced,
+      p.kiln_dried as kiln_dried_produced, p.cca_treated as cca_treated_produced, p.untreated as untreated_produced,
+      s.timber as timber_sold, s.poles as poles_sold,
+      s.kiln_dried as kiln_dried_sold, s.cca_treated as cca_treated_sold, s.untreated as untreated_sold,
+      (p.timber    - s.timber)    as timber_stock,
+      (p.poles     - s.poles)     as poles_stock,
+      (p.kiln_dried  - s.kiln_dried)  as kiln_dried_stock,
+      (p.cca_treated - s.cca_treated) as cca_treated_stock,
+      (p.untreated   - s.untreated)   as untreated_stock
+    from produced p, sold s
+  `);
+  await pool.query(`
+    create unique index if not exists mv_stock_summary_unique on mv_stock_summary((1))
+  `);
 }
 
 async function seedProductCatalog() {
