@@ -94,6 +94,7 @@ const NAV = [
   { id: 'notifications',      icon: 'ti-bell',               label: 'Notifications',        sec: 'System'          },
   { id: 'audit',              icon: 'ti-shield-check',       label: 'Audit Trail',          sec: 'System'          },
   { id: 'export',             icon: 'ti-file-export',        label: 'Exports',              sec: 'System'          },
+  { id: 'trash',              icon: 'ti-trash',              label: 'Trash',                sec: 'System'          },
 ];
 
 function $(id) {
@@ -289,6 +290,46 @@ function confirmDelete(label, onConfirm) {
     </div>`, onConfirm);
 }
 
+// Soft-delete confirmation — requires reason + typing "DELETE"
+function confirmDeleteSoft(label, onConfirm) {
+  const ovId = 'ovSoftDel';
+  openOverlay('Move to Trash', null, `
+    <p style="color:var(--t1);margin-bottom:.5rem">${label}</p>
+    <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:.75rem;margin-bottom:1rem;font-size:13px;color:var(--amber,#f59e0b)">
+      <i class="ti ti-info-circle"></i>
+      This record will be moved to Trash and can be restored by an authorized user within 30 days.
+    </div>
+    <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:.25rem">Reason for deletion <span style="color:var(--red)">*</span></label>
+    <textarea id="softDelReason" rows="3" style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--t1);font-size:13px;resize:vertical;margin-bottom:.75rem" placeholder="Describe why this record should be deleted…"></textarea>
+    <label style="font-size:12px;color:var(--t3);display:block;margin-bottom:.25rem">Type <strong>DELETE</strong> to confirm <span style="color:var(--red)">*</span></label>
+    <input id="softDelConfirm" type="text" autocomplete="off" style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--t1);font-size:13px;margin-bottom:1.25rem" placeholder="DELETE">
+    <div class="brow">
+      <button id="${ovId}" class="bp1" style="background:var(--red);border-color:var(--red);opacity:.4;cursor:not-allowed" disabled>
+        <i class="ti ti-trash"></i>Move to Trash
+      </button>
+      <button class="bs1" id="ovCancel">Cancel</button>
+    </div>`, null);
+
+  const btn = document.getElementById(ovId);
+  const reasonEl = document.getElementById('softDelReason');
+  const confirmEl = document.getElementById('softDelConfirm');
+
+  function checkReady() {
+    const ready = reasonEl.value.trim().length > 0 && confirmEl.value.trim() === 'DELETE';
+    btn.disabled = !ready;
+    btn.style.opacity = ready ? '1' : '.4';
+    btn.style.cursor = ready ? 'pointer' : 'not-allowed';
+  }
+  reasonEl.addEventListener('input', checkReady);
+  confirmEl.addEventListener('input', checkReady);
+
+  btn.addEventListener('click', () => {
+    const reason = reasonEl.value.trim();
+    closeOverlay();
+    onConfirm(reason);
+  });
+}
+
 // ── Supervisor approval helpers ───────────────────────────────────────────────
 
 function isSupervisor() {
@@ -337,19 +378,52 @@ async function insertPendingPanel(pageEl, entityTypes, onReviewed) {
   pageEl.prepend(panel);
 
   panel.querySelectorAll('.pa-approve').forEach(btn => {
-    btn.onclick = async () => {
-      const r = await UFCL.pendingEditsReview(STORAGE.user.id, Number(btn.dataset.id), 'Approved', null);
-      if (!r.ok) { alert(r.error); return; }
-      await onReviewed();
+    btn.onclick = () => {
+      const pending = (res.rows || []).find(p => String(p.id) === btn.dataset.id);
+      const ref = pending ? (pending.entity_ref || `${pending.entity_type} #${pending.entity_id}`) : 'this record';
+      openOverlay('Approve Request', null, `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:.5rem">You are about to approve this change request.</p>
+          <ul style="margin:.5rem 0 0 1rem;font-size:13px;color:var(--t3);line-height:1.8">
+            <li>The requested changes will be applied immediately.</li>
+            <li>This action will be recorded in the audit log.</li>
+          </ul>
+        </div>
+        <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:6px;padding:.75rem 1rem;font-size:13px;color:var(--t2);margin-bottom:1.25rem">
+          <strong>Record:</strong> ${ref}
+        </div>
+        <div class="fg" style="margin-bottom:1.25rem">
+          <label>Approval comments (optional)</label>
+          <input id="pa-notes" type="text" placeholder="Add any comments…">
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave" style="background:var(--green,#22c55e);border-color:var(--green,#22c55e)"><i class="ti ti-check"></i>Approve</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const notes = $('pa-notes')?.value?.trim() || null;
+          const r = await UFCL.pendingEditsReview(STORAGE.user.id, btn.dataset.id, 'Approved', notes);
+          if (!r.ok) { showOverlayError(r.error); return; }
+          showOverlaySuccess('Request approved and changes applied.'); await onReviewed();
+        });
     };
   });
 
   panel.querySelectorAll('.pa-reject').forEach(btn => {
     btn.onclick = () => {
-      openOverlay('Reject request', null, `
-        <p style="font-size:13px;color:var(--t3);margin-bottom:1rem">The supervisor will not be notified but the request will be marked as rejected.</p>
-        <div class="fg"><label>Reason for rejection *</label>
-          <input id="rej-reason" type="text" placeholder="Why is this request being rejected?">
+      const pending = (res.rows || []).find(p => String(p.id) === btn.dataset.id);
+      const ref = pending ? (pending.entity_ref || `${pending.entity_type} #${pending.entity_id}`) : 'this record';
+      openOverlay('Reject Request', null, `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:.5rem">You are about to reject this request.</p>
+          <p style="font-size:13px;color:var(--t3)">No changes will be applied. The requester will be notified with your reason.</p>
+        </div>
+        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:.75rem 1rem;font-size:13px;color:var(--t2);margin-bottom:1rem">
+          <strong>Record:</strong> ${ref}
+        </div>
+        <div class="fg" style="margin-bottom:1.25rem">
+          <label>Reason for rejection <span style="color:var(--red)">*</span></label>
+          <textarea id="rej-reason" rows="3" style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--t1);font-size:13px;resize:vertical" placeholder="Explain why this request is being rejected…"></textarea>
         </div>
         <div class="brow">
           <button class="bp1" id="ovSave" style="background:var(--red);border-color:var(--red)"><i class="ti ti-x"></i>Reject</button>
@@ -358,9 +432,116 @@ async function insertPendingPanel(pageEl, entityTypes, onReviewed) {
         async () => {
           const reason = $('rej-reason')?.value?.trim();
           if (!reason) { showOverlayError('Reason is required'); return; }
-          const r = await UFCL.pendingEditsReview(STORAGE.user.id, Number(btn.dataset.id), 'Rejected', reason);
+          const r = await UFCL.pendingEditsReview(STORAGE.user.id, btn.dataset.id, 'Rejected', reason);
           if (!r.ok) { showOverlayError(r.error); return; }
-          showOverlaySuccess('Request rejected.'); await onReviewed();
+          showOverlaySuccess('Request rejected. The requester has been notified.'); await onReviewed();
+        });
+    };
+  });
+}
+
+function canManageTrash() {
+  return ['admin', 'ceo', 'operations'].includes(STORAGE.user?.role);
+}
+
+// Inserts a pending-deletion-requests panel for managers to approve/reject.
+async function insertDeletionPanel(pageEl, entityTypes, onReviewed) {
+  if (!canManageTrash()) return;
+  const res = await UFCL.deletionRequestsList(STORAGE.user.id);
+  if (!res.ok) return;
+  const pending = (res.rows || []).filter(r =>
+    entityTypes.includes(r.entity_type) && r.status === 'pending'
+  );
+  if (!pending.length) return;
+
+  const panel = document.createElement('div');
+  panel.style.cssText = 'margin-bottom:1.25rem';
+  panel.innerHTML = `
+    <div style="border:1px solid rgba(239,68,68,.3);border-radius:8px;overflow:hidden">
+      <div style="display:flex;align-items:center;gap:.625rem;padding:.75rem 1.25rem;background:rgba(239,68,68,.07);border-bottom:1px solid rgba(239,68,68,.2)">
+        <i class="ti ti-trash" style="color:var(--red);font-size:16px"></i>
+        <span style="font-weight:600;font-size:13px;color:var(--red)">${pending.length} pending deletion request${pending.length > 1 ? 's' : ''}</span>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Requested By</th><th>Record</th><th>Reason</th><th>Submitted</th><th>Review</th></tr></thead>
+        <tbody>
+          ${pending.map(p => `<tr>
+            <td style="font-weight:500">${p.requested_by_name || '—'}</td>
+            <td style="font-weight:500">${p.entity_ref || p.entity_type + ' #' + p.record_id}</td>
+            <td style="font-size:12px;color:var(--t3)">${p.deletion_reason || '—'}</td>
+            <td style="font-size:12px;color:var(--t3)">${p.requested_at}</td>
+            <td style="white-space:nowrap;display:flex;gap:4px">
+              <button class="bp1 dr-approve" data-id="${p.id}" style="padding:4px 10px;font-size:12px;background:var(--red);border-color:var(--red)"><i class="ti ti-check"></i>Approve</button>
+              <button class="bs1 dr-reject"  data-id="${p.id}" style="padding:4px 10px;font-size:12px;color:var(--t2)"><i class="ti ti-x"></i>Reject</button>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+  pageEl.prepend(panel);
+
+  panel.querySelectorAll('.dr-approve').forEach(btn => {
+    btn.onclick = () => {
+      const req = pending.find(p => String(p.id) === btn.dataset.id);
+      const ref = req ? (req.entity_ref || `${req.entity_type} #${req.record_id}`) : 'this record';
+      const who = req?.requested_by_name || 'the requester';
+      openOverlay('Approve Deletion Request', null, `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:.5rem">You are about to approve this deletion request.</p>
+          <ul style="margin:.5rem 0 0 1rem;font-size:13px;color:var(--t3);line-height:1.8">
+            <li>The record will be moved to Trash immediately.</li>
+            <li>It can be restored within 30 days from the Trash page.</li>
+            <li>This action will be recorded in the audit log.</li>
+          </ul>
+        </div>
+        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:.75rem 1rem;font-size:13px;color:var(--t2);margin-bottom:.75rem">
+          <div><strong>Record:</strong> ${ref}</div>
+          <div style="margin-top:.25rem"><strong>Requested by:</strong> ${who}</div>
+          ${req?.deletion_reason ? `<div style="margin-top:.25rem"><strong>Reason given:</strong> ${req.deletion_reason}</div>` : ''}
+        </div>
+        <div class="fg" style="margin-bottom:1.25rem">
+          <label>Approval comments (optional)</label>
+          <input id="dr-appr-notes" type="text" placeholder="Add any comments for the requester…">
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave" style="background:var(--red);border-color:var(--red)"><i class="ti ti-check"></i>Approve — Move to Trash</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const notes = $('dr-appr-notes')?.value?.trim() || null;
+          const r = await UFCL.deletionRequestApprove(STORAGE.user.id, btn.dataset.id, notes);
+          if (!r.ok) { showOverlayError(r.error); return; }
+          showOverlaySuccess('Deletion approved. Record moved to Trash.'); await onReviewed();
+        });
+    };
+  });
+
+  panel.querySelectorAll('.dr-reject').forEach(btn => {
+    btn.onclick = () => {
+      const req = pending.find(p => String(p.id) === btn.dataset.id);
+      const ref = req ? (req.entity_ref || `${req.entity_type} #${req.record_id}`) : 'this record';
+      openOverlay('Reject Deletion Request', null, `
+        <div style="margin-bottom:1rem">
+          <p style="font-size:14px;font-weight:600;color:var(--t1);margin-bottom:.5rem">You are about to reject this request.</p>
+          <p style="font-size:13px;color:var(--t3)">No changes will be applied. The record will remain active and the requester will be notified with your reason.</p>
+        </div>
+        <div style="background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.2);border-radius:6px;padding:.75rem 1rem;font-size:13px;color:var(--t2);margin-bottom:1rem">
+          <strong>Record:</strong> ${ref}
+        </div>
+        <div class="fg" style="margin-bottom:1.25rem">
+          <label>Reason for rejection <span style="color:var(--red)">*</span></label>
+          <textarea id="dr-rej-reason" rows="3" style="width:100%;box-sizing:border-box;padding:.5rem .75rem;border-radius:6px;border:1px solid var(--border);background:var(--bg2);color:var(--t1);font-size:13px;resize:vertical" placeholder="Explain why this deletion request is being rejected…"></textarea>
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave"><i class="ti ti-x"></i>Reject</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const notes = $('dr-rej-reason')?.value?.trim();
+          if (!notes) { showOverlayError('Reason is required'); return; }
+          const r = await UFCL.deletionRequestReject(STORAGE.user.id, btn.dataset.id, notes);
+          if (!r.ok) { showOverlayError(r.error); return; }
+          showOverlaySuccess('Rejection recorded. The requester has been notified.'); await onReviewed();
         });
     };
   });
@@ -490,6 +671,8 @@ async function showPage(id) {
       return renderCasualLabourRequests();
     case 'casuals':
       return renderCasuals();
+    case 'trash':
+      return renderTrash();
     default:
       return renderStub(id);
   }
@@ -901,6 +1084,7 @@ async function renderPageDailyTimber(cid='page-daily-timber') {
   const timberProducts = productsRes.ok ? productsRes.rows : [];
   renderDailyTimber(res.stock || {}, rows, cid, () => renderPageDailyTimber(cid), res.transport || {}, timberProducts);
   await insertPendingPanel($(cid), ['daily_log'], () => renderPageDailyTimber(cid));
+  await insertDeletionPanel($(cid), ['daily_log'], () => renderPageDailyTimber(cid));
 }
 
 async function renderPageDailyPoles(cid='page-daily-poles') {
@@ -913,6 +1097,7 @@ async function renderPageDailyPoles(cid='page-daily-poles') {
   const rows = (res.rows || []).filter(r => Number(r.poles_units || 0) > 0);
   renderDailyPoles(res.stock || {}, rows, cid, () => renderPageDailyPoles(cid));
   await insertPendingPanel($(cid), ['daily_log'], () => renderPageDailyPoles(cid));
+  await insertDeletionPanel($(cid), ['daily_log'], () => renderPageDailyPoles(cid));
 }
 
 async function renderPageDailyHarvest(cid='page-daily-harvest') {
@@ -924,6 +1109,7 @@ async function renderPageDailyHarvest(cid='page-daily-harvest') {
   if (!res.ok) { $(cid).innerHTML = `<div style="padding:2rem;color:var(--danger)">${res.error}</div>`; return; }
   renderDailyHarvest(res.rows || [], res.summary || {}, cid, () => renderPageDailyHarvest(cid), res.compartments || []);
   await insertPendingPanel($(cid), ['harvest_log'], () => renderPageDailyHarvest(cid));
+  await insertDeletionPanel($(cid), ['harvest_log'], () => renderPageDailyHarvest(cid));
 }
 
 // ── Sawmill Timber sub-view ───────────────────────────────────────────────────
@@ -998,7 +1184,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
                 const rWaste = Number(r.timber_waste || 0);
                 const rWastePct = (rTotal + rWaste) > 0 ? ((rWaste / (rTotal + rWaste)) * 100).toFixed(1) : '0.0';
                 return `<tr>
-                  <td style="font-family:var(--fm);font-weight:500">${r.date}</td>
+                  <td style="font-family:var(--fm);font-weight:500">${r.date}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                   <td>${r.supervisor || '—'}</td>
                   <td style="color:var(--t3);font-size:12px">${r.machine || '—'}</td>
                   <td style="font-family:var(--fm);color:#1D4ED8;font-weight:600">${rLogs.toLocaleString()}</td>
@@ -1141,21 +1327,18 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
-        confirmDelete(`Submit delete request for timber log <strong>${r.date}</strong>? A manager must approve before it is removed.`, async () => {
-          const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
-            action_type: 'delete', entity_type: 'daily_log',
-            entity_id: r.id, entity_ref: r.date, payload: null
-          });
+        confirmDeleteSoft(`Submit delete request for timber log <strong>${r.date}</strong>? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'daily_logs', r.id, 'daily_log', r.date, reason);
           if (!r2.ok) { showOverlayError(r2.error); return; }
           showOverlaySuccess('Delete request submitted — awaiting manager approval.');
           await refresh();
         });
         return;
       }
-      confirmDelete(`Delete timber log for <strong>${r.date}</strong>?`, async () => {
-        const res2 = await UFCL.dailyDelete(STORAGE.user.id, r.id);
+      confirmDeleteSoft(`Move timber log for <strong>${r.date}</strong> to Trash?`, async (reason) => {
+        const res2 = await UFCL.dailyDelete(STORAGE.user.id, r.id, reason);
         if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Entry deleted.'); await refresh();
+        showOverlaySuccess('Entry moved to Trash.'); await refresh();
       });
     };
   });
@@ -1195,7 +1378,7 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
           ${rows.length === 0
             ? '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No poles entries yet. Click "Add poles entry" to log production.</td></tr>'
             : rows.map(r => `<tr>
-              <td style="font-family:var(--fm);font-weight:500">${r.date}</td>
+              <td style="font-family:var(--fm);font-weight:500">${r.date}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
               <td>${r.supervisor || '—'}</td>
               <td><span style="font-size:12px;font-weight:600;color:#1D4ED8">${r.product_size || '—'}</span></td>
               <td style="color:var(--t3);font-size:12px">${r.machine || '—'}</td>
@@ -1330,21 +1513,18 @@ function renderDailyPoles(stock, rows, cid = 'daily-content', onRefresh = null) 
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
-        confirmDelete(`Submit delete request for poles log <strong>${r.date}</strong>? A manager must approve before it is removed.`, async () => {
-          const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
-            action_type: 'delete', entity_type: 'daily_log',
-            entity_id: r.id, entity_ref: r.date, payload: null
-          });
+        confirmDeleteSoft(`Submit delete request for poles log <strong>${r.date}</strong>? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'daily_logs', r.id, 'daily_log', r.date, reason);
           if (!r2.ok) { showOverlayError(r2.error); return; }
           showOverlaySuccess('Delete request submitted — awaiting manager approval.');
           await refresh();
         });
         return;
       }
-      confirmDelete(`Delete poles log for <strong>${r.date}</strong>?`, async () => {
-        const res2 = await UFCL.dailyDelete(STORAGE.user.id, r.id);
+      confirmDeleteSoft(`Move poles log for <strong>${r.date}</strong> to Trash?`, async (reason) => {
+        const res2 = await UFCL.dailyDelete(STORAGE.user.id, r.id, reason);
         if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Entry deleted.'); await refresh();
+        showOverlaySuccess('Entry moved to Trash.'); await refresh();
       });
     };
   });
@@ -1449,7 +1629,7 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
                 const rem   = Math.max(0, xcut - hroll);
                 const vol   = xcut > 0 ? (xcut / 3.4).toFixed(2) : '—';
                 return `<tr>
-                  <td style="font-weight:500;white-space:nowrap">${r.harvest_date}</td>
+                  <td style="font-weight:500;white-space:nowrap">${r.harvest_date}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                   <td style="color:var(--g-dark);font-weight:500">${r.compt_name || r.location || '—'}${r.sub_name ? `<div style="font-size:11px;color:var(--t3)">${r.sub_name}</div>` : ''}</td>
                   <td><span class="badge bt">${r.species}</span></td>
                   <td style="font-family:var(--fm);font-weight:600">${Number(r.quantity).toLocaleString()}</td>
@@ -1630,21 +1810,18 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
       if (isSupervisor()) {
-        confirmDelete(`Submit delete request for harvest: <strong>${r.species}</strong> on ${r.harvest_date}? A manager must approve before it is removed.`, async () => {
-          const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
-            action_type: 'delete', entity_type: 'harvest_log',
-            entity_id: r.id, entity_ref: `${r.species} — ${r.harvest_date}`, payload: null
-          });
+        confirmDeleteSoft(`Submit delete request for harvest: <strong>${r.species}</strong> on ${r.harvest_date}? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'harvest_logs', r.id, 'harvest_log', `${r.species} — ${r.harvest_date}`, reason);
           if (!r2.ok) { showOverlayError(r2.error); return; }
           showOverlaySuccess('Delete request submitted — awaiting manager approval.');
           await refresh();
         });
         return;
       }
-      confirmDelete(`Delete harvest log: <strong>${r.species}</strong> on ${r.harvest_date}?`, async () => {
-        const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id);
+      confirmDeleteSoft(`Move harvest log <strong>${r.species}</strong> on ${r.harvest_date} to Trash?`, async (reason) => {
+        const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id, reason);
         if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Harvest log deleted.'); await refresh();
+        showOverlaySuccess('Harvest log moved to Trash.'); await refresh();
       });
     };
   });
@@ -1705,7 +1882,7 @@ async function renderSales() {
               : rows.map((r) => {
                   const subBadge = r.product_sub_type === 'Kiln-dried' ? 'ba' : r.product_sub_type === 'CCA-treated' ? 'bg' : r.product_sub_type === 'Untreated' ? 'bt' : '';
                   return `<tr>
-                    <td style="font-family:var(--fm);font-weight:500">${r.order_number}</td>
+                    <td style="font-family:var(--fm);font-weight:500">${r.order_number}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                     <td>${r.customer_name}</td>
                     <td><span class="badge ${r.product_type === 'Timber' ? 'ba' : 'bb'}">${r.product_type}</span></td>
                     <td>${r.product_sub_type ? `<span class="badge ${subBadge}">${r.product_sub_type}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
@@ -1789,7 +1966,7 @@ async function renderSales() {
 
   $('page-sales').querySelectorAll('.so-edit-btn').forEach((btn) => {
     btn.onclick = () => {
-      const r = rows.find(x => Number(x.id) === Number(btn.dataset.so));
+      const r = rows.find(x => x.id === btn.dataset.so);
       if (!r) return;
       openOverlay('Edit sales order', r.order_number, `
         <div class="frow">
@@ -1818,7 +1995,7 @@ async function renderSales() {
         </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
-          const res2 = await UFCL.salesUpdate(STORAGE.user.id, r.id, {
+          const payload = {
             order_number: $('soe-num').value.trim(),
             customer_name: $('soe-cust').value.trim(),
             product_type: $('soe-type').value,
@@ -1827,22 +2004,40 @@ async function renderSales() {
             quantity: $('soe-qty').value,
             unit_price: $('soe-price').value,
             notes: $('soe-notes').value.trim()
-          });
-          if (!res2.ok) { showOverlayError(res2.error); return; }
-          showOverlaySuccess('Order updated.'); await renderSales();
+          };
+          if (isSupervisor()) {
+            const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
+              action_type: 'edit', entity_type: 'sales_order',
+              entity_id: r.id, entity_ref: r.order_number, payload
+            });
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderSales();
+          } else {
+            const res2 = await UFCL.salesUpdate(STORAGE.user.id, r.id, payload);
+            if (!res2.ok) { showOverlayError(res2.error); return; }
+            showOverlaySuccess('Order updated.'); await renderSales();
+          }
         });
     };
   });
 
   $('page-sales').querySelectorAll('.so-del-btn').forEach((btn) => {
     btn.onclick = () => {
-      const r = rows.find(x => Number(x.id) === Number(btn.dataset.so));
+      const r = rows.find(x => x.id === btn.dataset.so);
       if (!r) return;
-      confirmDelete(`Delete order <strong>${r.order_number}</strong> for ${r.customer_name}?`, async () => {
-        const res2 = await UFCL.salesDelete(STORAGE.user.id, r.id);
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Order deleted.'); await renderSales();
-      });
+      if (isSupervisor()) {
+        confirmDeleteSoft(`Submit delete request for order <strong>${r.order_number}</strong>? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'sales_orders', r.id, 'sales_order', r.order_number, reason);
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Deletion request submitted for approval.'); await renderSales();
+        });
+      } else {
+        confirmDeleteSoft(`Move order <strong>${r.order_number}</strong> for ${r.customer_name} to Trash?`, async (reason) => {
+          const res2 = await UFCL.salesDelete(STORAGE.user.id, r.id, reason);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Order moved to Trash.'); await renderSales();
+        });
+      }
     };
   });
 
@@ -1887,6 +2082,9 @@ async function renderSales() {
       );
     };
   });
+
+  await insertPendingPanel($('page-sales'), ['sales_order'], renderSales);
+  await insertDeletionPanel($('page-sales'), ['sales_order'], renderSales);
 }
 
 async function renderProducts() {
@@ -2578,10 +2776,11 @@ async function renderNotifications() {
       ${rows
         .map((n) => {
           const dot = n.type === 'red' ? 'nd-red' : n.type === 'amber' ? 'nd-amber' : n.type === 'blue' ? 'nd-blue' : 'nd-green';
+          const directBadge = n.direct ? `<span style="font-size:10px;background:rgba(99,102,241,.12);color:#6366f1;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:6px;vertical-align:middle">For you</span>` : '';
           return `<div class="nitem ${n.read ? '' : 'unread'}" id="nn-${n.id}">
             <div class="ndot ${dot}"></div>
             <div style="flex:1">
-              <div class="ntxt"><strong>${n.title}</strong><div style="color:var(--t3);margin-top:2px">${n.body}</div></div>
+              <div class="ntxt"><strong>${n.title}</strong>${directBadge}<div style="color:var(--t3);margin-top:2px">${n.body}</div></div>
               <div class="ntime">${n.time}</div>
             </div>
             ${n.read ? '' : `<button class="bs1" style="padding:3px 9px;font-size:11px" data-mr="${n.id}">Mark read</button>`}
@@ -3937,11 +4136,19 @@ async function renderStockMovements() {
     btn.onclick = () => {
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
-      confirmDelete(`Delete stock movement: <strong>${r.movement_type}</strong> ${r.quantity} ${r.uom} of ${r.item_name}? Stock level will be reversed.`, async () => {
-        const res2 = await UFCL.stockMovementsDelete(STORAGE.user.id, r.id);
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Movement deleted and stock level reversed.'); await renderStockMovements();
-      });
+      if (isSupervisor()) {
+        confirmDeleteSoft(`Submit delete request for stock movement <strong>${r.movement_type}</strong> (${r.quantity} ${r.uom} of ${r.item_name})? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'stock_movements', r.id, 'stock_movement', `${r.movement_type} — ${r.item_name}`, reason);
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Deletion request submitted for approval.'); await renderStockMovements();
+        });
+      } else {
+        confirmDeleteSoft(`Move stock movement <strong>${r.movement_type}</strong> (${r.quantity} ${r.uom} of ${r.item_name}) to Trash? Stock level will be reversed.`, async (reason) => {
+          const res2 = await UFCL.stockMovementsDelete(STORAGE.user.id, r.id, reason);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Movement moved to Trash and stock level reversed.'); await renderStockMovements();
+        });
+      }
     };
   });
 
@@ -4006,6 +4213,7 @@ async function renderStockMovements() {
     });
   };
   bindWorkshopBanner(renderStockMovements);
+  await insertDeletionPanel($('page-stock-movements'), ['stock_movement'], renderStockMovements);
 }
 
 // ── Material Requests ─────────────────────────────────────────────────────────
@@ -4896,10 +5104,10 @@ async function renderHarvest() {
     btn.onclick = () => {
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
-      confirmDelete(`Delete harvest log: <strong>${r.species}</strong> at ${r.location} on ${r.harvest_date}?`, async () => {
-        const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id);
+      confirmDeleteSoft(`Move harvest log <strong>${r.species}</strong> at ${r.location} on ${r.harvest_date} to Trash?`, async (reason) => {
+        const res2 = await UFCL.harvestDelete(STORAGE.user.id, r.id, reason);
         if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Harvest log deleted.'); await renderHarvest();
+        showOverlaySuccess('Harvest log moved to Trash.'); await renderHarvest();
       });
     };
   });
@@ -5554,7 +5762,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
             : null;
           const effCol = eff === null ? 'color:var(--t3)' : eff >= 90 ? 'color:var(--green);font-weight:600' : eff >= 70 ? 'color:var(--amber)' : 'color:var(--red);font-weight:600';
           return `<tr>
-            <td>${new Date(r.log_date+'T12:00:00').toLocaleDateString('en-GB')}</td>
+            <td>${new Date(r.log_date+'T12:00:00').toLocaleDateString('en-GB')}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
             <td style="font-weight:500">${r.machine_code} — ${r.machine_name}</td>
             <td><span class="badge bt">${r.category_name}</span></td>
             <td>${r.item_category ? `<span class="badge bg" style="font-size:11px">${r.item_category}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
@@ -5718,10 +5926,20 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
         const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
         openOverlay('Edit log entry', row.machine_code + ' · ' + new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB'), logForm(row), async () => {
-          const r2 = await UFCL.machineLogsUpdate(STORAGE.user.id, row.id, collectLog());
-          if (!r2.ok) { showOverlayError(r2.error); return; }
-          showOverlaySuccess('Log updated.');
-          await renderMachineLogs(cid);
+          const payload = collectLog();
+          if (isSupervisor()) {
+            const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
+              action_type: 'edit', entity_type: 'machine_daily_log',
+              entity_id: row.id, entity_ref: `${row.machine_code} — ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}`, payload
+            });
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderMachineLogs(cid);
+          } else {
+            const r2 = await UFCL.machineLogsUpdate(STORAGE.user.id, row.id, payload);
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Log updated.');
+            await renderMachineLogs(cid);
+          }
         });
       };
     });
@@ -5730,14 +5948,25 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
       btn.onclick = () => {
         const row = rows.find(r => r.id === btn.dataset.id);
         if (!row) return;
-        confirmDelete(`Delete log for <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}?`, async () => {
-          const r2 = await UFCL.machineLogsDelete(STORAGE.user.id, row.id);
-          if (!r2.ok) { showOverlayError(r2.error); return; }
-          showOverlaySuccess('Deleted.'); await renderMachineLogs(cid);
-        });
+        if (isSupervisor()) {
+          confirmDeleteSoft(`Submit delete request for log <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}? A manager must approve before it is moved to Trash.`, async (reason) => {
+            const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'machine_daily_logs', row.id, 'machine_daily_log', `${row.machine_code} — ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}`, reason);
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Deletion request submitted for approval.'); await renderMachineLogs(cid);
+          });
+        } else {
+          confirmDeleteSoft(`Move log for <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')} to Trash?`, async (reason) => {
+            const r2 = await UFCL.machineLogsDelete(STORAGE.user.id, row.id, reason);
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Entry moved to Trash.'); await renderMachineLogs(cid);
+          });
+        }
       };
     });
   }
+
+  await insertPendingPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid));
+  await insertDeletionPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid));
 }
 
 // ── Machine KPI Performance ───────────────────────────────────────────────────
@@ -6017,7 +6246,7 @@ async function renderCompartments() {
                 const pct = Number(r.volume_m3) > 0 ? Math.min(100, Math.round(Number(r.volume_harvested_m3) / Number(r.volume_m3) * 100)) : 0;
                 const statusBadge = r.status === 'Active' ? '<span class="badge bg">Active</span>' : '<span class="badge ba">Completed</span>';
                 return `<tr>
-                  <td style="font-weight:600;color:var(--g-dark)">${r.compt_name}</td>
+                  <td style="font-weight:600;color:var(--g-dark)">${r.compt_name}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                   <td style="color:var(--t3)">${r.sub_name || '—'}</td>
                   <td><span class="badge bt">${r.species}</span></td>
                   <td style="font-family:var(--fm)">${Number(r.area_ha).toFixed(2)}</td>
@@ -6105,13 +6334,23 @@ async function renderCompartments() {
         </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
-          const res2 = await UFCL.compartmentsUpdate(STORAGE.user.id, r.id, {
+          const payload = {
             entry_date: $('cp-date').value, compt_name: $('cp-name').value.trim(),
             sub_name: $('cp-sub').value.trim() || null, species: $('cp-species').value.trim(),
             area_ha: $('cp-area').value, status: $('cp-status').value
-          });
-          if (!res2.ok) { showOverlayError(res2.error); return; }
-          showOverlaySuccess('Compartment updated.'); await renderCompartments();
+          };
+          if (isSupervisor()) {
+            const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
+              action_type: 'edit', entity_type: 'compartment',
+              entity_id: r.id, entity_ref: r.compt_name, payload
+            });
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderCompartments();
+          } else {
+            const res2 = await UFCL.compartmentsUpdate(STORAGE.user.id, r.id, payload);
+            if (!res2.ok) { showOverlayError(res2.error); return; }
+            showOverlaySuccess('Compartment updated.'); await renderCompartments();
+          }
         }
       );
       const aEl = document.getElementById('cp-area');
@@ -6124,13 +6363,24 @@ async function renderCompartments() {
     btn.onclick = () => {
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
-      confirmDelete(`Delete compartment <strong>${r.compt_name}</strong>? This will unlink all associated harvest logs.`, async () => {
-        const res2 = await UFCL.compartmentsDelete(STORAGE.user.id, r.id);
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Compartment deleted.'); await renderCompartments();
-      });
+      if (isSupervisor()) {
+        confirmDeleteSoft(`Submit delete request for compartment <strong>${r.compt_name}</strong>? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'compartments', r.id, 'compartment', r.compt_name, reason);
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Deletion request submitted for approval.'); await renderCompartments();
+        });
+      } else {
+        confirmDeleteSoft(`Move compartment <strong>${r.compt_name}</strong> to Trash? Associated harvest logs will be unlinked.`, async (reason) => {
+          const res2 = await UFCL.compartmentsDelete(STORAGE.user.id, r.id, reason);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Compartment moved to Trash.'); await renderCompartments();
+        });
+      }
     };
   });
+
+  await insertPendingPanel($('page-compartments'), ['compartment'], renderCompartments);
+  await insertDeletionPanel($('page-compartments'), ['compartment'], renderCompartments);
 }
 
 // ── Log Transport ─────────────────────────────────────────────────────────────
@@ -6186,7 +6436,7 @@ async function renderLogTransport() {
           ${rows.length === 0
             ? '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:2rem">No transport entries yet. Click "Log transport" to record a load.</td></tr>'
             : rows.map(r => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}</td>
+                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                 <td style="font-weight:500;color:var(--g-dark)">${r.compt_name || '—'}</td>
                 <td style="color:var(--t3)">${r.sub_name || '—'}</td>
                 <td style="font-family:var(--fm);font-weight:600;color:#1D4ED8">${Number(r.qty_transported).toLocaleString()}</td>
@@ -6265,13 +6515,25 @@ async function renderLogTransport() {
 
   document.querySelectorAll('.lt-del').forEach(btn => {
     btn.onclick = () => {
-      confirmDelete('Delete this transport entry?', async () => {
-        const res2 = await UFCL.logTransportDelete(STORAGE.user.id, Number(btn.dataset.id));
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Entry deleted.'); await renderLogTransport();
-      });
+      const r = rows.find(x => x.id === btn.dataset.id);
+      if (isSupervisor()) {
+        confirmDeleteSoft('Submit delete request for this transport entry? A manager must approve before it is moved to Trash.', async (reason) => {
+          const ref = r ? `${r.compt_name || 'Transport'} — ${r.date_fmt}` : btn.dataset.id;
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'log_transport', btn.dataset.id, 'log_transport', ref, reason);
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Deletion request submitted for approval.'); await renderLogTransport();
+        });
+      } else {
+        confirmDeleteSoft('Move this transport entry to Trash?', async (reason) => {
+          const res2 = await UFCL.logTransportDelete(STORAGE.user.id, btn.dataset.id, reason);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Entry moved to Trash.'); await renderLogTransport();
+        });
+      }
     };
   });
+
+  await insertDeletionPanel($('page-log-transport'), ['log_transport'], renderLogTransport);
 }
 
 // ── Value-Added Timber ─────────────────────────────────────────────────────────
@@ -6350,7 +6612,7 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
           ${rows.length === 0
             ? '<tr><td colspan="6" style="text-align:center;color:var(--t3);padding:2rem">No entries yet. Click "Add entry" to record value-added timber.</td></tr>'
             : rows.map(r => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}</td>
+                <td style="font-family:var(--fm);font-weight:500">${r.date_fmt}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                 <td><span class="badge ${r.type_value_added === 'Kiln-dried timber' ? 'ba' : 'bg'}">${r.type_value_added}</span></td>
                 <td style="font-weight:600;color:var(--g-dark)">${r.product_size}</td>
                 <td style="font-family:var(--fm);font-weight:600;color:var(--green)">${Number(r.num_timber).toLocaleString()}</td>
@@ -6435,14 +6697,24 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
         </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
-          const res2 = await UFCL.valueAddedTimberUpdate(STORAGE.user.id, r.id, {
+          const payload = {
             entry_date: $('vat-date').value,
             type_value_added: $('vat-type').value,
             product_size: $('vat-size').value,
             num_timber: $('vat-num').value
-          });
-          if (!res2.ok) { showOverlayError(res2.error); return; }
-          showOverlaySuccess('Entry updated.'); await renderValueAddedTimber(cid);
+          };
+          if (isSupervisor()) {
+            const r2 = await UFCL.pendingEditsCreate(STORAGE.user.id, {
+              action_type: 'edit', entity_type: 'value_added_timber',
+              entity_id: r.id, entity_ref: `${r.date_fmt} — ${r.type_value_added}`, payload
+            });
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderValueAddedTimber(cid);
+          } else {
+            const res2 = await UFCL.valueAddedTimberUpdate(STORAGE.user.id, r.id, payload);
+            if (!res2.ok) { showOverlayError(res2.error); return; }
+            showOverlaySuccess('Entry updated.'); await renderValueAddedTimber(cid);
+          }
         }
       );
     };
@@ -6452,13 +6724,24 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
     btn.onclick = () => {
       const r = rows.find(x => x.id === btn.dataset.id);
       if (!r) return;
-      confirmDelete(`Delete value-added timber entry for <strong>${r.date_fmt}</strong> — ${r.type_value_added}, ${r.product_size}?`, async () => {
-        const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber(cid);
-      });
+      if (isSupervisor()) {
+        confirmDeleteSoft(`Submit delete request for value-added timber entry <strong>${r.date_fmt}</strong> — ${r.type_value_added}, ${r.product_size}? A manager must approve before it is moved to Trash.`, async (reason) => {
+          const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'value_added_timber', r.id, 'value_added_timber', `${r.date_fmt} — ${r.type_value_added}, ${r.product_size}`, reason);
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Deletion request submitted for approval.'); await renderValueAddedTimber(cid);
+        });
+      } else {
+        confirmDeleteSoft(`Move value-added timber entry for <strong>${r.date_fmt}</strong> — ${r.type_value_added}, ${r.product_size} to Trash?`, async (reason) => {
+          const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, btn.dataset.id, reason);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Entry moved to Trash.'); await renderValueAddedTimber(cid);
+        });
+      }
     };
   });
+
+  await insertPendingPanel($(cid), ['value_added_timber'], () => renderValueAddedTimber(cid));
+  await insertDeletionPanel($(cid), ['value_added_timber'], () => renderValueAddedTimber(cid));
 }
 
 // ── Machine Fuel Logs ─────────────────────────────────────────────────────────
@@ -6519,7 +6802,7 @@ async function renderMachineFuelLogs() {
           ${rows.length === 0
             ? `<tr><td colspan="${canManage ? 9 : 8}" style="text-align:center;color:var(--t3);padding:2rem">No fuel logs yet.</td></tr>`
             : rows.map(r => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.log_date}</td>
+                <td style="font-family:var(--fm);font-weight:500">${r.log_date}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                 <td style="font-weight:600">${r.machine_code || '—'}<br><span style="font-size:11px;font-weight:400;color:var(--t3)">${r.machine_name || ''}</span></td>
                 <td style="font-family:var(--fm);color:var(--t3)">${r.plate_number || '—'}</td>
                 <td>${r.operator || '—'}</td>
@@ -6569,13 +6852,26 @@ async function renderMachineFuelLogs() {
       }));
 
     pg.querySelectorAll('.mfl-del').forEach(btn => {
-      btn.onclick = () => confirmDelete('Delete this fuel log entry?', async () => {
-        const r2 = await UFCL.machineFuelLogsDelete(STORAGE.user.id, Number(btn.dataset.id));
-        if (!r2.ok) { showOverlayError(r2.error); return; }
-        showOverlaySuccess('Entry deleted.'); await renderMachineFuelLogs();
-      });
+      const r = rows.find(x => x.id === btn.dataset.id);
+      btn.onclick = () => {
+        if (isSupervisor()) {
+          confirmDeleteSoft('Submit delete request for this fuel log entry? A manager must approve before it is moved to Trash.', async (reason) => {
+            const ref = r ? `${r.machine_code || '—'} — ${r.log_date} (${r.fuel_type})` : btn.dataset.id;
+            const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'machine_fuel_logs', btn.dataset.id, 'machine_fuel_log', ref, reason);
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Deletion request submitted for approval.'); await renderMachineFuelLogs();
+          });
+        } else {
+          confirmDeleteSoft('Move this fuel log entry to Trash?', async (reason) => {
+            const r2 = await UFCL.machineFuelLogsDelete(STORAGE.user.id, btn.dataset.id, reason);
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            showOverlaySuccess('Entry moved to Trash.'); await renderMachineFuelLogs();
+          });
+        }
+      };
     });
   }
+  await insertDeletionPanel($('page-machine-fuel'), ['machine_fuel_log'], renderMachineFuelLogs);
 }
 
 // ── Casual Labour Requests ────────────────────────────────────────────────────
@@ -6876,6 +7172,84 @@ async function renderCasuals() {
       });
     });
   }
+}
+
+async function renderTrash() {
+  const pg = $('page-trash');
+  pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+
+  if (!canManageTrash()) {
+    pg.innerHTML = `<div class="ptitle"><i class="ti ti-trash" style="color:var(--red)"></i> Trash</div>
+      <div class="psub" style="color:var(--t3)">Only Admin, CEO, and Operations roles can view and manage the Trash.</div>`;
+    return;
+  }
+
+  const res = await UFCL.trashList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('trash', res.error);
+
+  const rows = res.rows || [];
+
+  pg.innerHTML = `
+    <div class="ptitle"><i class="ti ti-trash" style="color:var(--red)"></i> Trash</div>
+    <div class="psub">Soft-deleted records are kept for 30 days. Restore to undo, or Purge to permanently remove.</div>
+    <div class="card" style="padding:0">
+      <div style="padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-trash"></i>Deleted Records (${rows.length})</h3>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr>
+          <th>Type</th><th>Record</th><th>Deleted By</th><th>Deleted At</th><th>Reason</th><th>Days Left</th><th>Actions</th>
+        </tr></thead>
+        <tbody>
+          ${rows.length === 0
+            ? `<tr><td colspan="7" style="text-align:center;color:var(--t3);padding:2rem">Trash is empty.</td></tr>`
+            : rows.map(r => `<tr>
+                <td><span class="badge bt" style="font-size:11px">${r.label}</span></td>
+                <td style="font-weight:600">${r.entity_ref || '#' + r.record_id}</td>
+                <td style="color:var(--t3);font-size:12px">${r.deleted_by_name || '—'}</td>
+                <td style="font-family:var(--fm);font-size:12px;color:var(--t3)">${r.deleted_at}</td>
+                <td style="font-size:12px;color:var(--t3);max-width:200px">${r.deletion_reason || '—'}</td>
+                <td>
+                  <span class="badge ${Number(r.days_remaining) <= 3 ? 'br' : Number(r.days_remaining) <= 7 ? 'ba' : 'bg'}">
+                    ${r.days_remaining}d
+                  </span>
+                </td>
+                <td style="white-space:nowrap;display:flex;gap:4px">
+                  <button class="bp1 tr-restore" data-table="${r.table_name}" data-id="${r.record_id}" style="padding:4px 10px;font-size:12px;background:var(--green,#22c55e);border-color:var(--green,#22c55e)">
+                    <i class="ti ti-arrow-back-up"></i>Restore
+                  </button>
+                  <button class="bs1 tr-purge" data-table="${r.table_name}" data-id="${r.record_id}" style="padding:4px 10px;font-size:12px;color:var(--red)">
+                    <i class="ti ti-flame"></i>Purge
+                  </button>
+                </td>
+              </tr>`).join('')}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  pg.querySelectorAll('.tr-restore').forEach(btn => {
+    btn.onclick = async () => {
+      if (!confirm(`Restore this record? It will reappear in its original list.`)) return;
+      const r = await UFCL.trashRestore(STORAGE.user.id, btn.dataset.table, btn.dataset.id);
+      if (!r.ok) { alert(r.error); return; }
+      await renderTrash();
+    };
+  });
+
+  pg.querySelectorAll('.tr-purge').forEach(btn => {
+    btn.onclick = () => {
+      if (STORAGE.user?.role !== 'admin' && STORAGE.user?.role !== 'ceo') {
+        alert('Only Admin or CEO can permanently purge records.');
+        return;
+      }
+      confirmDelete('Permanently delete this record? This cannot be undone.', async () => {
+        const r = await UFCL.trashPurge(STORAGE.user.id, btn.dataset.table, btn.dataset.id);
+        if (!r.ok) { alert(r.error); return; }
+        showOverlaySuccess('Record permanently deleted.');
+        await renderTrash();
+      });
+    };
+  });
 }
 
 function wireLogin() {

@@ -137,21 +137,21 @@ contextBridge.exposeInMainWorld('UFCL', {
     ipcRenderer.invoke('pending-edits:review', { userId, pendingId, status, reviewNotes }),
 
   dailyUpdate: (userId, logId, payload) => ipcRenderer.invoke('daily:update', { userId, logId, payload }),
-  dailyDelete: (userId, logId) => ipcRenderer.invoke('daily:delete', { userId, logId }),
+  dailyDelete: (userId, logId, reason) => ipcRenderer.invoke('daily:delete', { userId, logId, reason }),
   salesUpdate: (userId, orderId, payload) => ipcRenderer.invoke('sales:update', { userId, orderId, payload }),
-  salesDelete: (userId, orderId) => ipcRenderer.invoke('sales:delete', { userId, orderId }),
+  salesDelete: (userId, orderId, reason) => ipcRenderer.invoke('sales:delete', { userId, orderId, reason }),
   logisticsUpdate: (userId, itemId, payload) => ipcRenderer.invoke('logistics:update', { userId, itemId, payload }),
   logisticsDelete: (userId, itemId) => ipcRenderer.invoke('logistics:delete', { userId, itemId }),
   harvestUpdate: (userId, logId, payload) => ipcRenderer.invoke('harvest:update', { userId, logId, payload }),
-  harvestDelete: (userId, logId) => ipcRenderer.invoke('harvest:delete', { userId, logId }),
+  harvestDelete: (userId, logId, reason) => ipcRenderer.invoke('harvest:delete', { userId, logId, reason }),
   deliveriesUpdate: (userId, orderId, payload) => ipcRenderer.invoke('deliveries:update', { userId, orderId, payload }),
   deliveriesDelete: (userId, orderId) => ipcRenderer.invoke('deliveries:delete', { userId, orderId }),
   dispatchDelete: (userId, requestId) => ipcRenderer.invoke('dispatch:delete', { userId, requestId }),
   transportJobsUpdate: (userId, jobId, payload) => ipcRenderer.invoke('transport:jobs:update', { userId, jobId, payload }),
   transportJobsDelete: (userId, jobId) => ipcRenderer.invoke('transport:jobs:delete', { userId, jobId }),
   fuelLogsDelete: (userId, logId) => ipcRenderer.invoke('fuel-logs:delete', { userId, logId }),
-  maintenanceDelete: (userId, recordId) => ipcRenderer.invoke('maintenance:delete', { userId, recordId }),
-  stockMovementsDelete: (userId, movementId) => ipcRenderer.invoke('stock-movements:delete', { userId, movementId }),
+  maintenanceDelete: (userId, recordId, reason) => ipcRenderer.invoke('maintenance:delete', { userId, recordId, reason }),
+  stockMovementsDelete: (userId, movementId, reason) => ipcRenderer.invoke('stock-movements:delete', { userId, movementId, reason }),
   warehousesDelete: (userId, warehouseId) => ipcRenderer.invoke('warehouses:delete', { userId, warehouseId }),
   stockItemsDelete: (userId, itemId) => ipcRenderer.invoke('stock-items:delete', { userId, itemId }),
   vehiclesDelete: (userId, vehicleId) => ipcRenderer.invoke('vehicles:delete', { userId, vehicleId }),
@@ -176,7 +176,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   machineLogsList:   (userId, machineId, month) => ipcRenderer.invoke('machine-logs:list', { userId, machineId, month }),
   machineLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-logs:create', { userId, payload }),
   machineLogsUpdate: (userId, logId, payload) => ipcRenderer.invoke('machine-logs:update', { userId, logId, payload }),
-  machineLogsDelete: (userId, logId) => ipcRenderer.invoke('machine-logs:delete', { userId, logId }),
+  machineLogsDelete: (userId, logId, reason) => ipcRenderer.invoke('machine-logs:delete', { userId, logId, reason }),
 
   // Machine KPI
   machineKpiDefinitionsList:   (userId) => ipcRenderer.invoke('machine-kpi:definitions:list', { userId }),
@@ -197,20 +197,20 @@ contextBridge.exposeInMainWorld('UFCL', {
   compartmentsList:        (userId) => ipcRenderer.invoke('compartments:list', { userId }),
   compartmentsCreate:      (userId, payload) => ipcRenderer.invoke('compartments:create', { userId, payload }),
   compartmentsUpdate:      (userId, comptId, payload) => ipcRenderer.invoke('compartments:update', { userId, comptId, payload }),
-  compartmentsDelete:      (userId, comptId) => ipcRenderer.invoke('compartments:delete', { userId, comptId }),
+  compartmentsDelete:      (userId, comptId, reason) => ipcRenderer.invoke('compartments:delete', { userId, comptId, reason }),
   compartmentsForDropdown: (userId) => ipcRenderer.invoke('compartments:for-dropdown', { userId }),
 
   // Log Transport
   logTransportList:   (userId) => ipcRenderer.invoke('log-transport:list', { userId }),
   logTransportCreate: (userId, payload) => ipcRenderer.invoke('log-transport:create', { userId, payload }),
   logTransportUpdate: (userId, id, payload) => ipcRenderer.invoke('log-transport:update', { userId, id, payload }),
-  logTransportDelete: (userId, id) => ipcRenderer.invoke('log-transport:delete', { userId, id }),
+  logTransportDelete: (userId, id, reason) => ipcRenderer.invoke('log-transport:delete', { userId, id, reason }),
 
   // Value-Added Timber
   valueAddedTimberList:   (userId) => ipcRenderer.invoke('value-added-timber:list', { userId }),
   valueAddedTimberCreate: (userId, payload) => ipcRenderer.invoke('value-added-timber:create', { userId, payload }),
   valueAddedTimberUpdate: (userId, id, payload) => ipcRenderer.invoke('value-added-timber:update', { userId, id, payload }),
-  valueAddedTimberDelete: (userId, id) => ipcRenderer.invoke('value-added-timber:delete', { userId, id }),
+  valueAddedTimberDelete: (userId, id, reason) => ipcRenderer.invoke('value-added-timber:delete', { userId, id, reason }),
 
   // Logistics Dashboard
   logisticsDashboard: (userId) => ipcRenderer.invoke('logistics:dashboard', { userId }),
@@ -219,7 +219,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   machineFuelLogsList:   (userId) => ipcRenderer.invoke('machine-fuel:list', { userId }),
   machineFuelLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-fuel:create', { userId, payload }),
   machineFuelLogsUpdate: (userId, id, payload) => ipcRenderer.invoke('machine-fuel:update', { userId, id, payload }),
-  machineFuelLogsDelete: (userId, id) => ipcRenderer.invoke('machine-fuel:delete', { userId, id }),
+  machineFuelLogsDelete: (userId, id, reason) => ipcRenderer.invoke('machine-fuel:delete', { userId, id, reason }),
 
   // Casual Labour Requests
   casualLabourRequestsList:   (userId) => ipcRenderer.invoke('casual-requests:list', { userId }),
@@ -233,6 +233,18 @@ contextBridge.exposeInMainWorld('UFCL', {
   casualsUpdate: (userId, casualId, payload) => ipcRenderer.invoke('casuals:update', { userId, casualId, payload }),
   casualsDelete: (userId, casualId) => ipcRenderer.invoke('casuals:delete', { userId, casualId }),
 
-  ceoOverview: (userId) => ipcRenderer.invoke('ceo:overview', { userId })
+  ceoOverview: (userId) => ipcRenderer.invoke('ceo:overview', { userId }),
+
+  // Deletion Requests
+  deletionRequestCreate:  (userId, tableName, recordId, entityType, entityRef, reason) =>
+    ipcRenderer.invoke('deletion-requests:create', { userId, tableName, recordId, entityType, entityRef, reason }),
+  deletionRequestsList:   (userId) => ipcRenderer.invoke('deletion-requests:list', { userId }),
+  deletionRequestApprove: (userId, requestId, notes) => ipcRenderer.invoke('deletion-requests:approve', { userId, requestId, notes }),
+  deletionRequestReject:  (userId, requestId, notes) => ipcRenderer.invoke('deletion-requests:reject', { userId, requestId, notes }),
+
+  // Trash
+  trashList:    (userId) => ipcRenderer.invoke('trash:list', { userId }),
+  trashRestore: (userId, tableName, recordId) => ipcRenderer.invoke('trash:restore', { userId, tableName, recordId }),
+  trashPurge:   (userId, tableName, recordId) => ipcRenderer.invoke('trash:purge', { userId, tableName, recordId })
 });
 

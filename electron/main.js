@@ -216,21 +216,21 @@ ipcMain.handle('pending-edits:review', async (_evt, { userId, pendingId, status,
 
 // Edit / Delete
 ipcMain.handle('daily:update', async (_evt, { userId, logId, payload }) => data.dailyUpdate(userId, logId, payload));
-ipcMain.handle('daily:delete', async (_evt, { userId, logId }) => data.dailyDelete(userId, logId));
+ipcMain.handle('daily:delete', async (_evt, { userId, logId, reason }) => data.dailyDelete(userId, logId, reason));
 ipcMain.handle('sales:update', async (_evt, { userId, orderId, payload }) => data.salesUpdate(userId, orderId, payload));
-ipcMain.handle('sales:delete', async (_evt, { userId, orderId }) => data.salesDelete(userId, orderId));
+ipcMain.handle('sales:delete', async (_evt, { userId, orderId, reason }) => data.salesDelete(userId, orderId, reason));
 ipcMain.handle('logistics:update', async (_evt, { userId, itemId, payload }) => data.logisticsUpdate(userId, itemId, payload));
 ipcMain.handle('logistics:delete', async (_evt, { userId, itemId }) => data.logisticsDelete(userId, itemId));
 ipcMain.handle('harvest:update', async (_evt, { userId, logId, payload }) => data.harvestUpdate(userId, logId, payload));
-ipcMain.handle('harvest:delete', async (_evt, { userId, logId }) => data.harvestDelete(userId, logId));
+ipcMain.handle('harvest:delete', async (_evt, { userId, logId, reason }) => data.harvestDelete(userId, logId, reason));
 ipcMain.handle('deliveries:update', async (_evt, { userId, orderId, payload }) => data.deliveryOrdersUpdate(userId, orderId, payload));
 ipcMain.handle('deliveries:delete', async (_evt, { userId, orderId }) => data.deliveryOrdersDelete(userId, orderId));
 ipcMain.handle('dispatch:delete', async (_evt, { userId, requestId }) => data.dispatchDelete(userId, requestId));
 ipcMain.handle('transport:jobs:update', async (_evt, { userId, jobId, payload }) => data.transportJobsUpdate(userId, jobId, payload));
 ipcMain.handle('transport:jobs:delete', async (_evt, { userId, jobId }) => data.transportJobsDelete(userId, jobId));
 ipcMain.handle('fuel-logs:delete', async (_evt, { userId, logId }) => data.fuelLogsDelete(userId, logId));
-ipcMain.handle('maintenance:delete', async (_evt, { userId, recordId }) => data.maintenanceDelete(userId, recordId));
-ipcMain.handle('stock-movements:delete', async (_evt, { userId, movementId }) => data.stockMovementsDelete(userId, movementId));
+ipcMain.handle('maintenance:delete', async (_evt, { userId, recordId, reason }) => data.maintenanceDelete(userId, recordId, reason));
+ipcMain.handle('stock-movements:delete', async (_evt, { userId, movementId, reason }) => data.stockMovementsDelete(userId, movementId, reason));
 ipcMain.handle('warehouses:delete', async (_evt, { userId, warehouseId }) => data.warehousesDelete(userId, warehouseId));
 ipcMain.handle('stock-items:delete', async (_evt, { userId, itemId }) => data.stockItemsDelete(userId, itemId));
 ipcMain.handle('vehicles:delete', async (_evt, { userId, vehicleId }) => data.vehiclesDelete(userId, vehicleId));
@@ -263,7 +263,7 @@ ipcMain.handle('machine-log-cats:delete', async (_evt, { userId, id }) => data.m
 ipcMain.handle('machine-logs:list',   async (_evt, { userId, machineId, month }) => data.machineLogsList(userId, machineId, month));
 ipcMain.handle('machine-logs:create', async (_evt, { userId, payload }) => data.machineLogsCreate(userId, payload));
 ipcMain.handle('machine-logs:update', async (_evt, { userId, logId, payload }) => data.machineLogsUpdate(userId, logId, payload));
-ipcMain.handle('machine-logs:delete', async (_evt, { userId, logId }) => data.machineLogsDelete(userId, logId));
+ipcMain.handle('machine-logs:delete', async (_evt, { userId, logId, reason }) => data.machineLogsDelete(userId, logId, reason));
 
 // Machine KPI
 ipcMain.handle('machine-kpi:definitions:list',   async (_evt, { userId }) => data.machineKpiDefinitionsList(userId));
@@ -284,20 +284,20 @@ ipcMain.handle('machine-maint:delete', async (_evt, { userId, schedId }) => data
 ipcMain.handle('compartments:list',   async (_evt, { userId }) => data.compartmentsList(userId));
 ipcMain.handle('compartments:create', async (_evt, { userId, payload }) => data.compartmentsCreate(userId, payload));
 ipcMain.handle('compartments:update', async (_evt, { userId, comptId, payload }) => data.compartmentsUpdate(userId, comptId, payload));
-ipcMain.handle('compartments:delete', async (_evt, { userId, comptId }) => data.compartmentsDelete(userId, comptId));
+ipcMain.handle('compartments:delete', async (_evt, { userId, comptId, reason }) => data.compartmentsDelete(userId, comptId, reason));
 ipcMain.handle('compartments:for-dropdown', async (_evt, { userId }) => data.compartmentsForDropdown(userId));
 
 // Log Transport
 ipcMain.handle('log-transport:list',   async (_evt, { userId }) => data.logTransportList(userId));
 ipcMain.handle('log-transport:create', async (_evt, { userId, payload }) => data.logTransportCreate(userId, payload));
 ipcMain.handle('log-transport:update', async (_evt, { userId, id, payload }) => data.logTransportUpdate(userId, id, payload));
-ipcMain.handle('log-transport:delete', async (_evt, { userId, id }) => data.logTransportDelete(userId, id));
+ipcMain.handle('log-transport:delete', async (_evt, { userId, id, reason }) => data.logTransportDelete(userId, id, reason));
 
 // Value-Added Timber
 ipcMain.handle('value-added-timber:list',   async (_evt, { userId }) => data.valueAddedTimberList(userId));
 ipcMain.handle('value-added-timber:create', async (_evt, { userId, payload }) => data.valueAddedTimberCreate(userId, payload));
 ipcMain.handle('value-added-timber:update', async (_evt, { userId, id, payload }) => data.valueAddedTimberUpdate(userId, id, payload));
-ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id }) => data.valueAddedTimberDelete(userId, id));
+ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id, reason }) => data.valueAddedTimberDelete(userId, id, reason));
 
 // Logistics Dashboard
 ipcMain.handle('logistics:dashboard', async (_evt, { userId }) => data.logisticsDashboard(userId));
@@ -306,7 +306,7 @@ ipcMain.handle('logistics:dashboard', async (_evt, { userId }) => data.logistics
 ipcMain.handle('machine-fuel:list',   async (_evt, { userId }) => data.machineFuelLogsList(userId));
 ipcMain.handle('machine-fuel:create', async (_evt, { userId, payload }) => data.machineFuelLogsCreate(userId, payload));
 ipcMain.handle('machine-fuel:update', async (_evt, { userId, id, payload }) => data.machineFuelLogsUpdate(userId, id, payload));
-ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id }) => data.machineFuelLogsDelete(userId, id));
+ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id, reason }) => data.machineFuelLogsDelete(userId, id, reason));
 
 // Casual Labour Requests
 ipcMain.handle('casual-requests:list',   async (_evt, { userId }) => data.casualLabourRequestsList(userId));
@@ -321,4 +321,16 @@ ipcMain.handle('casuals:update', async (_evt, { userId, casualId, payload }) => 
 ipcMain.handle('casuals:delete', async (_evt, { userId, casualId }) => data.casualsDelete(userId, casualId));
 
 ipcMain.handle('ceo:overview', async (_evt, { userId }) => data.getCeoOverview(userId));
+
+// Deletion Requests (supervisor → manager approval workflow)
+ipcMain.handle('deletion-requests:create',  async (_evt, { userId, tableName, recordId, entityType, entityRef, reason }) =>
+  data.deletionRequestCreate(userId, { tableName, recordId, entityType, entityRef, reason }));
+ipcMain.handle('deletion-requests:list',    async (_evt, { userId }) => data.deletionRequestsList(userId));
+ipcMain.handle('deletion-requests:approve', async (_evt, { userId, requestId, notes }) => data.deletionRequestApprove(userId, requestId, notes));
+ipcMain.handle('deletion-requests:reject',  async (_evt, { userId, requestId, notes }) => data.deletionRequestReject(userId, requestId, notes));
+
+// Trash (soft-deleted records)
+ipcMain.handle('trash:list',    async (_evt, { userId }) => data.trashList(userId));
+ipcMain.handle('trash:restore', async (_evt, { userId, tableName, recordId }) => data.trashRestore(userId, tableName, recordId));
+ipcMain.handle('trash:purge',   async (_evt, { userId, tableName, recordId }) => data.trashPurge(userId, tableName, recordId));
 

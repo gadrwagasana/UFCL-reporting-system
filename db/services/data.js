@@ -165,22 +165,30 @@ async function logAudit(user, action, icon = 'ti-check', meta = {}) {
   }
 }
 
-async function pushNotification({ type, title, body, roles }) {
-  await pool.query('insert into notifications(type,title,body,roles) values ($1,$2,$3,$4)', [
-    type,
-    title,
-    body,
-    roles || []
-  ]);
+async function pushNotification({ type, title, body, roles, forUserId }) {
+  if (forUserId) {
+    await pool.query(
+      'insert into notifications(type,title,body,roles,for_user_id) values ($1,$2,$3,$4,$5)',
+      [type, title, body, roles || [], forUserId]
+    );
+  } else {
+    await pool.query(
+      'insert into notifications(type,title,body,roles) values ($1,$2,$3,$4)',
+      [type, title, body, roles || []]
+    );
+  }
 }
 
 async function unreadCount(userId) {
+  const user = await getUser(userId);
   const { rows } = await pool.query(
     `select count(*)::int as n
      from notifications n
      left join notifications_read r on r.notification_id=n.id and r.user_id=$1
-     where r.notification_id is null`,
-    [userId]
+     where r.notification_id is null
+       and ((array_length(n.roles,1) is null or n.roles='{}' or $2=any(n.roles))
+            or n.for_user_id=$1)`,
+    [userId, user.role]
   );
   return rows[0]?.n || 0;
 }
@@ -255,8 +263,9 @@ async function dailyList(userId) {
       `select id, to_char(log_date,'DD/MM/YYYY') as date, machine, product_size,
               timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
               timber_waste, poles_units, poles_waste, downtime_hours, logs_received,
-              supervisor, remarks, created_at
+              supervisor, remarks, created_at, pending_deletion
        from daily_logs
+       where deleted_at is null
        order by log_date desc, id desc
        limit 50`
     ),
@@ -485,8 +494,9 @@ async function salesList(userId) {
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
   const [{ rows }, { rows: stockRows }] = await Promise.all([
     pool.query(
-      `select id, order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, status, created_at
+      `select id, order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, status, created_at, pending_deletion
        from sales_orders
+       where deleted_at is null
        order by created_at desc, id desc
        limit 50`
     ),
@@ -723,12 +733,15 @@ async function notificationsList(userId) {
   if (!(await mustRole(user, 'notifications'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query(
     `select n.id, n.type, n.title, n.body, to_char(n.created_at,'DD Mon YYYY HH24:MI') as time,
-            (r.notification_id is not null) as read
+            (r.notification_id is not null) as read,
+            (n.for_user_id is not null and n.for_user_id=$1) as direct
      from notifications n
      left join notifications_read r on r.notification_id=n.id and r.user_id=$1
+     where (array_length(n.roles,1) is null or n.roles='{}' or $2=any(n.roles))
+        or n.for_user_id=$1
      order by n.created_at desc, n.id desc
      limit 200`,
-    [userId]
+    [userId, user.role]
   );
   const unread = rows.filter(r => !r.read).length;
   return { ok: true, rows, unread };
@@ -753,8 +766,10 @@ async function notificationsMarkAllRead(userId) {
     `insert into notifications_read(notification_id,user_id)
      select n.id, $1
      from notifications n
+     where (array_length(n.roles,1) is null or n.roles='{}' or $2=any(n.roles))
+        or n.for_user_id=$1
      on conflict do nothing`,
-    [userId]
+    [userId, user.role]
   );
   return { ok: true, unread: await unreadCount(userId) };
 }
@@ -1365,13 +1380,13 @@ async function stockMovementsList(userId, workshopId) {
          left join warehouses w on w.id=sm.warehouse_id
          left join warehouses tw on tw.id=sm.to_warehouse_id
          left join app_users u on u.id=sm.created_by
-         where sm.warehouse_id=$1 or sm.to_warehouse_id=$1
+         where sm.deleted_at is null and (sm.warehouse_id=$1 or sm.to_warehouse_id=$1)
          order by sm.created_at desc limit 100`, [filterWh])
     : await pool.query(
         `select sm.id, sc.name as item_name, sc.category, sc.uom,
                 w.name as warehouse_name, tw.name as to_warehouse_name,
                 sm.movement_type, sm.quantity, sm.reference, sm.notes,
-                sm.approval_status, sm.rejection_reason,
+                sm.approval_status, sm.rejection_reason, sm.pending_deletion,
                 to_char(sm.created_at,'DD/MM/YYYY HH24:MI') as created_at,
                 u.name as created_by
          from stock_movements sm
@@ -1379,6 +1394,7 @@ async function stockMovementsList(userId, workshopId) {
          left join warehouses w on w.id=sm.warehouse_id
          left join warehouses tw on tw.id=sm.to_warehouse_id
          left join app_users u on u.id=sm.created_by
+         where sm.deleted_at is null
          order by sm.created_at desc limit 100`);
   const { rows: items } = filterWh
     ? await pool.query(
@@ -1840,10 +1856,10 @@ async function maintenanceList(userId, vehicleId) {
     `select mr.id, v.registration, mr.maintenance_type, mr.description,
             mr.cost, to_char(mr.maintenance_date,'DD/MM/YYYY') as maintenance_date,
             to_char(mr.next_due_date,'DD/MM/YYYY') as next_due_date,
-            mr.performed_by, mr.notes
+            mr.performed_by, mr.notes, mr.pending_deletion
      from maintenance_records mr
      join vehicles v on v.id=mr.vehicle_id
-     where mr.vehicle_id=$1
+     where mr.vehicle_id=$1 and mr.deleted_at is null
      order by mr.maintenance_date desc`,
     [vehicleId]
   );
@@ -1998,9 +2014,10 @@ async function harvestList(userId) {
     `select hl.id, hl.location, hl.species, hl.quantity, hl.uom, hl.notes,
             to_char(hl.harvest_date,'DD/MM/YYYY') as harvest_date,
             to_char(hl.created_at,'DD/MM/YYYY') as created_at,
-            u.name as logged_by
+            u.name as logged_by, hl.pending_deletion
      from harvest_logs hl
      left join app_users u on u.id=hl.logged_by
+     where hl.deleted_at is null
      order by hl.harvest_date desc
      limit 100`
   );
@@ -2092,10 +2109,12 @@ async function dailyHarvestData(userId) {
               to_char(hl.harvest_date,'DD/MM/YYYY') as harvest_date,
               to_char(hl.created_at,'DD/MM/YYYY') as created_at,
               u.name as logged_by,
-              c.compt_name, c.area_ha, c.volume_m3 as compt_volume_m3
+              c.compt_name, c.area_ha, c.volume_m3 as compt_volume_m3,
+              hl.pending_deletion
        from harvest_logs hl
        left join app_users u on u.id=hl.logged_by
        left join compartments c on c.id=hl.compt_id
+       where hl.deleted_at is null
        order by hl.harvest_date desc
        limit 100`
     ),
@@ -2143,21 +2162,49 @@ async function pendingEditsList(userId) {
   return { ok: true, rows };
 }
 
+const ENTITY_TABLE_MAP = {
+  daily_log:          'daily_logs',
+  harvest_log:        'harvest_logs',
+  logistics_item:     'logistics_items',
+  sales_order:        'sales_orders',
+  machine_daily_log:  'machine_daily_logs',
+  compartment:        'compartments',
+  value_added_timber: 'value_added_timber',
+  log_transport:      'log_transport'
+};
+
 async function pendingEditsCreate(userId, payload) {
   const user = await getUser(userId);
   const p = payload || {};
   if (!p.entity_type || !p.entity_id || !p.action_type)
     return { ok: false, error: 'Missing required fields' };
+
+  // Capture old record snapshot for audit trail
+  let oldSnapshot = null;
+  const tbl = ENTITY_TABLE_MAP[p.entity_type];
+  if (tbl) {
+    const { rows: snap } = await pool.query(`SELECT * FROM ${tbl} WHERE id=$1`, [p.entity_id]);
+    oldSnapshot = snap[0] || null;
+  }
+
   await pool.query(
-    `insert into pending_edits(action_type, entity_type, entity_id, entity_ref, payload, submitted_by)
-     values ($1,$2,$3,$4,$5,$6)`,
+    `insert into pending_edits(action_type, entity_type, entity_id, entity_ref, payload, old_snapshot, submitted_by)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
     [p.action_type, p.entity_type, p.entity_id, p.entity_ref || null,
-     p.payload ? JSON.stringify(p.payload) : null, user.id]
+     p.payload ? JSON.stringify(p.payload) : null,
+     oldSnapshot ? JSON.stringify(oldSnapshot) : null, user.id]
   );
   logAudit(user,
     `Submitted ${p.action_type} request for ${p.entity_type} #${p.entity_id}`,
-    'ti-send', { entity_type: p.entity_type, entity_id: p.entity_id }
+    'ti-send', { entity_type: p.entity_type, entity_id: p.entity_id, old: oldSnapshot, new: p.payload }
   );
+  // Notify managers
+  pushNotification({
+    type: 'amber',
+    title: `New ${p.action_type} request — ${p.entity_ref || p.entity_type + ' #' + p.entity_id}`,
+    body: `${user.name} has submitted a ${p.action_type} request that requires your approval.`,
+    roles: ['admin', 'ceo', 'operations', 'logistics']
+  });
   return { ok: true };
 }
 
@@ -2188,8 +2235,27 @@ async function pendingEditsReview(userId, pendingId, status, reviewNotes) {
   logAudit(user,
     `${status} ${pe.action_type} request for ${pe.entity_type} #${pe.entity_id}`,
     status === 'Approved' ? 'ti-circle-check' : 'ti-circle-x',
-    { pendingId, entity_type: pe.entity_type, entity_id: pe.entity_id }
+    { pendingId, entity_type: pe.entity_type, entity_id: pe.entity_id,
+      approvedBy: user.name, notes: reviewNotes }
   );
+
+  const ref = pe.entity_ref || `${pe.entity_type} #${pe.entity_id}`;
+  if (status === 'Approved') {
+    pushNotification({
+      type: 'green',
+      title: `Request approved — ${ref}`,
+      body: `Your ${pe.action_type} request was approved by ${user.name} and has been applied.`,
+      forUserId: pe.submitted_by
+    });
+  } else {
+    pushNotification({
+      type: 'red',
+      title: `Request rejected — ${ref}`,
+      body: `Your ${pe.action_type} request was rejected by ${user.name}.${reviewNotes ? ' Reason: ' + reviewNotes : ''}`,
+      forUserId: pe.submitted_by
+    });
+  }
+
   return { ok: true };
 }
 
@@ -2198,9 +2264,14 @@ async function applyPendingEdit(pe) {
 
   if (pe.action_type === 'delete') {
     const tableMap = {
-      daily_log:      'daily_logs',
-      harvest_log:    'harvest_logs',
-      logistics_item: 'logistics_items'
+      daily_log:          'daily_logs',
+      harvest_log:        'harvest_logs',
+      logistics_item:     'logistics_items',
+      sales_order:        'sales_orders',
+      machine_daily_log:  'machine_daily_logs',
+      compartment:        'compartments',
+      value_added_timber: 'value_added_timber',
+      log_transport:      'log_transport'
     };
     const tbl = tableMap[pe.entity_type];
     if (!tbl) throw new Error(`Unknown entity type: ${pe.entity_type}`);
@@ -2247,6 +2318,53 @@ async function applyPendingEdit(pe) {
          pe.entity_id]
       );
       break;
+    case 'sales_order':
+      await pool.query(
+        `update sales_orders
+         set order_number=$1, customer_name=$2, product_type=$3, product_sub_type=$4,
+             product_size=$5, quantity=$6, unit_price=$7, notes=$8
+         where id=$9`,
+        [p.order_number, p.customer_name, p.product_type, p.product_sub_type || null,
+         p.product_size, Number(p.quantity), Number(p.unit_price), p.notes || null, pe.entity_id]
+      );
+      break;
+    case 'machine_daily_log':
+      await pool.query(
+        `update machine_daily_logs set hours_worked=$1, downtime_hours=$2, downtime_reason=$3,
+           fuel_consumed=$4, daily_production=$5, capacity_per_day=$6, product_type=$7,
+           item_category=$8, logs_loaded=$9, logs_unloaded=$10, loading_trips=$11, remarks=$12
+         where id=$13`,
+        [p.hours_worked || 0, p.downtime_hours || 0, p.downtime_reason || null,
+         p.fuel_consumed || 0, p.daily_production || 0, p.capacity_per_day || 0, p.product_type || null,
+         p.item_category || null,
+         p.logs_loaded || 0, p.logs_unloaded || 0, p.loading_trips || 0, p.remarks || null, pe.entity_id]
+      );
+      break;
+    case 'compartment': {
+      const vol = p.area_ha ? Math.round(Number(p.area_ha) * 219 * 100) / 100 : null;
+      await pool.query(
+        `update compartments set compt_name=$1, sub_name=$2, species=$3, area_ha=$4, volume_m3=$5,
+         entry_date=$6, status=$7 where id=$8`,
+        [p.compt_name?.trim(), p.sub_name?.trim() || null, p.species, Number(p.area_ha),
+         vol, p.entry_date, p.status || 'Active', pe.entity_id]
+      );
+      break;
+    }
+    case 'value_added_timber':
+      await pool.query(
+        `update value_added_timber set entry_date=$1, type_value_added=$2, product_size=$3, num_timber=$4 where id=$5`,
+        [p.entry_date, p.type_value_added, p.product_size, Number(p.num_timber), pe.entity_id]
+      );
+      break;
+    case 'log_transport':
+      await pool.query(
+        `update log_transport set transport_date=$1, compt_id=$2, sub_name=$3, qty_transported=$4,
+           unit=$5, notes=$6, tractor_plate=$7, loggers_number=$8 where id=$9`,
+        [p.transport_date, p.compt_id ? Number(p.compt_id) : null, p.sub_name || null,
+         Number(p.qty_transported), p.unit || 'logs', p.notes || null,
+         p.tractor_plate?.trim() || null, p.loggers_number?.trim() || null, pe.entity_id]
+      );
+      break;
     default:
       throw new Error(`No apply handler for entity type: ${pe.entity_type}`);
   }
@@ -2280,13 +2398,16 @@ async function dailyUpdate(userId, logId, payload) {
   return { ok: true };
 }
 
-async function dailyDelete(userId, logId) {
+async function dailyDelete(userId, logId, reason) {
   const user = await getUser(userId);
   if (!(await canAccessDaily(user))) return { ok: false, error: 'Access denied' };
-  const { rows } = await pool.query('select log_date from daily_logs where id=$1', [logId]);
+  const { rows } = await pool.query('select log_date from daily_logs where id=$1 and deleted_at is null', [logId]);
   if (!rows.length) return { ok: false, error: 'Entry not found' };
-  await pool.query('delete from daily_logs where id=$1', [logId]);
-  logAudit(user, `Deleted daily log #${logId} (${rows[0].log_date})`, 'ti-trash', { logId });
+  await pool.query(
+    'update daily_logs set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, logId]
+  );
+  logAudit(user, `Moved daily log #${logId} to trash`, 'ti-trash', { logId, reason });
   refreshStockView();
   return { ok: true };
 }
@@ -2309,13 +2430,16 @@ async function salesUpdate(userId, orderId, payload) {
   return { ok: true };
 }
 
-async function salesDelete(userId, orderId) {
+async function salesDelete(userId, orderId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
-  const { rows } = await pool.query('select order_number from sales_orders where id=$1', [orderId]);
+  const { rows } = await pool.query('select order_number from sales_orders where id=$1 and deleted_at is null', [orderId]);
   if (!rows.length) return { ok: false, error: 'Order not found' };
-  await pool.query('delete from sales_orders where id=$1', [orderId]);
-  logAudit(user, `Deleted sales order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  await pool.query(
+    'update sales_orders set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, orderId]
+  );
+  logAudit(user, `Moved sales order ${rows[0].order_number} to trash`, 'ti-trash', { orderId, reason });
   refreshStockView();
   return { ok: true };
 }
@@ -2335,13 +2459,13 @@ async function logisticsUpdate(userId, itemId, payload) {
   return { ok: true };
 }
 
-async function logisticsDelete(userId, itemId) {
+async function logisticsDelete(userId, itemId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'logistics'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select name from logistics_items where id=$1', [itemId]);
   if (!rows.length) return { ok: false, error: 'Item not found' };
   await pool.query('delete from logistics_items where id=$1', [itemId]);
-  logAudit(user, `Deleted logistics item: ${rows[0].name}`, 'ti-trash', { itemId });
+  logAudit(user, `Deleted logistics item: ${rows[0].name}`, 'ti-trash', { itemId, reason });
   return { ok: true };
 }
 
@@ -2365,12 +2489,17 @@ async function harvestUpdate(userId, logId, payload) {
   return { ok: true };
 }
 
-async function harvestDelete(userId, logId) {
+async function harvestDelete(userId, logId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'harvest')) && !(await mustRole(user, 'daily-harvest')))
     return { ok: false, error: 'Access denied' };
-  await pool.query('delete from harvest_logs where id=$1', [logId]);
-  logAudit(user, `Deleted harvest log #${logId}`, 'ti-trash', { logId });
+  const { rows } = await pool.query('select species, harvest_date from harvest_logs where id=$1 and deleted_at is null', [logId]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query(
+    'update harvest_logs set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, logId]
+  );
+  logAudit(user, `Moved harvest log #${logId} to trash`, 'ti-trash', { logId, reason });
   return { ok: true };
 }
 
@@ -2387,22 +2516,22 @@ async function deliveryOrdersUpdate(userId, orderId, payload) {
   return { ok: true };
 }
 
-async function deliveryOrdersDelete(userId, orderId) {
+async function deliveryOrdersDelete(userId, orderId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select order_number from delivery_orders where id=$1', [orderId]);
   if (!rows.length) return { ok: false, error: 'Delivery order not found' };
   await pool.query('delete from dispatch_requests where delivery_order_id=$1', [orderId]);
   await pool.query('delete from delivery_orders where id=$1', [orderId]);
-  logAudit(user, `Deleted delivery order ${rows[0].order_number}`, 'ti-trash', { orderId });
+  logAudit(user, `Deleted delivery order ${rows[0].order_number}`, 'ti-trash', { orderId, reason });
   return { ok: true };
 }
 
-async function dispatchDelete(userId, requestId) {
+async function dispatchDelete(userId, requestId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'dispatch'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from dispatch_requests where id=$1', [requestId]);
-  logAudit(user, `Deleted dispatch request #${requestId}`, 'ti-trash', { requestId });
+  logAudit(user, `Deleted dispatch request #${requestId}`, 'ti-trash', { requestId, reason });
   return { ok: true };
 }
 
@@ -2425,40 +2554,45 @@ async function transportJobsUpdate(userId, jobId, payload) {
   return { ok: true };
 }
 
-async function transportJobsDelete(userId, jobId) {
+async function transportJobsDelete(userId, jobId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from transport_jobs where id=$1', [jobId]);
-  logAudit(user, `Deleted transport job #${jobId}`, 'ti-trash', { jobId });
+  logAudit(user, `Deleted transport job #${jobId}`, 'ti-trash', { jobId, reason });
   return { ok: true };
 }
 
-async function fuelLogsDelete(userId, logId) {
+async function fuelLogsDelete(userId, logId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
   await pool.query('delete from fuel_logs where id=$1', [logId]);
-  logAudit(user, `Deleted fuel log #${logId}`, 'ti-trash', { logId });
+  logAudit(user, `Deleted fuel log #${logId}`, 'ti-trash', { logId, reason });
   return { ok: true };
 }
 
-async function maintenanceDelete(userId, recordId) {
+async function maintenanceDelete(userId, recordId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
-  await pool.query('delete from maintenance_records where id=$1', [recordId]);
-  logAudit(user, `Deleted maintenance record #${recordId}`, 'ti-trash', { recordId });
+  const { rows } = await pool.query('select maintenance_type from maintenance_records where id=$1 and deleted_at is null', [recordId]);
+  if (!rows.length) return { ok: false, error: 'Record not found' };
+  await pool.query(
+    'update maintenance_records set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, recordId]
+  );
+  logAudit(user, `Moved maintenance record #${recordId} to trash`, 'ti-trash', { recordId, reason });
   return { ok: true };
 }
 
-async function stockMovementsDelete(userId, movementId) {
+async function stockMovementsDelete(userId, movementId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'stock-movements'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query(
-    'select item_id, warehouse_id, to_warehouse_id, movement_type, quantity from stock_movements where id=$1',
+    'select item_id, warehouse_id, to_warehouse_id, movement_type, quantity from stock_movements where id=$1 and deleted_at is null',
     [movementId]
   );
   if (!rows.length) return { ok: false, error: 'Movement not found' };
   const { item_id, warehouse_id, to_warehouse_id, movement_type, quantity } = rows[0];
-  // Reverse the stock level effect
+  // Reverse stock levels so inventory stays correct while record is in trash
   if (warehouse_id) {
     if (['in', 'return'].includes(movement_type)) {
       await pool.query(
@@ -2483,23 +2617,26 @@ async function stockMovementsDelete(userId, movementId) {
       );
     }
   }
-  await pool.query('delete from stock_movements where id=$1', [movementId]);
-  logAudit(user, `Deleted stock movement #${movementId} (${movement_type})`, 'ti-trash', { movementId });
+  await pool.query(
+    'update stock_movements set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, movementId]
+  );
+  logAudit(user, `Moved stock movement #${movementId} (${movement_type}) to trash`, 'ti-trash', { movementId, reason });
   return { ok: true };
 }
 
-async function warehousesDelete(userId, warehouseId) {
+async function warehousesDelete(userId, warehouseId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'warehouses'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select name from warehouses where id=$1', [warehouseId]);
   if (!rows.length) return { ok: false, error: 'Warehouse not found' };
   await pool.query('delete from stock_levels where warehouse_id=$1', [warehouseId]);
   await pool.query('delete from warehouses where id=$1', [warehouseId]);
-  logAudit(user, `Deleted warehouse: ${rows[0].name}`, 'ti-trash', { warehouseId });
+  logAudit(user, `Deleted warehouse: ${rows[0].name}`, 'ti-trash', { warehouseId, reason });
   return { ok: true };
 }
 
-async function stockItemsDelete(userId, itemId) {
+async function stockItemsDelete(userId, itemId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select name from stock_catalog where id=$1', [itemId]);
@@ -2507,24 +2644,24 @@ async function stockItemsDelete(userId, itemId) {
   await pool.query('delete from stock_levels where item_id=$1', [itemId]);
   await pool.query('delete from stock_movements where item_id=$1', [itemId]);
   await pool.query('delete from stock_catalog where id=$1', [itemId]);
-  logAudit(user, `Deleted stock item: ${rows[0].name}`, 'ti-trash', { itemId });
+  logAudit(user, `Deleted stock item: ${rows[0].name}`, 'ti-trash', { itemId, reason });
   return { ok: true };
 }
 
-async function vehiclesDelete(userId, vehicleId) {
+async function vehiclesDelete(userId, vehicleId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select registration from vehicles where id=$1', [vehicleId]);
   if (!rows.length) return { ok: false, error: 'Vehicle not found' };
   await pool.query('delete from fuel_logs where vehicle_id=$1', [vehicleId]);
-  await pool.query('delete from maintenance_records where vehicle_id=$1', [vehicleId]);
+  await pool.query('delete from maintenance_records where vehicle_id=$1 and deleted_at is null', [vehicleId]);
   await pool.query('update delivery_orders set vehicle_id=null where vehicle_id=$1', [vehicleId]);
   await pool.query('delete from vehicles where id=$1', [vehicleId]);
-  logAudit(user, `Deleted vehicle: ${rows[0].registration}`, 'ti-trash', { vehicleId });
+  logAudit(user, `Deleted vehicle: ${rows[0].registration}`, 'ti-trash', { vehicleId, reason });
   return { ok: true };
 }
 
-async function transportCompaniesDelete(userId, companyId) {
+async function transportCompaniesDelete(userId, companyId, reason) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select name from transport_companies where id=$1', [companyId]);
@@ -2532,7 +2669,7 @@ async function transportCompaniesDelete(userId, companyId) {
   const { rows: jobRows } = await pool.query('select count(*)::int as n from transport_jobs where transport_company_id=$1', [companyId]);
   if (jobRows[0].n > 0) return { ok: false, error: `Cannot delete — ${jobRows[0].n} job(s) recorded for this company. Deactivate it instead.` };
   await pool.query('delete from transport_companies where id=$1', [companyId]);
-  logAudit(user, `Deleted transport company: ${rows[0].name}`, 'ti-trash', { companyId });
+  logAudit(user, `Deleted transport company: ${rows[0].name}`, 'ti-trash', { companyId, reason });
   return { ok: true };
 }
 
@@ -2668,12 +2805,14 @@ async function compartmentsList(userId) {
             u.name as created_by_name,
             coalesce(sum(hl.quantity),0)::int as trees_harvested,
             coalesce(sum(hl.logs_crosscut),0)::int as logs_harvested,
-            round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as volume_harvested_m3
+            round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as volume_harvested_m3,
+            c.pending_deletion
      from compartments c
      left join app_users u on u.id=c.created_by
-     left join harvest_logs hl on hl.compt_id=c.id
+     left join harvest_logs hl on hl.compt_id=c.id and hl.deleted_at is null
+     where c.deleted_at is null
      group by c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status,
-              c.entry_date, c.created_at, u.name
+              c.entry_date, c.created_at, u.name, c.pending_deletion
      order by c.compt_name`
   );
   return { ok: true, rows };
@@ -2717,14 +2856,17 @@ async function compartmentsUpdate(userId, comptId, payload) {
   return { ok: true };
 }
 
-async function compartmentsDelete(userId, comptId) {
+async function compartmentsDelete(userId, comptId, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role))
     return { ok: false, error: 'Access denied' };
-  const { rows } = await pool.query('select compt_name from compartments where id=$1', [comptId]);
+  const { rows } = await pool.query('select compt_name from compartments where id=$1 and deleted_at is null', [comptId]);
   if (!rows.length) return { ok: false, error: 'Compartment not found' };
-  await pool.query('delete from compartments where id=$1', [comptId]);
-  logAudit(user, `Deleted compartment: ${rows[0].compt_name}`, 'ti-trash', { comptId });
+  await pool.query(
+    'update compartments set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, comptId]
+  );
+  logAudit(user, `Moved compartment ${rows[0].compt_name} to trash`, 'ti-trash', { comptId, reason });
   return { ok: true };
 }
 
@@ -2734,7 +2876,8 @@ async function compartmentsForDropdown(userId) {
     `select c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status,
             round(coalesce(sum(hl.logs_crosscut::numeric / 3.4),0)::numeric, 2) as volume_harvested_m3
      from compartments c
-     left join harvest_logs hl on hl.compt_id=c.id
+     left join harvest_logs hl on hl.compt_id=c.id and hl.deleted_at is null
+     where c.deleted_at is null
      group by c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status
      order by c.compt_name`
   );
@@ -2754,10 +2897,11 @@ async function logTransportList(userId) {
               to_char(lt.transport_date,'DD/MM/YYYY') as date_fmt,
               to_char(lt.created_at,'DD/MM/YYYY') as created_at,
               c.compt_name, c.species, c.volume_m3 as compt_volume_m3,
-              u.name as logged_by_name
+              u.name as logged_by_name, lt.pending_deletion
        from log_transport lt
        left join compartments c on c.id=lt.compt_id
        left join app_users u on u.id=lt.logged_by
+       where lt.deleted_at is null
        order by lt.transport_date desc
        limit 200`
     ),
@@ -2800,12 +2944,17 @@ async function logTransportCreate(userId, payload) {
   return { ok: true };
 }
 
-async function logTransportDelete(userId, id) {
+async function logTransportDelete(userId, id, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role))
     return { ok: false, error: 'Access denied' };
-  await pool.query('delete from log_transport where id=$1', [id]);
-  logAudit(user, `Deleted log transport #${id}`, 'ti-trash', { id });
+  const { rows } = await pool.query('select transport_date from log_transport where id=$1 and deleted_at is null', [id]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query(
+    'update log_transport set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, id]
+  );
+  logAudit(user, `Moved log transport #${id} to trash`, 'ti-trash', { id, reason });
   return { ok: true };
 }
 
@@ -2819,9 +2968,10 @@ async function valueAddedTimberList(userId) {
     `select vt.id, vt.type_value_added, vt.product_size, vt.num_timber,
             to_char(vt.entry_date,'DD/MM/YYYY') as date_fmt,
             to_char(vt.created_at,'DD/MM/YYYY') as created_at,
-            u.name as created_by_name
+            u.name as created_by_name, vt.pending_deletion
      from value_added_timber vt
      left join app_users u on u.id=vt.created_by
+     where vt.deleted_at is null
      order by vt.entry_date desc
      limit 200`
   );
@@ -2846,12 +2996,17 @@ async function valueAddedTimberCreate(userId, payload) {
   return { ok: true };
 }
 
-async function valueAddedTimberDelete(userId, id) {
+async function valueAddedTimberDelete(userId, id, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role))
     return { ok: false, error: 'Access denied' };
-  await pool.query('delete from value_added_timber where id=$1', [id]);
-  logAudit(user, `Deleted value-added timber #${id}`, 'ti-trash', { id });
+  const { rows } = await pool.query('select entry_date from value_added_timber where id=$1 and deleted_at is null', [id]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query(
+    'update value_added_timber set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, id]
+  );
+  logAudit(user, `Moved value-added timber #${id} to trash`, 'ti-trash', { id, reason });
   return { ok: true };
 }
 
@@ -2865,10 +3020,11 @@ async function machineFuelLogsList(userId) {
     `select mfl.id, mfl.log_date, mfl.operator, mfl.fuel_type, mfl.quantity, mfl.unit, mfl.notes,
             to_char(mfl.log_date,'DD/MM/YYYY') as date_fmt,
             m.name as machine_name, m.plate_number,
-            u.name as logged_by_name
+            u.name as logged_by_name, mfl.pending_deletion
      from machine_fuel_logs mfl
      left join machines m on m.id=mfl.machine_id
      left join app_users u on u.id=mfl.logged_by
+     where mfl.deleted_at is null
      order by mfl.log_date desc, mfl.id desc
      limit 200`
   );
@@ -2894,12 +3050,17 @@ async function machineFuelLogsCreate(userId, payload) {
   return { ok: true };
 }
 
-async function machineFuelLogsDelete(userId, id) {
+async function machineFuelLogsDelete(userId, id, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations','logistics'].includes(user.role))
     return { ok: false, error: 'Access denied' };
-  await pool.query('delete from machine_fuel_logs where id=$1', [id]);
-  logAudit(user, `Deleted machine fuel log #${id}`, 'ti-trash', { id });
+  const { rows } = await pool.query('select log_date from machine_fuel_logs where id=$1 and deleted_at is null', [id]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query(
+    'update machine_fuel_logs set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, id]
+  );
+  logAudit(user, `Moved machine fuel log #${id} to trash`, 'ti-trash', { id, reason });
   return { ok: true };
 }
 
@@ -2957,11 +3118,11 @@ async function casualLabourRequestsReview(userId, requestId, status) {
   return { ok: true };
 }
 
-async function casualLabourRequestsDelete(userId, id) {
+async function casualLabourRequestsDelete(userId, id, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
   await pool.query('delete from casual_labour_requests where id=$1', [id]);
-  logAudit(user, `Deleted casual request #${id}`, 'ti-trash', { id });
+  logAudit(user, `Deleted casual request #${id}`, 'ti-trash', { id, reason });
   return { ok: true };
 }
 
@@ -3035,13 +3196,13 @@ async function casualsUpdate(userId, casualId, payload) {
   return { ok: true };
 }
 
-async function casualsDelete(userId, casualId) {
+async function casualsDelete(userId, casualId, reason) {
   const user = await getUser(userId);
   if (!['admin','ceo','operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select full_name from casuals where id=$1', [casualId]);
   if (!rows.length) return { ok: false, error: 'Casual not found' };
   await pool.query('delete from casuals where id=$1', [casualId]);
-  logAudit(user, `Deleted casual: ${rows[0].full_name}`, 'ti-trash', { casualId });
+  logAudit(user, `Deleted casual: ${rows[0].full_name}`, 'ti-trash', { casualId, reason });
   return { ok: true };
 }
 
@@ -3107,6 +3268,207 @@ async function logisticsDashboard(userId) {
   );
 
   return { ok: true, workshops, lowStock, recentMovements, monthTotals, user_workshop_id: user.workshop_id };
+}
+
+// ── Deletion Request Workflow ─────────────────────────────────────────────────
+
+const SOFT_DELETE_ALLOWED = new Set([
+  'daily_logs','harvest_logs','value_added_timber','machine_daily_logs',
+  'compartments','log_transport','machine_fuel_logs','maintenance_records',
+  'sales_orders','stock_movements'
+]);
+
+async function deletionRequestCreate(userId, { tableName, recordId, entityType, entityRef, reason }) {
+  const user = await getUser(userId);
+  if (!reason?.trim()) return { ok: false, error: 'Deletion reason is required' };
+  if (!SOFT_DELETE_ALLOWED.has(tableName)) return { ok: false, error: 'Invalid table' };
+  const { rows: existing } = await pool.query(
+    `SELECT id FROM ${tableName} WHERE id=$1 AND deleted_at IS NULL`, [recordId]
+  );
+  if (!existing.length) return { ok: false, error: 'Record not found' };
+  const { rows: snap } = await pool.query(`SELECT * FROM ${tableName} WHERE id=$1`, [recordId]);
+  await pool.query(`UPDATE ${tableName} SET pending_deletion=TRUE WHERE id=$1`, [recordId]);
+  const { rows: [req] } = await pool.query(
+    `INSERT INTO deletion_requests(table_name,record_id,entity_type,entity_ref,deletion_reason,requested_by,record_snapshot)
+     VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+    [tableName, recordId, entityType, entityRef || null, reason.trim(), user.id, JSON.stringify(snap[0] || {})]
+  );
+  logAudit(user, `Deletion request submitted for ${entityType} #${recordId}`, 'ti-hourglass', { tableName, recordId, reason });
+  // Notify managers
+  pushNotification({
+    type: 'red',
+    title: `Deletion request — ${entityRef || entityType + ' #' + recordId}`,
+    body: `${user.name} has requested deletion of a ${entityType} record. Reason: ${reason.trim()}`,
+    roles: ['admin', 'ceo', 'operations']
+  });
+  return { ok: true, requestId: req.id };
+}
+
+async function deletionRequestsList(userId) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(`
+    SELECT dr.*, u.name as requested_by_name, rv.name as reviewed_by_name,
+           to_char(dr.requested_at,'DD/MM/YYYY HH24:MI') as requested_at_fmt
+    FROM deletion_requests dr
+    LEFT JOIN app_users u  ON u.id  = dr.requested_by
+    LEFT JOIN app_users rv ON rv.id = dr.reviewed_by
+    WHERE dr.status = 'pending'
+    ORDER BY dr.requested_at DESC
+  `);
+  return { ok: true, rows };
+}
+
+async function deletionRequestApprove(userId, requestId, notes) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `SELECT * FROM deletion_requests WHERE id=$1 AND status='pending'`, [requestId]
+  );
+  if (!rows.length) return { ok: false, error: 'Request not found or already reviewed' };
+  const req = rows[0];
+  if (!SOFT_DELETE_ALLOWED.has(req.table_name)) return { ok: false, error: 'Invalid table' };
+  await pool.query(
+    `UPDATE ${req.table_name} SET deleted_at=NOW(), deleted_by=$1, deletion_reason=$2, pending_deletion=FALSE WHERE id=$3`,
+    [user.id, req.deletion_reason, req.record_id]
+  );
+  await pool.query(
+    `UPDATE deletion_requests SET status='approved', reviewed_by=$1, reviewed_at=NOW(), review_notes=$2 WHERE id=$3`,
+    [user.id, notes || null, requestId]
+  );
+  if (['daily_logs','sales_orders','stock_movements'].includes(req.table_name)) refreshStockView();
+  logAudit(user, `Approved deletion of ${req.entity_type} #${req.record_id}`, 'ti-check',
+    { requestId, tableName: req.table_name, approvedBy: user.name, approvedAt: new Date().toISOString(), notes });
+  pushNotification({
+    type: 'amber',
+    title: `Deletion approved — ${req.entity_ref || req.entity_type + ' #' + req.record_id}`,
+    body: `Your deletion request was approved by ${user.name}. The record has been moved to Trash.${notes ? ' Note: ' + notes : ''}`,
+    forUserId: req.requested_by
+  });
+  return { ok: true };
+}
+
+async function deletionRequestReject(userId, requestId, notes) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `SELECT * FROM deletion_requests WHERE id=$1 AND status='pending'`, [requestId]
+  );
+  if (!rows.length) return { ok: false, error: 'Request not found or already reviewed' };
+  const req = rows[0];
+  if (SOFT_DELETE_ALLOWED.has(req.table_name))
+    await pool.query(`UPDATE ${req.table_name} SET pending_deletion=FALSE WHERE id=$1`, [req.record_id]);
+  await pool.query(
+    `UPDATE deletion_requests SET status='rejected', reviewed_by=$1, reviewed_at=NOW(), review_notes=$2 WHERE id=$3`,
+    [user.id, notes || null, requestId]
+  );
+  logAudit(user, `Rejected deletion of ${req.entity_type} #${req.record_id}`, 'ti-x',
+    { requestId, rejectedBy: user.name, rejectedAt: new Date().toISOString(), reason: notes });
+  pushNotification({
+    type: 'red',
+    title: `Deletion rejected — ${req.entity_ref || req.entity_type + ' #' + req.record_id}`,
+    body: `Your deletion request was rejected by ${user.name}.${notes ? ' Reason: ' + notes : ''}`,
+    forUserId: req.requested_by
+  });
+  return { ok: true };
+}
+
+// ── Trash / Recycle Bin ───────────────────────────────────────────────────────
+
+const TRASH_TABLES = [
+  { table: 'daily_logs',          type: 'daily_log',          label: 'Daily Production Log',
+    refSql: `to_char(log_date,'DD/MM/YYYY')` },
+  { table: 'harvest_logs',        type: 'harvest_log',        label: 'Harvest Log',
+    refSql: `species || ' — ' || to_char(harvest_date,'DD/MM/YYYY')` },
+  { table: 'value_added_timber',  type: 'value_added_timber', label: 'Value-Added Timber',
+    refSql: `type_value_added || ' — ' || to_char(entry_date,'DD/MM/YYYY')` },
+  { table: 'machine_daily_logs',  type: 'machine_daily_log',  label: 'Machine Daily Log',
+    refSql: `to_char(log_date,'DD/MM/YYYY')` },
+  { table: 'compartments',        type: 'compartment',        label: 'Compartment',
+    refSql: `compt_name` },
+  { table: 'log_transport',       type: 'log_transport',      label: 'Log Transport',
+    refSql: `to_char(transport_date,'DD/MM/YYYY') || ' (' || qty_transported || ' logs)'` },
+  { table: 'machine_fuel_logs',   type: 'machine_fuel_log',   label: 'Machine Fuel Log',
+    refSql: `to_char(log_date,'DD/MM/YYYY') || ' — ' || fuel_type` },
+  { table: 'maintenance_records', type: 'maintenance_record',  label: 'Maintenance Record',
+    refSql: `maintenance_type || ' — ' || to_char(maintenance_date,'DD/MM/YYYY')` },
+  { table: 'sales_orders',        type: 'sales_order',        label: 'Sales Order',
+    refSql: `order_number || ' — ' || customer_name` },
+  { table: 'stock_movements',     type: 'stock_movement',     label: 'Stock Movement',
+    refSql: `movement_type || ' — ' || to_char(created_at,'DD/MM/YYYY')` },
+];
+
+async function trashList(userId) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const now = Date.now();
+  const items = [];
+  for (const t of TRASH_TABLES) {
+    const { rows } = await pool.query(
+      `SELECT id, ${t.refSql} as entity_ref,
+              to_char(deleted_at,'DD/MM/YYYY HH24:MI') as deleted_at_fmt,
+              deleted_at, deleted_by, deletion_reason
+       FROM ${t.table} WHERE deleted_at IS NOT NULL
+       ORDER BY deleted_at DESC LIMIT 100`
+    );
+    for (const r of rows) {
+      items.push({
+        ...r,
+        table_name: t.table,
+        entity_type: t.type,
+        entity_label: t.label,
+        days_remaining: Math.max(0, 30 - Math.floor((now - new Date(r.deleted_at).getTime()) / 86400000))
+      });
+    }
+  }
+  const userIds = [...new Set(items.map(i => i.deleted_by).filter(Boolean))];
+  if (userIds.length) {
+    const { rows: users } = await pool.query(`SELECT id, name FROM app_users WHERE id = ANY($1)`, [userIds]);
+    const byId = {};
+    users.forEach(u => { byId[u.id] = u.name; });
+    items.forEach(i => { i.deleted_by_name = byId[i.deleted_by] || '—'; });
+  } else {
+    items.forEach(i => { i.deleted_by_name = '—'; });
+  }
+  items.sort((a, b) => new Date(b.deleted_at) - new Date(a.deleted_at));
+  return { ok: true, rows: items };
+}
+
+async function trashRestore(userId, tableName, recordId) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  if (!SOFT_DELETE_ALLOWED.has(tableName)) return { ok: false, error: 'Invalid table' };
+  const { rows } = await pool.query(
+    `SELECT id FROM ${tableName} WHERE id=$1 AND deleted_at IS NOT NULL`, [recordId]
+  );
+  if (!rows.length) return { ok: false, error: 'Record not found in trash' };
+  await pool.query(
+    `UPDATE ${tableName} SET deleted_at=NULL, deleted_by=NULL, deletion_reason=NULL, pending_deletion=FALSE WHERE id=$1`,
+    [recordId]
+  );
+  if (['daily_logs','sales_orders'].includes(tableName)) refreshStockView();
+  logAudit(user, `Restored ${tableName} #${recordId} from trash`, 'ti-restore', { tableName, recordId });
+  return { ok: true };
+}
+
+async function trashPurge(userId, tableName, recordId) {
+  const user = await getUser(userId);
+  if (!['admin','ceo'].includes(user.role))
+    return { ok: false, error: 'Access denied — admin/CEO only' };
+  if (!SOFT_DELETE_ALLOWED.has(tableName)) return { ok: false, error: 'Invalid table' };
+  const { rows } = await pool.query(
+    `SELECT id FROM ${tableName} WHERE id=$1 AND deleted_at IS NOT NULL`, [recordId]
+  );
+  if (!rows.length) return { ok: false, error: 'Record not found in trash' };
+  await pool.query(`DELETE FROM deletion_requests WHERE table_name=$1 AND record_id=$2`, [tableName, recordId]);
+  await pool.query(`DELETE FROM ${tableName} WHERE id=$1`, [recordId]);
+  logAudit(user, `Permanently purged ${tableName} #${recordId}`, 'ti-trash-x', { tableName, recordId });
+  return { ok: true };
 }
 
 module.exports = {
@@ -3260,7 +3622,14 @@ module.exports = {
   casualsCreate,
   casualsUpdate,
   casualsDelete,
-  getCeoOverview
+  getCeoOverview,
+  deletionRequestCreate,
+  deletionRequestsList,
+  deletionRequestApprove,
+  deletionRequestReject,
+  trashList,
+  trashRestore,
+  trashPurge
 };
 
 // ── CEO Overview ──────────────────────────────────────────────────────────────
@@ -3455,7 +3824,7 @@ async function machineLogsList(userId, machineId, month) {
     from machine_daily_logs mdl
     join machines m on m.id = mdl.machine_id
     join machine_categories mc on mc.id = m.category_id
-    where 1=1 ${whereClause}
+    where mdl.deleted_at is null ${whereClause}
     order by mdl.log_date desc, m.name
   `, params);
   const { rows: machines } = await pool.query(
@@ -3513,11 +3882,16 @@ async function machineLogsUpdate(userId, logId, payload) {
   return { ok: true };
 }
 
-async function machineLogsDelete(userId, logId) {
+async function machineLogsDelete(userId, logId, reason) {
   const user = await getUser(userId);
   if (!['admin', 'operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
-  await pool.query('delete from machine_daily_logs where id=$1', [logId]);
-  logAudit(user, `Machine log deleted: #${logId}`, 'ti-trash', { logId });
+  const { rows } = await pool.query('select log_date from machine_daily_logs where id=$1 and deleted_at is null', [logId]);
+  if (!rows.length) return { ok: false, error: 'Entry not found' };
+  await pool.query(
+    'update machine_daily_logs set deleted_at=now(), deleted_by=$1, deletion_reason=$2, pending_deletion=false where id=$3',
+    [user.id, reason || null, logId]
+  );
+  logAudit(user, `Moved machine log #${logId} to trash`, 'ti-trash', { logId, reason });
   return { ok: true };
 }
 

@@ -172,6 +172,26 @@ async function ensureSchema() {
   // Workshop cost center tracking on maintenance records
   await pool.query(`alter table maintenance_records add column if not exists workshop_id bigint references warehouses(id)`);
 
+  // ── Soft-delete columns for all critical business tables ─────────────────────
+  // Records are never hard-deleted; they move to Trash and can be restored within 30 days.
+  const SOFT_DELETE_TABLES = [
+    'daily_logs', 'harvest_logs', 'value_added_timber', 'machine_daily_logs',
+    'compartments', 'log_transport', 'machine_fuel_logs', 'maintenance_records',
+    'sales_orders', 'stock_movements'
+  ];
+  for (const t of SOFT_DELETE_TABLES) {
+    await pool.query(`alter table ${t} add column if not exists pending_deletion boolean not null default false`);
+    await pool.query(`alter table ${t} add column if not exists deleted_at timestamptz`);
+    await pool.query(`alter table ${t} add column if not exists deleted_by bigint references app_users(id)`);
+    await pool.query(`alter table ${t} add column if not exists deletion_reason text`);
+  }
+  // deletion_requests table (created by schema.sql; add reference column on stock_movements if missing)
+  await pool.query(`create index if not exists idx_del_req_status on deletion_requests(status) where status='pending'`);
+  // Approval workflow enhancements
+  await pool.query(`alter table notifications add column if not exists for_user_id bigint references app_users(id) on delete cascade`);
+  await pool.query(`create index if not exists idx_notif_for_user on notifications(for_user_id) where for_user_id is not null`);
+  await pool.query(`alter table pending_edits add column if not exists old_snapshot jsonb`);
+
   // ── Performance indexes ──────────────────────────────────────────────────────
   await pool.query(`create index if not exists idx_stock_mv_item     on stock_movements(item_id)`);
   await pool.query(`create index if not exists idx_stock_mv_wh       on stock_movements(warehouse_id)`);

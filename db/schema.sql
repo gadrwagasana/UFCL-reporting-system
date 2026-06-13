@@ -39,6 +39,7 @@ create table if not exists notifications (
   title text not null,
   body text not null,
   roles text[] not null default '{}'::text[],
+  for_user_id bigint references app_users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
 
@@ -375,6 +376,7 @@ create table if not exists pending_edits (
   entity_id bigint not null,
   entity_ref text,                -- human-readable label (date, name, order #)
   payload jsonb,                  -- new field values for edits; null for deletes
+  old_snapshot jsonb,             -- previous record values captured at request time
   status text not null default 'Pending', -- Pending / Approved / Rejected
   review_notes text,
   submitted_by bigint references app_users(id),
@@ -612,4 +614,24 @@ alter table harvest_logs add column if not exists logs_handrolled int not null d
 alter table machines add column if not exists plate_number text;
 alter table log_transport add column if not exists tractor_plate text;
 alter table log_transport add column if not exists loggers_number text;
+
+-- ── Deletion Request Workflow ─────────────────────────────────────────────────
+-- Tracks pending deletion approvals and audit trail for soft-deleted records.
+create table if not exists deletion_requests (
+  id             bigserial primary key,
+  table_name     text not null,
+  record_id      bigint not null,
+  entity_type    text not null,
+  entity_ref     text,
+  deletion_reason text not null,
+  requested_by   bigint not null references app_users(id),
+  requested_at   timestamptz not null default now(),
+  status         text not null default 'pending', -- pending | approved | rejected
+  reviewed_by    bigint references app_users(id),
+  reviewed_at    timestamptz,
+  review_notes   text,
+  record_snapshot jsonb
+);
+create index if not exists idx_deletion_requests_status on deletion_requests(status);
+create index if not exists idx_deletion_requests_table  on deletion_requests(table_name, record_id);
 
