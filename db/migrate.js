@@ -95,6 +95,46 @@ async function ensureSchema() {
   await pool.query(`update expense_categories set name='Casuals', description='Casual labour wages' where name='Labor'`);
   // Workshop assignment for users
   await pool.query(`alter table app_users add column if not exists workshop_id bigint references warehouses(id)`);
+  // Workshop isolation for logistics_items (inventory)
+  await pool.query(`alter table logistics_items add column if not exists workshop_id bigint references warehouses(id)`);
+  // Vehicle fleet — extended fields
+  const vAlter = [
+    `alter table vehicles add column if not exists ownership_type text`,
+    `alter table vehicles add column if not exists vehicle_category text`,
+    `alter table vehicles add column if not exists year int`,
+    `alter table vehicles add column if not exists chassis_vin text`,
+    `alter table vehicles add column if not exists engine_number text`,
+    `alter table vehicles add column if not exists odometer_reading int`,
+    `alter table vehicles add column if not exists asset_code text`,
+    `alter table vehicles add column if not exists purchase_date date`,
+    `alter table vehicles add column if not exists purchase_cost numeric(14,2)`,
+    `alter table vehicles add column if not exists department text`,
+    `alter table vehicles add column if not exists driver_assigned text`,
+    `alter table vehicles add column if not exists road_license_expiry date`,
+    `alter table vehicles add column if not exists inspection_expiry date`,
+    `alter table vehicles add column if not exists owner_name text`,
+    `alter table vehicles add column if not exists owner_type text`,
+    `alter table vehicles add column if not exists owner_id_number text`,
+    `alter table vehicles add column if not exists owner_phone text`,
+    `alter table vehicles add column if not exists owner_email text`,
+    `alter table vehicles add column if not exists owner_address text`,
+    `alter table vehicles add column if not exists contract_number text`,
+    `alter table vehicles add column if not exists contract_start_date date`,
+    `alter table vehicles add column if not exists contract_end_date date`,
+    `alter table vehicles add column if not exists payment_rate numeric(14,2)`,
+    `alter table vehicles add column if not exists payment_method text`,
+    `alter table vehicles add column if not exists assigned_project text`,
+    `alter table vehicles add column if not exists driver_name text`,
+    `alter table vehicles add column if not exists driver_phone text`,
+    `alter table vehicles add column if not exists driver_license_number text`,
+    `alter table vehicles add column if not exists driver_license_expiry date`,
+    `alter table vehicles add column if not exists doc_registration_card text`,
+    `alter table vehicles add column if not exists doc_insurance_cert text`,
+    `alter table vehicles add column if not exists doc_photos text`,
+    `alter table vehicles add column if not exists doc_owner_id text`,
+    `alter table vehicles add column if not exists doc_contract text`,
+  ];
+  for (const sql of vAlter) await pool.query(sql);
   // Machine log item category
   await pool.query(`alter table machine_daily_logs add column if not exists item_category text`);
   // Seed default machine log categories (idempotent)
@@ -102,6 +142,35 @@ async function ensureSchema() {
   for (const name of defaultCats) {
     await pool.query(`insert into machine_log_categories(name) values($1) on conflict(name) do nothing`, [name]);
   }
+  // Workshop type on warehouses
+  await pool.query(`alter table warehouses add column if not exists workshop_type text`);
+  // Machine → workshop assignment
+  await pool.query(`alter table machines add column if not exists workshop_id bigint references warehouses(id)`);
+  // Transfer approval workflow on stock movements
+  await pool.query(`alter table stock_movements add column if not exists approval_status text`);
+  await pool.query(`alter table stock_movements add column if not exists approved_by bigint references app_users(id)`);
+  await pool.query(`alter table stock_movements add column if not exists approved_at timestamptz`);
+  await pool.query(`alter table stock_movements add column if not exists rejection_reason text`);
+  // Material requests table
+  await pool.query(`
+    create table if not exists material_requests (
+      id bigserial primary key,
+      item_id bigint not null references stock_catalog(id),
+      workshop_id bigint references warehouses(id),
+      requested_qty int not null,
+      approved_qty int,
+      reason text,
+      priority text not null default 'normal',
+      status text not null default 'pending',
+      requested_by bigint references app_users(id),
+      reviewed_by bigint references app_users(id),
+      review_notes text,
+      requested_at timestamptz not null default now(),
+      reviewed_at timestamptz
+    )
+  `);
+  // Workshop cost center tracking on maintenance records
+  await pool.query(`alter table maintenance_records add column if not exists workshop_id bigint references warehouses(id)`);
 }
 
 async function seedProductCatalog() {

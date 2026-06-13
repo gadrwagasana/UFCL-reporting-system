@@ -186,6 +186,7 @@ create table if not exists warehouses (
   id bigserial primary key,
   name text not null,
   location text,
+  workshop_type text,
   capacity int,
   notes text,
   active boolean not null default true,
@@ -225,8 +226,28 @@ create table if not exists stock_movements (
   quantity int not null,
   reference text,
   notes text,
+  approval_status text,
+  approved_by bigint references app_users(id),
+  approved_at timestamptz,
+  rejection_reason text,
   created_by bigint references app_users(id),
   created_at timestamptz not null default now()
+);
+
+create table if not exists material_requests (
+  id bigserial primary key,
+  item_id bigint not null references stock_catalog(id),
+  workshop_id bigint references warehouses(id),
+  requested_qty int not null,
+  approved_qty int,
+  reason text,
+  priority text not null default 'normal',
+  status text not null default 'pending',
+  requested_by bigint references app_users(id),
+  reviewed_by bigint references app_users(id),
+  review_notes text,
+  requested_at timestamptz not null default now(),
+  reviewed_at timestamptz
 );
 
 -- ── Fleet & Logistics ─────────────────────────────────────────────────────────

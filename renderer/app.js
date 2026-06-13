@@ -7,17 +7,46 @@ const STORAGE = {
   pages: []
 };
 
+// Workshop & Stock filter — null = all workshops, number = specific warehouse id
+let WORKSHOP_FILTER = null;
+
+function workshopBannerHtml(allWarehouses, userWorkshopId) {
+  const wh = allWarehouses || [];
+  if (userWorkshopId) {
+    const mine = wh.find(w => w.id === userWorkshopId);
+    return `<div style="display:flex;align-items:center;gap:.625rem;padding:.55rem 1rem;background:rgba(30,95,54,.06);border:1px solid rgba(30,95,54,.18);border-radius:8px;margin-bottom:1.25rem;font-size:13px">
+      <i class="ti ti-building-warehouse" style="color:var(--g-soft);font-size:15px"></i>
+      <span style="color:var(--t3)">Workshop:</span>
+      <strong style="color:var(--g-dark)">${mine?.name || 'Your Workshop'}</strong>
+      <span class="badge bg" style="font-size:10px;margin-left:2px">restricted</span>
+    </div>`;
+  }
+  const opts = `<option value="">All workshops</option>` +
+    wh.map(w => `<option value="${w.id}" ${WORKSHOP_FILTER == w.id ? 'selected' : ''}>${w.name}</option>`).join('');
+  return `<div style="display:flex;align-items:center;gap:.625rem;padding:.55rem 1rem;background:var(--surf);border:1px solid var(--bdr);border-radius:8px;margin-bottom:1.25rem;font-size:13px">
+    <i class="ti ti-building-warehouse" style="color:var(--g-soft);font-size:15px"></i>
+    <span style="color:var(--t3);font-weight:600">Workshop:</span>
+    <select id="wsBannerFilter" style="border:1px solid var(--bdr);border-radius:5px;padding:3px 10px;font-size:12px;background:var(--bg2);color:var(--t1)">${opts}</select>
+    ${WORKSHOP_FILTER ? `<span class="badge ba" style="font-size:10px">filtered</span>` : ''}
+  </div>`;
+}
+
+function bindWorkshopBanner(onRefresh) {
+  const sel = document.getElementById('wsBannerFilter');
+  if (sel) sel.onchange = () => { WORKSHOP_FILTER = sel.value ? Number(sel.value) : null; onRefresh(); };
+}
+
 const NAV = [
   // ── Overview ──────────────────────────────────────────────────────
   { id: 'dashboard',          icon: 'ti-layout-dashboard',   label: 'Dashboard',            sec: 'Overview'        },
   { id: 'ceo',                icon: 'ti-crown',              label: 'CEO Overview',         sec: 'Overview'        },
 
-  // ── Production (forest → mill → product, daily logs) ─────────────
+  // ── Production ────────────────────────────────────────────────────
   { id: 'daily-harvest',      icon: 'ti-axe',                label: 'Harvesting Daily',     sec: 'Production'      },
   { id: 'daily-timber',       icon: 'ti-trees',              label: 'Timber Daily',         sec: 'Production'      },
   { id: 'daily-poles',        icon: 'ti-align-center',       label: 'Poles Daily',          sec: 'Production'      },
   { id: 'value-added-timber', icon: 'ti-certificate',        label: 'Value-Added Timber',   sec: 'Production'      },
-  { id: 'machine-logs',       icon: 'ti-list-details',       label: 'Machine Daily Logs',   sec: 'Production'      },
+  { id: 'machine-logs',       icon: 'ti-engine',             label: 'Machine Daily Logs',   sec: 'Production'      },
 
   // ── Forestry ──────────────────────────────────────────────────────
   { id: 'timber-inventory',   icon: 'ti-database',           label: 'Timber Inventory',     sec: 'Forestry'        },
@@ -29,11 +58,12 @@ const NAV = [
   { id: 'casuals',            icon: 'ti-user-check',         label: 'Casuals',              sec: 'Labour'          },
 
   // ── Workshop & Stock ──────────────────────────────────────────────
+  { id: 'workshop-overview',   icon: 'ti-layout-dashboard',   label: 'Workshop Overview',    sec: 'Workshop & Stock' },
   { id: 'warehouses',         icon: 'ti-building-warehouse', label: 'Workshops',            sec: 'Workshop & Stock' },
   { id: 'stock-items',        icon: 'ti-package',            label: 'Stock Catalog',        sec: 'Workshop & Stock' },
   { id: 'inventory',          icon: 'ti-stack',              label: 'Inventory',            sec: 'Workshop & Stock' },
   { id: 'stock-movements',    icon: 'ti-arrows-exchange',    label: 'Stock Movements',      sec: 'Workshop & Stock' },
-  { id: 'logistics',          icon: 'ti-tools',              label: 'Spare Parts',          sec: 'Workshop & Stock' },
+  { id: 'material-requests',  icon: 'ti-clipboard-list',     label: 'Material Requests',    sec: 'Workshop & Stock' },
 
   // ── Fleet & Machines ──────────────────────────────────────────────
   { id: 'machines',           icon: 'ti-settings-2',         label: 'Machine Registry',     sec: 'Fleet & Machines' },
@@ -125,16 +155,54 @@ function pageTitle(pageId) {
 }
 
 function renderPermissionCheckboxes(selected = []) {
-  const pageIds = ['dashboard', 'daily', 'sales', 'products', 'logistics', 'weekly-cost', 'weekly-perf', 'monthly', 'inventory', 'sage', 'kpi', 'changes', 'audit', 'notifications', 'export', 'users', 'logistics-dashboard', 'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'timber-inventory', 'transport', 'machines', 'machine-logs', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber', 'machine-fuel', 'casual-requests', 'casuals'];
-  return pageIds
-    .map(
-      (id) => `
-      <label class="fg" style="display:block;margin-bottom:.45rem">
-        <input type="checkbox" class="perm-checkbox" value="${id}" ${selected.includes(id) ? 'checked' : ''}>
-        ${pageTitle(id)}
-      </label>`
-    )
-    .join('');
+  const grpHdr = (label) => `<div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--g-soft);margin:10px 0 4px;padding-top:6px;border-top:1px solid var(--bdr)">${label}</div>`;
+  const chk = (id, label) => `
+    <label style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem;cursor:pointer;font-size:12.5px">
+      <input type="checkbox" class="perm-checkbox" value="${id}" ${selected.includes(id)?'checked':''} style="width:14px;height:14px;accent-color:var(--g-soft)">
+      ${label || pageTitle(id)}
+    </label>`;
+
+  return [
+    grpHdr('Overview'),
+    chk('dashboard'), chk('ceo', 'CEO Overview'),
+
+    grpHdr('Production'),
+    chk('daily-harvest',      'Harvesting Daily'),
+    chk('daily-timber',       'Timber Daily'),
+    chk('daily-poles',        'Poles Daily'),
+    chk('value-added-timber', 'Value-Added Timber'),
+    chk('machine-logs',       'Machine Daily Logs'),
+
+    grpHdr('Forestry'),
+    chk('timber-inventory'), chk('compartments'), chk('log-transport'),
+
+    grpHdr('Labour'),
+    chk('casual-requests', 'Labour Requests'), chk('casuals'),
+
+    grpHdr('Workshop & Stock'),
+    chk('workshop-overview', 'Workshop Overview'), chk('warehouses', 'Workshops'),
+    chk('stock-items', 'Stock Catalog'), chk('inventory', 'Inventory'),
+    chk('stock-movements', 'Stock Movements'), chk('material-requests', 'Material Requests'),
+
+    grpHdr('Fleet & Machines'),
+    chk('machines', 'Machine Registry'), chk('machine-fuel', 'Fuel Logs (Machines)'),
+    chk('machine-kpi', 'KPI Performance'), chk('vehicles', 'Vehicle Fleet'),
+
+    grpHdr('Logistics'),
+    chk('logistics-dashboard', 'Logistics Dashboard'), chk('deliveries', 'Delivery Orders'),
+    chk('dispatch'), chk('transport', 'Third-Party Transport'),
+
+    grpHdr('Commercial'),
+    chk('sales', 'Sales Orders'), chk('products', 'Product Catalog'), chk('logistics', 'Legacy Logistics'),
+
+    grpHdr('Reports'),
+    chk('weekly-cost'), chk('weekly-perf'), chk('monthly', 'Monthly Dashboard'),
+    chk('kpi', 'KPI Scorecard'), chk('sage', 'Sage Reconciliation'),
+
+    grpHdr('System'),
+    chk('users'), chk('changes', 'Change Requests'), chk('notifications'),
+    chk('audit', 'Audit Trail'), chk('export', 'Exports'),
+  ].join('');
 }
 
 function shortName(name) {
@@ -348,12 +416,12 @@ async function showPage(id) {
       return renderCeoOverview();
     case 'daily':
       return renderDaily();
+    case 'daily-harvest':
+      return renderPageDailyHarvest();
     case 'daily-timber':
       return renderPageDailyTimber();
     case 'daily-poles':
       return renderPageDailyPoles();
-    case 'daily-harvest':
-      return renderPageDailyHarvest();
     case 'sales':
       return renderSales();
     case 'products':
@@ -384,12 +452,16 @@ async function showPage(id) {
       return renderUsers();
     case 'logistics-dashboard':
       return renderLogisticsDashboard();
+    case 'workshop-overview':
+      return renderWorkshopOverview();
     case 'warehouses':
       return renderWarehouses();
     case 'stock-items':
       return renderStockItems();
     case 'stock-movements':
       return renderStockMovements();
+    case 'material-requests':
+      return renderMaterialRequests();
     case 'vehicles':
       return renderVehicles();
     case 'deliveries':
@@ -810,8 +882,8 @@ async function renderDaily(subType = null) {
 
 // ── Standalone page wrappers (called from showPage / sidebar) ─────────────────
 
-async function renderPageDailyTimber() {
-  $('page-daily-timber').innerHTML = `
+async function renderPageDailyTimber(cid='page-daily-timber') {
+  $(cid).innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;padding:2rem;color:var(--t3);font-size:13px">
       <i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…
     </div>`;
@@ -819,7 +891,7 @@ async function renderPageDailyTimber() {
     UFCL.dailyList(STORAGE.user.id),
     UFCL.productsActiveForForm(STORAGE.user.id, 'Timber')
   ]);
-  if (!res.ok) return renderDenied('daily-timber', res.error);
+  if (!res.ok) { $(cid).innerHTML = `<div style="padding:2rem;color:var(--danger)">${res.error}</div>`; return; }
   const rows = (res.rows || []).filter(r =>
     Number(r.timber_units || 0) > 0 ||
     Number(r.timber_kiln_dried || 0) > 0 ||
@@ -827,34 +899,31 @@ async function renderPageDailyTimber() {
     Number(r.timber_untreated || 0) > 0
   );
   const timberProducts = productsRes.ok ? productsRes.rows : [];
-  $('page-daily-timber').innerHTML = '<div id="daily-content"></div>';
-  renderDailyTimber(res.stock || {}, rows, 'page-daily-timber', renderPageDailyTimber, res.transport || {}, timberProducts);
-  await insertPendingPanel($('page-daily-timber'), ['daily_log'], renderPageDailyTimber);
+  renderDailyTimber(res.stock || {}, rows, cid, () => renderPageDailyTimber(cid), res.transport || {}, timberProducts);
+  await insertPendingPanel($(cid), ['daily_log'], () => renderPageDailyTimber(cid));
 }
 
-async function renderPageDailyPoles() {
-  $('page-daily-poles').innerHTML = `
+async function renderPageDailyPoles(cid='page-daily-poles') {
+  $(cid).innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;padding:2rem;color:var(--t3);font-size:13px">
       <i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…
     </div>`;
   const res = await UFCL.dailyList(STORAGE.user.id);
-  if (!res.ok) return renderDenied('daily-poles', res.error);
+  if (!res.ok) { $(cid).innerHTML = `<div style="padding:2rem;color:var(--danger)">${res.error}</div>`; return; }
   const rows = (res.rows || []).filter(r => Number(r.poles_units || 0) > 0);
-  $('page-daily-poles').innerHTML = '<div id="daily-content"></div>';
-  renderDailyPoles(res.stock || {}, rows, 'page-daily-poles', renderPageDailyPoles);
-  await insertPendingPanel($('page-daily-poles'), ['daily_log'], renderPageDailyPoles);
+  renderDailyPoles(res.stock || {}, rows, cid, () => renderPageDailyPoles(cid));
+  await insertPendingPanel($(cid), ['daily_log'], () => renderPageDailyPoles(cid));
 }
 
-async function renderPageDailyHarvest() {
-  $('page-daily-harvest').innerHTML = `
+async function renderPageDailyHarvest(cid='page-daily-harvest') {
+  $(cid).innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;padding:2rem;color:var(--t3);font-size:13px">
       <i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…
     </div>`;
   const res = await UFCL.dailyHarvestData(STORAGE.user.id);
-  if (!res.ok) return renderDenied('daily-harvest', res.error);
-  $('page-daily-harvest').innerHTML = '<div id="daily-content"></div>';
-  renderDailyHarvest(res.rows || [], res.summary || {}, 'page-daily-harvest', renderPageDailyHarvest, res.compartments || []);
-  await insertPendingPanel($('page-daily-harvest'), ['harvest_log'], renderPageDailyHarvest);
+  if (!res.ok) { $(cid).innerHTML = `<div style="padding:2rem;color:var(--danger)">${res.error}</div>`; return; }
+  renderDailyHarvest(res.rows || [], res.summary || {}, cid, () => renderPageDailyHarvest(cid), res.compartments || []);
+  await insertPendingPanel($(cid), ['harvest_log'], () => renderPageDailyHarvest(cid));
 }
 
 // ── Sawmill Timber sub-view ───────────────────────────────────────────────────
@@ -3028,7 +3097,7 @@ async function renderUsers() {
   }
 
 async function renderInventory() {
-  const res = await UFCL.inventoryList(STORAGE.user.id);
+  const res = await UFCL.inventoryList(STORAGE.user.id, WORKSHOP_FILTER);
   if (!res.ok) return renderDenied('inventory', res.error);
 
   const rows = res.rows || [];
@@ -3037,6 +3106,7 @@ async function renderInventory() {
   const totalValue = rows.reduce((s, r) => s + Number(r.stock) * Number(r.unit_cost), 0);
 
   $('page-inventory').innerHTML = `
+    ${workshopBannerHtml(res.warehouses, res.user_workshop_id)}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Inventory Overview</div>
@@ -3097,12 +3167,13 @@ async function renderInventory() {
                     <td><span class="badge ${out?'br':low?'ba':'bg'}">${out?'Out of stock':low?'Reorder':'OK'}</span></td>
                   </tr>`;
                 }).join('')
-              : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No items found. Add items via <strong>Spare Parts</strong>.</td></tr>'}
+              : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No items found.</td></tr>'}
           </tbody>
         </table>
       </div>
     </div>
   `;
+  bindWorkshopBanner(renderInventory);
 }
 
 async function renderSage() {
@@ -3329,10 +3400,167 @@ async function renderLogisticsDashboard() {
     </div>`;
 }
 
+// ── Workshop Overview ─────────────────────────────────────────────────────────
+
+const WORKSHOP_TYPE_ICONS = {
+  'Sawmill Workshop':            'ti-cut',
+  'Logging Equipment Workshop':  'ti-trees',
+  'Vehicle Workshop':            'ti-truck',
+  'Pole Treatment Workshop':     'ti-flame',
+  'Electrical Workshop':         'ti-bolt',
+  'Central Warehouse':           'ti-building-warehouse',
+};
+
+async function renderWorkshopOverview() {
+  const res = await UFCL.workshopOverview(STORAGE.user.id);
+  if (!res.ok) return renderDenied('workshop-overview', res.error);
+  const canApprove = ['admin','ceo','operations','logistics','supervisor'].includes(STORAGE.user?.role);
+
+  const priorityBadge = p => p==='urgent'?`<span class="badge br" style="font-size:10px">Urgent</span>`:p==='high'?`<span class="badge ba" style="font-size:10px">High</span>`:`<span class="badge bg" style="font-size:10px">Normal</span>`;
+
+  $('page-workshop-overview').innerHTML = `
+    <div class="ptitle"><i class="ti ti-layout-dashboard" style="color:var(--g-soft)"></i> Workshop Overview</div>
+    <div class="psub">Live view across all workshops — stock, machines, pending transfers and material requests.</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin:1.25rem 0">
+      ${res.workshops.map(w => {
+        const ic = WORKSHOP_TYPE_ICONS[w.workshop_type] || 'ti-building-warehouse';
+        return `
+        <div style="background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:1.25rem;border-top:3px solid var(--g-soft)">
+          <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">
+            <span style="width:32px;height:32px;border-radius:8px;background:var(--g-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="ti ${ic}" style="color:#fff;font-size:15px"></i></span>
+            <div>
+              <div style="font-weight:700;font-size:14px;color:var(--t1)">${w.name}</div>
+              <div style="font-size:11px;color:var(--t3)">${w.workshop_type||'Workshop'} ${w.location?'· '+w.location:''}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem">
+            <div style="background:var(--bg2);border-radius:6px;padding:.6rem .75rem">
+              <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Machines</div>
+              <div style="font-size:18px;font-weight:700;font-family:var(--fm)">${w.machine_count}</div>
+              <div style="font-size:11px;color:var(--green)">${w.machines_available} available</div>
+            </div>
+            <div style="background:var(--bg2);border-radius:6px;padding:.6rem .75rem">
+              <div style="font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em">Stock Value</div>
+              <div style="font-size:16px;font-weight:700;font-family:var(--fm)">${Number(w.stock_value).toLocaleString()}</div>
+              <div style="font-size:11px;color:var(--t3)">RWF · ${w.item_count} items</div>
+            </div>
+          </div>
+          ${w.machines_maintenance>0?`<div style="margin-top:.6rem;font-size:11.5px;color:var(--amber);display:flex;align-items:center;gap:.35rem"><i class="ti ti-tool"></i>${w.machines_maintenance} machine${w.machines_maintenance>1?'s':''} under maintenance</div>`:''}
+        </div>`;
+      }).join('') || '<div style="color:var(--t3);padding:2rem;text-align:center">No workshops found.</div>'}
+    </div>
+
+    ${res.pendingTransfers.length ? `
+    <div class="card" style="margin-bottom:1rem;padding:0">
+      <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">
+        <h3 style="margin:0;color:var(--amber)"><i class="ti ti-arrows-exchange"></i> Pending Transfers <span style="font-size:12px;font-weight:500;background:rgba(245,158,11,.12);color:var(--amber);padding:2px 8px;border-radius:10px;margin-left:.4rem">${res.pendingTransfers.length}</span></h3>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>From</th><th>To</th><th>Qty</th><th>Requested</th><th>By</th>${canApprove?'<th></th>':''}</tr></thead>
+        <tbody>
+          ${res.pendingTransfers.map(t=>`
+          <tr>
+            <td>${t.item_name}<br><span style="font-size:11px;color:var(--t3)">${t.uom}</span></td>
+            <td>${t.from_workshop||'—'}</td>
+            <td>${t.to_workshop||'—'}</td>
+            <td><strong>${t.quantity}</strong></td>
+            <td style="font-size:12px;color:var(--t3)">${t.created_at}</td>
+            <td style="font-size:12px">${t.requested_by||'—'}</td>
+            ${canApprove?`<td style="white-space:nowrap">
+              <button class="bs1 tr-approve" data-id="${t.id}" style="color:var(--green);padding:4px 8px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
+              <button class="bs1 tr-reject" data-id="${t.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-x"></i>Reject</button>
+            </td>`:''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    ${res.pendingRequests.length ? `
+    <div class="card" style="margin-bottom:1rem;padding:0">
+      <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;justify-content:space-between">
+        <h3 style="margin:0;color:var(--blue)"><i class="ti ti-clipboard-list"></i> Pending Material Requests <span style="font-size:12px;font-weight:500;background:rgba(59,130,246,.12);color:var(--blue);padding:2px 8px;border-radius:10px;margin-left:.4rem">${res.pendingRequests.length}</span></h3>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>Workshop</th><th>Qty</th><th>Priority</th><th>Reason</th><th>Requested</th>${canApprove?'<th></th>':''}</tr></thead>
+        <tbody>
+          ${res.pendingRequests.map(r=>`
+          <tr>
+            <td>${r.item_name}<br><span style="font-size:11px;color:var(--t3)">${r.uom}</span></td>
+            <td>${r.workshop_name||'—'}</td>
+            <td><strong>${r.requested_qty}</strong></td>
+            <td>${priorityBadge(r.priority)}</td>
+            <td style="font-size:12px;color:var(--t3);max-width:180px">${r.reason||'—'}</td>
+            <td style="font-size:12px;color:var(--t3)">${r.requested_at}<br>${r.requested_by||'—'}</td>
+            ${canApprove?`<td style="white-space:nowrap">
+              <button class="bs1 mr-approve" data-id="${r.id}" style="color:var(--green);padding:4px 8px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
+              <button class="bs1 mr-reject" data-id="${r.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-x"></i>Reject</button>
+            </td>`:''}
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    ${!res.pendingTransfers.length && !res.pendingRequests.length ? '<div style="padding:.75rem 0;font-size:13px;color:var(--green);display:flex;align-items:center;gap:.5rem"><i class="ti ti-circle-check"></i>No pending transfers or requests.</div>' : ''}
+
+    ${res.lowStock.length ? `
+    <div class="card" style="padding:0">
+      <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0;color:var(--red)"><i class="ti ti-alert-triangle"></i> Low Stock Alerts <span style="font-size:12px;font-weight:500;background:rgba(239,68,68,.1);color:var(--red);padding:2px 8px;border-radius:10px;margin-left:.4rem">${res.lowStock.length}</span></h3>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>Workshop</th><th>In Stock</th><th>Min Stock</th></tr></thead>
+        <tbody>
+          ${res.lowStock.map(r=>`
+          <tr>
+            <td>${r.name}<br><span style="font-size:11px;color:var(--t3)">${r.category} · ${r.uom}</span></td>
+            <td>${r.warehouse_name||'—'}</td>
+            <td style="color:var(--red);font-weight:700">${r.total_stock}</td>
+            <td style="color:var(--t3)">${r.min_stock}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+  `;
+
+  if (canApprove) {
+    document.querySelectorAll('.tr-approve').forEach(btn => {
+      btn.onclick = async () => {
+        const res2 = await UFCL.stockTransferApprove(STORAGE.user.id, Number(btn.dataset.id), 'approve', null);
+        if (!res2.ok) return alert(res2.error);
+        renderWorkshopOverview();
+      };
+    });
+    document.querySelectorAll('.tr-reject').forEach(btn => {
+      btn.onclick = async () => {
+        const reason = prompt('Rejection reason (optional):') ?? '';
+        const res2 = await UFCL.stockTransferApprove(STORAGE.user.id, Number(btn.dataset.id), 'reject', reason);
+        if (!res2.ok) return alert(res2.error);
+        renderWorkshopOverview();
+      };
+    });
+    document.querySelectorAll('.mr-approve').forEach(btn => {
+      btn.onclick = async () => {
+        const res2 = await UFCL.materialRequestsApprove(STORAGE.user.id, Number(btn.dataset.id), 'approve', null, null, null);
+        if (!res2.ok) return alert(res2.error);
+        renderWorkshopOverview();
+      };
+    });
+    document.querySelectorAll('.mr-reject').forEach(btn => {
+      btn.onclick = async () => {
+        const notes = prompt('Rejection reason (optional):') ?? '';
+        const res2 = await UFCL.materialRequestsApprove(STORAGE.user.id, Number(btn.dataset.id), 'reject', null, notes, null);
+        if (!res2.ok) return alert(res2.error);
+        renderWorkshopOverview();
+      };
+    });
+  }
+}
+
 // ── Workshops ─────────────────────────────────────────────────────────────────
 
 async function renderWarehouses() {
-  const res = await UFCL.warehousesList(STORAGE.user.id);
+  const res = await UFCL.warehousesList(STORAGE.user.id, WORKSHOP_FILTER);
   if (!res.ok) return renderDenied('warehouses', res.error);
   const rows = res.rows || [];
   const isRestricted = !!res.user_workshop_id;
@@ -3342,6 +3570,7 @@ async function renderWarehouses() {
   const whCap    = rows.reduce((s,r)=>s+Number(r.capacity||0),0);
 
   $('page-warehouses').innerHTML = `
+    ${workshopBannerHtml(res.allWarehouses, res.user_workshop_id)}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle"><i class="ti ti-building-warehouse" style="color:var(--g-soft)"></i> Workshops</div>
@@ -3364,6 +3593,7 @@ async function renderWarehouses() {
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:.5rem">
             <div>
               <div style="font-weight:700;font-size:16px;color:var(--g-dark)">${r.name}</div>
+              ${r.workshop_type?`<div style="font-size:11px;color:var(--g-soft);font-weight:600;margin-top:2px"><i class="ti ${WORKSHOP_TYPE_ICONS[r.workshop_type]||'ti-building-warehouse'}" style="font-size:10px"></i> ${r.workshop_type}</div>`:''}
               <div style="font-size:12px;color:var(--t3);margin-top:3px"><i class="ti ti-map-pin" style="font-size:11px"></i> ${r.location||'No location set'}</div>
             </div>
             <span class="badge ${r.active?'bg':'br'}">${r.active?'Active':'Inactive'}</span>
@@ -3382,19 +3612,24 @@ async function renderWarehouses() {
   `;
 
   if (canManage) {
+    const WTYPE_OPTS = ['Sawmill Workshop','Logging Equipment Workshop','Vehicle Workshop','Pole Treatment Workshop','Electrical Workshop','Central Warehouse'].map(t=>`<option value="${t}">${t}</option>`).join('');
     $('whAdd').onclick = () => openOverlay('Add Workshop', null, `
       <div class="frow">
         <div class="fg"><label>Workshop name *</label><input id="wh-name" type="text" placeholder="e.g. Gatare Workshop"></div>
-        <div class="fg"><label>Location</label><input id="wh-location" type="text" placeholder="Site or address"></div>
+        <div class="fg"><label>Workshop Type</label><select id="wh-type"><option value="">— Select type —</option>${WTYPE_OPTS}</select></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Location</label><input id="wh-location" type="text" placeholder="Site or address"></div>
         <div class="fg"><label>Capacity (units)</label><input id="wh-cap" type="number" min="0" placeholder="0"></div>
+      </div>
+      <div class="frow">
         <div class="fg"><label>Notes</label><input id="wh-notes" type="text"></div>
       </div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
       <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
       const res2 = await UFCL.warehousesCreate(STORAGE.user.id, {
         name: $('wh-name').value.trim(),
+        workshop_type: $('wh-type').value || null,
         location: $('wh-location').value.trim(),
         capacity: $('wh-cap').value,
         notes: $('wh-notes').value.trim()
@@ -3462,22 +3697,27 @@ async function renderWarehouses() {
       btn.onclick = () => {
         const row = rows.find(r => r.id === Number(btn.dataset.id));
         if (!row) return;
+        const WTYPE_OPTS2 = ['Sawmill Workshop','Logging Equipment Workshop','Vehicle Workshop','Pole Treatment Workshop','Electrical Workshop','Central Warehouse'].map(t=>`<option value="${t}" ${row.workshop_type===t?'selected':''}>${t}</option>`).join('');
         openOverlay('Edit Workshop', row.name, `
           <div class="frow">
             <div class="fg"><label>Name *</label><input id="whe-name" type="text" value="${row.name}"></div>
-            <div class="fg"><label>Location</label><input id="whe-location" type="text" value="${row.location||''}"></div>
+            <div class="fg"><label>Workshop Type</label><select id="whe-type"><option value="">— Select type —</option>${WTYPE_OPTS2}</select></div>
           </div>
           <div class="frow">
+            <div class="fg"><label>Location</label><input id="whe-location" type="text" value="${row.location||''}"></div>
             <div class="fg"><label>Capacity</label><input id="whe-cap" type="number" min="0" value="${row.capacity||''}"></div>
-            <div class="fg"><label>Notes</label><input id="whe-notes" type="text" value="${row.notes||''}"></div>
           </div>
-          <div class="fg"><label>Status</label>
-            <select id="whe-active"><option value="true" ${row.active?'selected':''}>Active</option><option value="false" ${!row.active?'selected':''}>Inactive</option></select>
+          <div class="frow">
+            <div class="fg"><label>Notes</label><input id="whe-notes" type="text" value="${row.notes||''}"></div>
+            <div class="fg"><label>Status</label>
+              <select id="whe-active"><option value="true" ${row.active?'selected':''}>Active</option><option value="false" ${!row.active?'selected':''}>Inactive</option></select>
+            </div>
           </div>
           <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button>
           <button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
           const res2 = await UFCL.warehousesUpdate(STORAGE.user.id, row.id, {
             name: $('whe-name').value.trim(),
+            workshop_type: $('whe-type').value || null,
             location: $('whe-location').value.trim(),
             capacity: $('whe-cap').value,
             notes: $('whe-notes').value.trim(),
@@ -3490,6 +3730,7 @@ async function renderWarehouses() {
       };
     });
   }
+  bindWorkshopBanner(renderWarehouses);
 }
 
 // ── Stock Catalog ─────────────────────────────────────────────────────────────
@@ -3497,7 +3738,7 @@ async function renderWarehouses() {
 const STOCK_CATEGORIES = ['Timber', 'Poles', 'Fuel', 'Spare Parts', 'Tools', 'Packaging', 'Raw Materials', 'Other'];
 
 async function renderStockItems() {
-  const res = await UFCL.stockItemsList(STORAGE.user.id);
+  const res = await UFCL.stockItemsList(STORAGE.user.id, WORKSHOP_FILTER);
   if (!res.ok) return renderDenied('stock-items', res.error);
   const rows = res.rows || [];
   const warehouses = res.warehouses || [];
@@ -3511,6 +3752,7 @@ async function renderStockItems() {
   }
 
   $('page-stock-items').innerHTML = `
+    ${workshopBannerHtml(res.warehouses, res.user_workshop_id)}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Stock Catalog</div>
@@ -3626,23 +3868,30 @@ async function renderStockItems() {
       });
     };
   });
+  bindWorkshopBanner(renderStockItems);
 }
 
 // ── Stock Movements ───────────────────────────────────────────────────────────
 
 async function renderStockMovements() {
-  const res = await UFCL.stockMovementsList(STORAGE.user.id);
+  const res = await UFCL.stockMovementsList(STORAGE.user.id, WORKSHOP_FILTER);
   if (!res.ok) return renderDenied('stock-movements', res.error);
   const rows = res.rows || [];
   const items = res.items || [];
   const warehouses = res.warehouses || [];
 
-  const typeBadge = (t) => {
+  const canApproveTransfer = ['admin','ceo','operations','logistics','supervisor'].includes(STORAGE.user?.role);
+  const typeBadge = (t, approval) => {
     const map = { in:'bg', out:'br', adjustment:'ba', transfer:'bp', return:'bb' };
-    return `<span class="badge ${map[t]||'bt'}">${t}</span>`;
+    const badge = `<span class="badge ${map[t]||'bt'}">${t}</span>`;
+    if (t==='transfer' && approval==='pending') return badge + `<span class="badge ba" style="font-size:10px;margin-left:3px">pending</span>`;
+    if (t==='transfer' && approval==='approved') return badge + `<span class="badge bg" style="font-size:10px;margin-left:3px">approved</span>`;
+    if (t==='transfer' && approval==='rejected') return badge + `<span class="badge br" style="font-size:10px;margin-left:3px">rejected</span>`;
+    return badge;
   };
 
   $('page-stock-movements').innerHTML = `
+    ${workshopBannerHtml(res.warehouses, res.user_workshop_id)}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Stock Movements</div>
@@ -3667,13 +3916,18 @@ async function renderStockMovements() {
           <td style="white-space:nowrap;color:var(--t3);font-size:12px">${r.created_at}</td>
           <td style="font-weight:500">${r.item_name}</td>
           <td><span class="badge bt">${r.category}</span></td>
-          <td>${typeBadge(r.movement_type)}</td>
+          <td>${typeBadge(r.movement_type, r.approval_status)}</td>
           <td style="font-family:var(--fm);font-weight:600">${r.quantity} <span style="color:var(--t3);font-weight:400">${r.uom}</span></td>
           <td>${r.warehouse_name||'—'}</td>
           <td>${r.to_warehouse_name||'—'}</td>
           <td style="font-family:var(--fm);color:var(--t3)">${r.reference||'—'}</td>
           <td>${r.created_by||'—'}</td>
-          <td><button class="bs1 sm-del" data-id="${r.id}" style="color:var(--red);padding:3px 8px" title="Delete &amp; reverse"><i class="ti ti-trash"></i></button></td>
+          <td style="white-space:nowrap">
+            ${canApproveTransfer && r.movement_type==='transfer' && r.approval_status==='pending'
+              ? `<button class="bs1 sm-tappr" data-id="${r.id}" style="color:var(--green);padding:3px 7px;font-size:11px"><i class="ti ti-check"></i></button>
+                 <button class="bs1 sm-trej" data-id="${r.id}" style="color:var(--red);padding:3px 7px;font-size:11px"><i class="ti ti-x"></i></button>`
+              : `<button class="bs1 sm-del" data-id="${r.id}" style="color:var(--red);padding:3px 8px" title="Delete &amp; reverse"><i class="ti ti-trash"></i></button>`}
+          </td>
         </tr>`).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-arrows-exchange" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No movements recorded yet.</td></tr>'}
         </tbody>
       </table></div>
@@ -3689,6 +3943,26 @@ async function renderStockMovements() {
         showOverlaySuccess('Movement deleted and stock level reversed.'); await renderStockMovements();
       });
     };
+  });
+
+  document.querySelectorAll('.sm-tappr').forEach(btn => {
+    btn.onclick = async () => {
+      const res2 = await UFCL.stockTransferApprove(STORAGE.user.id, Number(btn.dataset.id), 'approve', null);
+      if (!res2.ok) return alert(res2.error);
+      showOverlaySuccess('Transfer approved — stock moved.');
+      renderStockMovements();
+    };
+  });
+  document.querySelectorAll('.sm-trej').forEach(btn => {
+    btn.onclick = () => openOverlay('Reject Transfer', null, `
+      <div class="fg"><label>Rejection reason</label><input id="trej-reason" type="text" placeholder="Optional reason"></div>
+      <div class="brow"><button class="bp1" id="ovSave" style="background:var(--red)"><i class="ti ti-x"></i>Reject</button><button class="bs1" id="ovCancel">Cancel</button></div>
+    `, async () => {
+      const res2 = await UFCL.stockTransferApprove(STORAGE.user.id, Number(btn.dataset.id), 'reject', $('trej-reason').value.trim());
+      if (!res2.ok) { showOverlayError(res2.error); return; }
+      showOverlaySuccess('Transfer rejected.');
+      renderStockMovements();
+    });
   });
 
   $('smAdd').onclick = () => {
@@ -3731,6 +4005,138 @@ async function renderStockMovements() {
       await renderStockMovements();
     });
   };
+  bindWorkshopBanner(renderStockMovements);
+}
+
+// ── Material Requests ─────────────────────────────────────────────────────────
+
+async function renderMaterialRequests() {
+  const res = await UFCL.materialRequestsList(STORAGE.user.id, WORKSHOP_FILTER);
+  if (!res.ok) return renderDenied('material-requests', res.error);
+
+  const rows = res.rows || [];
+  const isRestricted = !!res.user_workshop_id;
+  const canApprove = ['admin','ceo','operations','logistics','supervisor'].includes(STORAGE.user?.role);
+  const itemOpts = (res.items||[]).map(i => `<option value="${i.id}">[${i.category}] ${i.name} (${i.uom})</option>`).join('');
+  const wshOpts = (res.workshops||[]).map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
+  const statusBadge = s => s==='pending'?`<span class="badge ba">Pending</span>`:s==='approved'?`<span class="badge bg">Approved</span>`:`<span class="badge br">Rejected</span>`;
+  const priBadge = p => p==='urgent'?`<span class="badge br" style="font-size:10px">Urgent</span>`:p==='high'?`<span class="badge ba" style="font-size:10px">High</span>`:`<span class="badge bt" style="font-size:10px">Normal</span>`;
+
+  const pending = rows.filter(r=>r.status==='pending').length;
+  const approved = rows.filter(r=>r.status==='approved').length;
+
+  $('page-material-requests').innerHTML = `
+    ${workshopBannerHtml(res.workshops, res.user_workshop_id)}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div class="ptitle"><i class="ti ti-clipboard-list" style="color:var(--g-soft)"></i> Material Requests</div>
+        <div class="psub">${isRestricted?'Submit requests for stock from your workshop.':'Review and approve incoming stock requests from all workshops.'}</div>
+      </div>
+      <button class="bp1" id="mrAdd"><i class="ti ti-plus"></i>New request</button>
+    </div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc"><div class="mclbl">Total</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-clipboard-list"></i>requests</div></div>
+      <div class="mc"><div class="mclbl">Pending</div><div class="mcval" style="${pending>0?'color:var(--amber)':''}">${pending}</div><div class="mcsub ca"><i class="ti ti-clock"></i>awaiting</div></div>
+      <div class="mc"><div class="mclbl">Approved</div><div class="mcval" style="color:var(--green)">${approved}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>issued</div></div>
+      <div class="mc"><div class="mclbl">Rejected</div><div class="mcval">${rows.filter(r=>r.status==='rejected').length}</div><div class="mcsub"><i class="ti ti-circle-x"></i></div></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="padding:.9rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-clipboard-list"></i> Request Log</h3>
+      </div>
+      <table class="tbl">
+        <thead><tr><th>Item</th><th>Workshop</th><th>Requested Qty</th><th>Approved Qty</th><th>Priority</th><th>Status</th><th>Reason</th><th>Requested</th>${canApprove?'<th></th>':''}</tr></thead>
+        <tbody>${rows.length ? rows.map(r=>`
+        <tr>
+          <td>${r.item_name}<br><span style="font-size:11px;color:var(--t3)">${r.category} · ${r.uom}</span></td>
+          <td style="font-size:12px">${r.workshop_name||'—'}</td>
+          <td style="font-family:var(--fm);font-weight:600">${r.requested_qty}</td>
+          <td style="font-family:var(--fm)">${r.approved_qty||'—'}</td>
+          <td>${priBadge(r.priority)}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td style="font-size:12px;color:var(--t3);max-width:160px">${r.reason||'—'}</td>
+          <td style="font-size:11px;color:var(--t3)">${r.requested_at}<br>${r.requested_by||'—'}</td>
+          ${canApprove && r.status==='pending' ? `<td style="white-space:nowrap">
+            <button class="bs1 mr-appr" data-id="${r.id}" data-qty="${r.requested_qty}" style="color:var(--green);padding:4px 8px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
+            <button class="bs1 mr-rej" data-id="${r.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-x"></i>Reject</button>
+          </td>` : canApprove?`<td></td>`:''}
+        </tr>`).join('')
+        : `<tr><td colspan="${canApprove?9:8}" style="text-align:center;color:var(--t3);padding:3rem">No requests yet.</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  $('mrAdd').onclick = () => openOverlay('New Material Request', null, `
+    <div class="frow">
+      <div class="fg"><label>Item *</label><select id="mr-item"><option value="">— Select item —</option>${itemOpts}</select></div>
+      <div class="fg"><label>Quantity *</label><input id="mr-qty" type="number" min="1" placeholder="0"></div>
+    </div>
+    <div class="frow">
+      ${!isRestricted?`<div class="fg"><label>For Workshop</label><select id="mr-wsh"><option value="">— All —</option>${wshOpts}</select></div>`:''}
+      <div class="fg"><label>Priority</label>
+        <select id="mr-pri">
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>Reason / Justification</label><input id="mr-reason" type="text" placeholder="Why is this item needed?"></div>
+    <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Submit request</button><button class="bs1" id="ovCancel">Cancel</button></div>
+  `, async () => {
+    const res2 = await UFCL.materialRequestsCreate(STORAGE.user.id, {
+      item_id: $('mr-item').value,
+      requested_qty: $('mr-qty').value,
+      workshop_id: document.getElementById('mr-wsh')?.value || null,
+      priority: $('mr-pri').value,
+      reason: $('mr-reason').value.trim()
+    });
+    if (!res2.ok) { showOverlayError(res2.error); return; }
+    showOverlaySuccess('Request submitted.');
+    await renderMaterialRequests();
+  });
+
+  if (canApprove) {
+    document.querySelectorAll('.mr-appr').forEach(btn => {
+      btn.onclick = () => {
+        const reqQty = btn.dataset.qty;
+        openOverlay('Approve Request', null, `
+          <div class="frow">
+            <div class="fg"><label>Approved Quantity</label><input id="appr-qty" type="number" min="1" value="${reqQty}"></div>
+            <div class="fg"><label>Source Workshop (to issue from)</label><select id="appr-src"><option value="">— None / manual —</option>${wshOpts}</select></div>
+          </div>
+          <div class="fg"><label>Notes</label><input id="appr-notes" type="text" placeholder="Optional notes"></div>
+          <div class="brow"><button class="bp1" id="ovSave" style="background:var(--green)"><i class="ti ti-check"></i>Confirm Approve</button><button class="bs1" id="ovCancel">Cancel</button></div>
+        `, async () => {
+          const res2 = await UFCL.materialRequestsApprove(
+            STORAGE.user.id, Number(btn.dataset.id), 'approve',
+            $('appr-qty').value, $('appr-notes').value.trim(), $('appr-src').value || null
+          );
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Request approved and stock issued.');
+          await renderMaterialRequests();
+        });
+      };
+    });
+
+    document.querySelectorAll('.mr-rej').forEach(btn => {
+      btn.onclick = () => openOverlay('Reject Request', null, `
+        <div class="fg"><label>Rejection Reason *</label><input id="rej-notes" type="text" placeholder="Explain why this request is rejected"></div>
+        <div class="brow"><button class="bp1" id="ovSave" style="background:var(--red)"><i class="ti ti-x"></i>Confirm Reject</button><button class="bs1" id="ovCancel">Cancel</button></div>
+      `, async () => {
+        const notes = $('rej-notes').value.trim();
+        if (!notes) { showOverlayError('Rejection reason is required.'); return; }
+        const res2 = await UFCL.materialRequestsApprove(STORAGE.user.id, Number(btn.dataset.id), 'reject', null, notes, null);
+        if (!res2.ok) { showOverlayError(res2.error); return; }
+        showOverlaySuccess('Request rejected.');
+        await renderMaterialRequests();
+      });
+    });
+  }
+
+  bindWorkshopBanner(renderMaterialRequests);
 }
 
 // ── Vehicles ──────────────────────────────────────────────────────────────────
@@ -3741,9 +4147,13 @@ function vehicleStatusBadge(s) {
 }
 
 async function renderVehicles() {
-  const res = await UFCL.vehiclesList(STORAGE.user.id);
+  const [res, compRes] = await Promise.all([
+    UFCL.vehiclesList(STORAGE.user.id),
+    UFCL.transportCompaniesDropdown(STORAGE.user.id)
+  ]);
   if (!res.ok) return renderDenied('vehicles', res.error);
   const rows = res.rows || [];
+  const tpCompanies = compRes?.rows || [];
   const active = rows.filter(r=>r.status==='Active').length;
   const maintenance = rows.filter(r=>r.status==='In Maintenance').length;
 
@@ -3771,20 +4181,23 @@ async function renderVehicles() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} vehicle${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Registration</th><th>Make / Model</th><th>Type</th><th>Status</th><th>Fuel type</th><th>Insurance expiry</th><th>Fuel cost (RWF)</th><th>Maintenance records</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Plate</th><th>Ownership</th><th>Category</th><th>Make / Model</th><th>Status</th><th>Insurance expiry</th><th>Road Lic. expiry</th><th>Fuel cost (RWF)</th><th>Actions</th></tr></thead>
         <tbody>${rows.length ? rows.map(r=>{
-          const insExpiry = r.insurance_expiry ? new Date(r.insurance_expiry) : null;
-          const insExpired = insExpiry && insExpiry < new Date();
-          const insWarn = insExpiry && !insExpired && (insExpiry - new Date()) < 30*24*60*60*1000;
+          const insExpiry  = r.insurance_expiry  ? new Date(r.insurance_expiry)  : null;
+          const roadExpiry = r.road_license_expiry ? new Date(r.road_license_expiry) : null;
+          const now = new Date();
+          const soon = 30*24*60*60*1000;
+          const fmtDate = (d) => d ? d.toLocaleDateString('en-GB') : '—';
+          const dateCls = (d) => d && d < now ? 'color:var(--red);font-weight:600' : d && (d-now)<soon ? 'color:var(--amber);font-weight:500' : '';
           return `<tr>
             <td style="font-weight:700;font-family:var(--fm)">${r.registration}</td>
+            <td><span class="badge ${r.ownership_type==='Third-Party Car'?'bb':'bg'}" style="font-size:10px">${r.ownership_type||'Company Car'}</span></td>
+            <td>${r.vehicle_category||'—'}</td>
             <td>${[r.make,r.model].filter(Boolean).join(' ')||'—'}</td>
-            <td>${r.vehicle_type||'—'}</td>
             <td>${vehicleStatusBadge(r.status)}</td>
-            <td>${r.fuel_type||'—'}</td>
-            <td style="${insExpired?'color:var(--red);font-weight:600':insWarn?'color:var(--amber);font-weight:500':''}">${r.insurance_expiry?new Date(r.insurance_expiry).toLocaleDateString('en-GB'):'—'}${insExpired?' <span style="font-size:11px">(expired)</span>':insWarn?' <span style="font-size:11px">(expiring soon)</span>':''}</td>
+            <td style="${dateCls(insExpiry)}">${fmtDate(insExpiry)}</td>
+            <td style="${dateCls(roadExpiry)}">${fmtDate(roadExpiry)}</td>
             <td style="font-family:var(--fm)">${Math.round(r.total_fuel_cost||0).toLocaleString()}</td>
-            <td style="text-align:center">${r.maintenance_count||0}</td>
             <td style="white-space:nowrap;display:flex;gap:4px">
               <button class="bs1 v-fuel" data-id="${r.id}" data-reg="${r.registration}" title="Log fuel"><i class="ti ti-gas-station"></i></button>
               <button class="bs1 v-maint" data-id="${r.id}" data-reg="${r.registration}" title="Add maintenance"><i class="ti ti-tool"></i></button>
@@ -3792,66 +4205,275 @@ async function renderVehicles() {
               <button class="bs1 v-del" data-id="${r.id}" style="color:var(--red)" title="Delete"><i class="ti ti-trash"></i></button>
             </td>
           </tr>`;
-        }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No vehicles registered yet.</td></tr>'}
+        }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No vehicles registered yet. Click <strong>Register vehicle</strong> to add one.</td></tr>'}
         </tbody>
       </table></div>
     </div>`;
 
-  function vehicleForm(r) {
-    const statOpts = ['Active','In Maintenance','Inactive'].map(s=>`<option value="${s}" ${r&&r.status===s?'selected':''}>${s}</option>`).join('');
+  const VEHICLE_CATEGORIES = ['Pickup','Truck','Van','Bus','Lorry','Motorcycle','Excavator','Tractor','Other'];
+  const FUEL_TYPES   = ['Diesel','Petrol','Electric','Hybrid'];
+  const PAY_METHODS  = ['Monthly','Weekly','Per Trip','Per Day','Fixed Contract'];
+
+  function vehicleForm(r, companies = []) {
+    const own = r?.ownership_type || 'Company Car';
+    const isC = own !== 'Third-Party Car';
+    const catOpts  = VEHICLE_CATEGORIES.map(c=>`<option value="${c}" ${r?.vehicle_category===c?'selected':''}>${c}</option>`).join('');
+    const statOpts = ['Active','In Maintenance','Inactive'].map(s=>`<option value="${s}" ${(r?.status||'Active')===s?'selected':''}>${s}</option>`).join('');
+    const fuelOpts = FUEL_TYPES.map(f=>`<option value="${f}" ${r?.fuel_type===f?'selected':''}>${f}</option>`).join('');
+    const payOpts  = PAY_METHODS.map(p=>`<option value="${p}" ${r?.payment_method===p?'selected':''}>${p}</option>`).join('');
+    const d = k => r&&r[k] ? new Date(r[k]).toISOString().slice(0,10) : '';
+    const v = k => r ? (r[k]||'') : '';
+    const fileInput = (id, cur) => {
+      const fname = cur ? cur.split(/[\\/]/).pop() : '';
+      return `<input id="${id}" type="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" style="font-size:12px;width:100%">
+        ${fname ? `<div style="font-size:11px;color:var(--g-soft);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${cur}"><i class="ti ti-paperclip" style="font-size:10px"></i> ${fname}</div>` : ''}
+        <input type="hidden" id="${id}-cur" value="${cur||''}">`;
+    };
+    const sh = (lbl,ic='ti-chevron-right') =>
+      `<div style="margin:1.1rem 0 .45rem;font-size:10.5px;font-weight:700;color:var(--g-dark);text-transform:uppercase;letter-spacing:.09em;border-bottom:1px solid var(--bdr);padding-bottom:.3rem;display:flex;align-items:center;gap:.35rem"><i class="ti ${ic}" style="font-size:12px"></i>${lbl}</div>`;
+    const ownBtn = (id,label,icon,active) =>
+      `<button type="button" id="${id}" style="flex:1;padding:.45rem;border:2px solid ${active?'var(--g-soft)':'var(--bdr)'};border-radius:7px;background:${active?'var(--g-soft)':'transparent'};color:${active?'#fff':'var(--t2)'};font-weight:600;font-size:12.5px;cursor:pointer;transition:.15s"><i class="ti ${icon}"></i> ${label}</button>`;
+
     return `
       <div class="frow">
-        <div class="fg"><label>Registration *</label><input id="v-reg" type="text" value="${r?r.registration:''}" placeholder="e.g. RAB 123A"></div>
-        <div class="fg"><label>Make</label><input id="v-make" type="text" value="${r?r.make||'':''}" placeholder="e.g. Toyota"></div>
-        <div class="fg"><label>Model</label><input id="v-model" type="text" value="${r?r.model||'':''}" placeholder="e.g. Hilux"></div>
+        <div class="fg"><label>Vehicle Category *</label><select id="v-category"><option value="">— Select —</option>${catOpts}</select></div>
       </div>
-      <div class="frow">
-        <div class="fg"><label>Vehicle type</label><input id="v-type" type="text" value="${r?r.vehicle_type||'':''}" placeholder="Truck, Van, Pickup…"></div>
-        <div class="fg"><label>Status</label><select id="v-status">${statOpts}</select></div>
-        <div class="fg"><label>Fuel type</label><select id="v-fuel"><option value="">—</option><option value="Diesel" ${r&&r.fuel_type==='Diesel'?'selected':''}>Diesel</option><option value="Petrol" ${r&&r.fuel_type==='Petrol'?'selected':''}>Petrol</option></select></div>
+      <div class="fg" style="margin-bottom:1rem">
+        <label>Vehicle Ownership Type *</label>
+        <div style="display:flex;gap:.5rem;margin-top:.4rem">
+          ${ownBtn('v-own-company','Company Car','ti-building',isC)}
+          ${ownBtn('v-own-third','Third-Party Car','ti-user-check',!isC)}
+        </div>
       </div>
-      <div class="frow">
-        <div class="fg"><label>Insurance expiry</label><input id="v-ins" type="date" value="${r&&r.insurance_expiry?new Date(r.insurance_expiry).toISOString().slice(0,10):''}"></div>
-        <div class="fg"><label>Notes</label><input id="v-notes" type="text" value="${r?r.notes||'':''}"></div>
+
+      <div id="v-sec-a" style="display:${isC?'block':'none'}">
+        ${sh('Vehicle Information','ti-car')}
+        <div class="frow three">
+          <div class="fg"><label>Plate Number *</label><input id="v-reg" type="text" value="${v('registration')}" placeholder="RAB 123A"></div>
+          <div class="fg"><label>Vehicle Type</label><input id="v-type" type="text" value="${v('vehicle_type')}" placeholder="Truck, Van…"></div>
+          <div class="fg"><label>Make</label><input id="v-make" type="text" value="${v('make')}" placeholder="Toyota"></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Model</label><input id="v-model" type="text" value="${v('model')}" placeholder="Hilux"></div>
+          <div class="fg"><label>Year</label><input id="v-year" type="number" value="${v('year')}" placeholder="2022" min="1990" max="2035"></div>
+          <div class="fg"><label>Fuel Type</label><select id="v-fuel"><option value="">—</option>${fuelOpts}</select></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Chassis / VIN Number</label><input id="v-chassis" type="text" value="${v('chassis_vin')}"></div>
+          <div class="fg"><label>Engine Number</label><input id="v-engine" type="text" value="${v('engine_number')}"></div>
+          <div class="fg"><label>Odometer Reading (km)</label><input id="v-odometer" type="number" value="${v('odometer_reading')}" min="0"></div>
+        </div>
+        ${sh('Asset Information','ti-file-invoice')}
+        <div class="frow three">
+          <div class="fg"><label>Asset Code</label><input id="v-asset-code" type="text" value="${v('asset_code')}"></div>
+          <div class="fg"><label>Purchase Date</label><input id="v-purchase-date" type="date" value="${d('purchase_date')}"></div>
+          <div class="fg"><label>Purchase Cost (RWF)</label><input id="v-purchase-cost" type="number" value="${v('purchase_cost')}" min="0"></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Department Assigned</label><input id="v-dept" type="text" value="${v('department')}"></div>
+          <div class="fg"><label>Driver Assigned</label><input id="v-driver-assigned" type="text" value="${v('driver_assigned')}"></div>
+          <div class="fg"><label>Vehicle Status</label><select id="v-status">${statOpts}</select></div>
+        </div>
+        ${sh('Compliance','ti-shield-check')}
+        <div class="frow three">
+          <div class="fg"><label>Insurance Expiry</label><input id="v-ins" type="date" value="${d('insurance_expiry')}"></div>
+          <div class="fg"><label>Road License Expiry</label><input id="v-road-lic" type="date" value="${d('road_license_expiry')}"></div>
+          <div class="fg"><label>Inspection Expiry</label><input id="v-inspection" type="date" value="${d('inspection_expiry')}"></div>
+        </div>
+        ${sh('Documents','ti-paperclip')}
+        <div class="frow three">
+          <div class="fg"><label>Registration Card</label>${fileInput('v-doc-reg', v('doc_registration_card'))}</div>
+          <div class="fg"><label>Insurance Certificate</label>${fileInput('v-doc-ins', v('doc_insurance_cert'))}</div>
+          <div class="fg"><label>Vehicle Photos</label>${fileInput('v-doc-photos', v('doc_photos'))}</div>
+        </div>
+        <div class="fg"><label>Notes</label><input id="v-notes" type="text" value="${v('notes')}"></div>
+      </div>
+
+      <div id="v-sec-b" style="display:${!isC?'block':'none'}">
+        ${sh('Owner Information','ti-user')}
+        <div class="frow three">
+          <div class="fg"><label>Owner Name *</label>
+            <select id="v-owner-name">
+              <option value="">— Select company —</option>
+              ${companies.map(c=>`<option value="${c.name}" ${r?.owner_name===c.name?'selected':''}>${c.name}</option>`).join('')}
+              <option value="__other__" ${r?.owner_name && !companies.find(c=>c.name===r?.owner_name)?'selected':''}>Other / enter manually</option>
+            </select>
+            <input id="v-owner-name-other" type="text" placeholder="Enter owner name" style="margin-top:5px;display:${r?.owner_name && !companies.find(c=>c.name===r?.owner_name) ? 'block' : 'none'}" value="${r?.owner_name && !companies.find(c=>c.name===r?.owner_name) ? v('owner_name') : ''}">
+          </div>
+          <div class="fg"><label>Owner Type</label>
+            <select id="v-owner-type">
+              <option value="">—</option>
+              <option value="Individual" ${r?.owner_type==='Individual'?'selected':''}>Individual</option>
+              <option value="Company" ${r?.owner_type==='Company'?'selected':''}>Company</option>
+            </select>
+          </div>
+          <div class="fg"><label>National ID / Company Reg No.</label><input id="v-owner-id" type="text" value="${v('owner_id_number')}"></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Phone Number</label><input id="v-owner-phone" type="text" value="${v('owner_phone')}"></div>
+          <div class="fg"><label>Email Address</label><input id="v-owner-email" type="email" value="${v('owner_email')}"></div>
+          <div class="fg"><label>Physical Address</label><input id="v-owner-address" type="text" value="${v('owner_address')}"></div>
+        </div>
+        ${sh('Vehicle Information','ti-car')}
+        <div class="frow three">
+          <div class="fg"><label>Plate Number *</label><input id="v-reg-b" type="text" value="${v('registration')}" placeholder="RAB 123A"></div>
+          <div class="fg"><label>Vehicle Type</label><input id="v-type-b" type="text" value="${v('vehicle_type')}" placeholder="Truck, Van…"></div>
+          <div class="fg"><label>Make</label><input id="v-make-b" type="text" value="${v('make')}" placeholder="Toyota"></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Model</label><input id="v-model-b" type="text" value="${v('model')}" placeholder="Hilux"></div>
+          <div class="fg"><label>Year</label><input id="v-year-b" type="number" value="${v('year')}" placeholder="2022" min="1990" max="2035"></div>
+          <div class="fg"><label>Chassis / VIN Number</label><input id="v-chassis-b" type="text" value="${v('chassis_vin')}"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Fuel Type</label><select id="v-fuel-b"><option value="">—</option>${fuelOpts}</select></div>
+        </div>
+        ${sh('Contract Information','ti-file-description')}
+        <div class="frow three">
+          <div class="fg"><label>Contract Number</label><input id="v-contract-num" type="text" value="${v('contract_number')}"></div>
+          <div class="fg"><label>Contract Start Date</label><input id="v-contract-start" type="date" value="${d('contract_start_date')}"></div>
+          <div class="fg"><label>Contract End Date</label><input id="v-contract-end" type="date" value="${d('contract_end_date')}"></div>
+        </div>
+        <div class="frow three">
+          <div class="fg"><label>Payment Rate (RWF)</label><input id="v-pay-rate" type="number" value="${v('payment_rate')}" min="0"></div>
+          <div class="fg"><label>Payment Method</label><select id="v-pay-method"><option value="">—</option>${payOpts}</select></div>
+          <div class="fg"><label>Assigned Project / Site</label><input id="v-project" type="text" value="${v('assigned_project')}"></div>
+        </div>
+        ${sh('Driver Information','ti-steering-wheel')}
+        <div class="frow">
+          <div class="fg"><label>Driver Name</label><input id="v-drv-name" type="text" value="${v('driver_name')}"></div>
+          <div class="fg"><label>Driver Phone</label><input id="v-drv-phone" type="text" value="${v('driver_phone')}"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Driver License Number</label><input id="v-drv-lic" type="text" value="${v('driver_license_number')}"></div>
+          <div class="fg"><label>License Expiry Date</label><input id="v-drv-lic-exp" type="date" value="${d('driver_license_expiry')}"></div>
+        </div>
+        ${sh('Compliance','ti-shield-check')}
+        <div class="frow three">
+          <div class="fg"><label>Insurance Expiry</label><input id="v-ins-b" type="date" value="${d('insurance_expiry')}"></div>
+          <div class="fg"><label>Road License Expiry</label><input id="v-road-lic-b" type="date" value="${d('road_license_expiry')}"></div>
+          <div class="fg"><label>Inspection Expiry</label><input id="v-inspection-b" type="date" value="${d('inspection_expiry')}"></div>
+        </div>
+        <div class="fg"><label>Vehicle Status</label><select id="v-status-b">${statOpts}</select></div>
+        ${sh('Documents','ti-paperclip')}
+        <div class="frow three">
+          <div class="fg"><label>Vehicle Registration Card</label>${fileInput('v-doc-reg-b', v('doc_registration_card'))}</div>
+          <div class="fg"><label>Owner ID / Company Certificate</label>${fileInput('v-doc-owner-id', v('doc_owner_id'))}</div>
+          <div class="fg"><label>Insurance Certificate</label>${fileInput('v-doc-ins-b', v('doc_insurance_cert'))}</div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Contract Agreement</label>${fileInput('v-doc-contract', v('doc_contract'))}</div>
+          <div class="fg"><label>Vehicle Photos</label>${fileInput('v-doc-photos-b', v('doc_photos'))}</div>
+        </div>
+        <div class="fg"><label>Notes</label><input id="v-notes-b" type="text" value="${v('notes')}"></div>
       </div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`;
   }
 
-  $('vAdd').onclick = () => openOverlay('Register vehicle', null, vehicleForm(null), async () => {
-    const res2 = await UFCL.vehiclesCreate(STORAGE.user.id, {
-      registration: $('v-reg').value.trim(),
-      make: $('v-make').value.trim(),
-      model: $('v-model').value.trim(),
-      vehicle_type: $('v-type').value.trim(),
-      status: $('v-status').value,
-      fuel_type: $('v-fuel').value || null,
-      insurance_expiry: $('v-ins').value || null,
-      notes: $('v-notes').value.trim()
+  function bindVehicleOwnershipToggle() {
+    const secA = document.getElementById('v-sec-a');
+    const secB = document.getElementById('v-sec-b');
+    const btnC = document.getElementById('v-own-company');
+    const btnT = document.getElementById('v-own-third');
+    if (!btnC || !btnT) return;
+    const activate = (isCompany) => {
+      secA.style.display = isCompany ? 'block' : 'none';
+      secB.style.display = isCompany ? 'none'  : 'block';
+      [btnC, btnT].forEach((b, i) => {
+        const on = isCompany ? i===0 : i===1;
+        b.style.background    = on ? 'var(--g-soft)' : 'transparent';
+        b.style.borderColor   = on ? 'var(--g-soft)' : 'var(--bdr)';
+        b.style.color         = on ? '#fff' : 'var(--t2)';
+      });
+    };
+    btnC.onclick = () => activate(true);
+    btnT.onclick = () => activate(false);
+    const ownerSel = document.getElementById('v-owner-name');
+    const ownerOther = document.getElementById('v-owner-name-other');
+    if (ownerSel && ownerOther) {
+      ownerSel.addEventListener('change', () => {
+        ownerOther.style.display = ownerSel.value === '__other__' ? 'block' : 'none';
+      });
+    }
+  }
+
+  function collectVehiclePayload() {
+    const secB = document.getElementById('v-sec-b');
+    const isThird = secB && secB.style.display !== 'none';
+    const g = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+    const getFile = id => {
+      const el = document.getElementById(id);
+      if (el && el.files && el.files.length > 0) return el.files[0].path || el.files[0].name || '';
+      const cur = document.getElementById(id + '-cur');
+      return cur ? cur.value : '';
+    };
+    if (!isThird) {
+      return {
+        ownership_type: 'Company Car',
+        vehicle_category: g('v-category'),
+        registration: g('v-reg'), vehicle_type: g('v-type'), make: g('v-make'),
+        model: g('v-model'), year: g('v-year') || null, fuel_type: g('v-fuel') || null,
+        chassis_vin: g('v-chassis'), engine_number: g('v-engine'),
+        odometer_reading: g('v-odometer') || null,
+        asset_code: g('v-asset-code'), purchase_date: g('v-purchase-date') || null,
+        purchase_cost: g('v-purchase-cost') || null, department: g('v-dept'),
+        driver_assigned: g('v-driver-assigned'),
+        status: g('v-status') || 'Active',
+        insurance_expiry: g('v-ins') || null, road_license_expiry: g('v-road-lic') || null,
+        inspection_expiry: g('v-inspection') || null,
+        doc_registration_card: getFile('v-doc-reg'), doc_insurance_cert: getFile('v-doc-ins'),
+        doc_photos: getFile('v-doc-photos'), notes: g('v-notes'),
+      };
+    }
+    return {
+      ownership_type: 'Third-Party Car',
+      vehicle_category: g('v-category'),
+      owner_name: (g('v-owner-name') === '__other__' ? g('v-owner-name-other') : g('v-owner-name')) || null, owner_type: g('v-owner-type') || null,
+      owner_id_number: g('v-owner-id'), owner_phone: g('v-owner-phone'),
+      owner_email: g('v-owner-email'), owner_address: g('v-owner-address'),
+      registration: g('v-reg-b'), vehicle_type: g('v-type-b'), make: g('v-make-b'),
+      model: g('v-model-b'), year: g('v-year-b') || null, chassis_vin: g('v-chassis-b'),
+      fuel_type: g('v-fuel-b') || null,
+      contract_number: g('v-contract-num'),
+      contract_start_date: g('v-contract-start') || null, contract_end_date: g('v-contract-end') || null,
+      payment_rate: g('v-pay-rate') || null, payment_method: g('v-pay-method') || null,
+      assigned_project: g('v-project'),
+      driver_name: g('v-drv-name'), driver_phone: g('v-drv-phone'),
+      driver_license_number: g('v-drv-lic'), driver_license_expiry: g('v-drv-lic-exp') || null,
+      insurance_expiry: g('v-ins-b') || null, road_license_expiry: g('v-road-lic-b') || null,
+      inspection_expiry: g('v-inspection-b') || null,
+      status: g('v-status-b') || 'Active',
+      doc_registration_card: getFile('v-doc-reg-b'), doc_owner_id: getFile('v-doc-owner-id'),
+      doc_insurance_cert: getFile('v-doc-ins-b'), doc_contract: getFile('v-doc-contract'),
+      doc_photos: getFile('v-doc-photos-b'), notes: g('v-notes-b'),
+    };
+  }
+
+  $('vAdd').onclick = () => {
+    openOverlay('Register vehicle', null, vehicleForm(null, tpCompanies), async () => {
+      const p = collectVehiclePayload();
+      if (!p.registration) { showOverlayError('Plate number is required.'); return; }
+      const res2 = await UFCL.vehiclesCreate(STORAGE.user.id, p);
+      if (!res2.ok) { showOverlayError(res2.error); return; }
+      showOverlaySuccess('Vehicle registered.');
+      await renderVehicles();
     });
-    if (!res2.ok) { showOverlayError(res2.error); return; }
-    showOverlaySuccess('Vehicle registered.');
-    await renderVehicles();
-  });
+    bindVehicleOwnershipToggle();
+  };
 
   document.querySelectorAll('.v-edit').forEach(btn => {
     btn.onclick = () => {
       const row = rows.find(r => r.id === Number(btn.dataset.id));
       if (!row) return;
-      openOverlay('Edit vehicle', row.registration, vehicleForm(row), async () => {
-        const res2 = await UFCL.vehiclesUpdate(STORAGE.user.id, row.id, {
-          registration: $('v-reg').value.trim(),
-          make: $('v-make').value.trim(),
-          model: $('v-model').value.trim(),
-          vehicle_type: $('v-type').value.trim(),
-          status: $('v-status').value,
-          fuel_type: $('v-fuel').value || null,
-          insurance_expiry: $('v-ins').value || null,
-          notes: $('v-notes').value.trim()
-        });
+      openOverlay('Edit vehicle', row.registration, vehicleForm(row, tpCompanies), async () => {
+        const p = collectVehiclePayload();
+        if (!p.registration) { showOverlayError('Plate number is required.'); return; }
+        const res2 = await UFCL.vehiclesUpdate(STORAGE.user.id, row.id, p);
         if (!res2.ok) { showOverlayError(res2.error); return; }
         showOverlaySuccess('Vehicle updated.');
         await renderVehicles();
       });
+      bindVehicleOwnershipToggle();
     };
   });
 
@@ -4674,6 +5296,7 @@ async function renderMachines() {
 
   const rows = res.rows || [];
   const categories = res.categories || [];
+  const workshops = res.workshops || [];
   const canManage = ['admin', 'operations', 'ceo', 'logistics'].includes(STORAGE.user?.role);
 
   const statusCls = s => ({ Available:'bg', Running:'bb', Maintenance:'ba', Breakdown:'br' }[s] || 'bt');
@@ -4702,12 +5325,13 @@ async function renderMachines() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} machine${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Code</th><th>Name</th><th>Plate/Fleet No.</th><th>Category</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canManage?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Code</th><th>Name</th><th>Plate/Fleet No.</th><th>Category</th><th>Workshop</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canManage?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r => `<tr>
           <td style="font-family:var(--fm);font-weight:600">${r.machine_code}</td>
           <td style="font-weight:500">${r.name}</td>
           <td style="font-family:var(--fm);color:var(--g-dark)">${r.plate_number || '—'}</td>
           <td><span class="badge bt">${r.category_name}</span></td>
+          <td style="font-size:12px;color:var(--g-soft)">${r.workshop_name||'<span style="color:var(--t3)">Unassigned</span>'}</td>
           <td><span class="badge ${statusCls(r.status)}">${r.status}</span></td>
           <td style="font-family:var(--fm)">${r.production_capacity ? Number(r.production_capacity).toLocaleString()+' '+r.capacity_unit+'/day' : '—'}</td>
           <td style="font-family:var(--fm)">${r.fuel_consumption_rate ? Number(r.fuel_consumption_rate)+' L/hr' : '—'}</td>
@@ -4719,7 +5343,7 @@ async function renderMachines() {
             <button class="bs1 mch-maint" data-id="${r.id}" title="Maintenance schedules"><i class="ti ti-calendar"></i></button>
           </td>` : ''}
         </tr>`).join('')
-        : `<tr><td colspan="${canManage?9:8}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
+        : `<tr><td colspan="${canManage?10:9}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
@@ -4727,6 +5351,7 @@ async function renderMachines() {
   function machineForm(r) {
     const catSel = categories.map(c => `<option value="${c.id}" ${r&&Number(r.category_id)===c.id?'selected':''}>${c.name}</option>`).join('');
     const statusOpts = ['Available','Running','Maintenance','Breakdown'].map(s => `<option value="${s}" ${r&&r.status===s?'selected':''}>${s}</option>`).join('');
+    const wshOpts = workshops.map(w => `<option value="${w.id}" ${r&&Number(r.workshop_id)===w.id?'selected':''}>${w.name}${w.workshop_type?' ('+w.workshop_type+')':''}</option>`).join('');
     return `
       <div class="frow">
         <div class="fg"><label>Machine Code *</label><input id="mch-code" type="text" value="${r?r.machine_code:''}" placeholder="e.g. SW-001" ${r?'readonly':''}></div>
@@ -4734,7 +5359,11 @@ async function renderMachines() {
       </div>
       <div class="frow">
         <div class="fg"><label>Category *</label><select id="mch-cat">${catSel}</select></div>
+        <div class="fg"><label>Assigned Workshop</label><select id="mch-workshop"><option value="">— Unassigned —</option>${wshOpts}</select></div>
+      </div>
+      <div class="frow">
         <div class="fg"><label>Status</label><select id="mch-status">${statusOpts}</select></div>
+        <div class="fg"><label>Plate / Fleet Number</label><input id="mch-plate" type="text" value="${r?r.plate_number||'':''}" placeholder="e.g. RAA 001A or FL-003"></div>
       </div>
       <div class="frow">
         <div class="fg"><label>Production Capacity (per day)</label><input id="mch-cap" type="number" min="0" value="${r?r.production_capacity:0}"></div>
@@ -4754,9 +5383,8 @@ async function renderMachines() {
       </div>
       <div class="frow">
         <div class="fg"><label>Date Acquired</label><input id="mch-acquired" type="date" value="${r&&r.date_acquired?String(r.date_acquired).slice(0,10):''}"></div>
-        <div class="fg"><label>Plate / Fleet Number</label><input id="mch-plate" type="text" value="${r?r.plate_number||'':''}" placeholder="e.g. RAA 001A or FL-003"></div>
+        <div class="fg"><label>Notes</label><input id="mch-notes" type="text" value="${r?r.notes||'':''}"></div>
       </div>
-      <div class="fg"><label>Notes</label><input id="mch-notes" type="text" value="${r?r.notes||'':''}"></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`;
   }
 
@@ -4766,6 +5394,7 @@ async function renderMachines() {
         machine_code: $('mch-code').value.trim(),
         name: $('mch-name').value.trim(),
         category_id: $('mch-cat').value,
+        workshop_id: $('mch-workshop').value || null,
         status: $('mch-status').value,
         production_capacity: $('mch-cap').value,
         capacity_unit: $('mch-capunit').value.trim() || 'm³',
@@ -4792,6 +5421,7 @@ async function renderMachines() {
           const r2 = await UFCL.machinesUpdate(STORAGE.user.id, row.id, {
             name: $('mch-name').value.trim(),
             category_id: $('mch-cat').value,
+            workshop_id: $('mch-workshop').value || null,
             status: $('mch-status').value,
             production_capacity: $('mch-cap').value,
             capacity_unit: $('mch-capunit').value.trim() || 'm³',
@@ -4869,8 +5499,8 @@ async function renderMachines() {
 
 // ── Machine Daily Logs ────────────────────────────────────────────────────────
 
-async function renderMachineLogs() {
-  $('page-machine-logs').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+async function renderMachineLogs(cid = 'page-machine-logs') {
+  $(cid).innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
 
   const today = new Date();
   const defaultMonth = today.toISOString().slice(0, 7);
@@ -4894,7 +5524,7 @@ async function renderMachineLogs() {
   const machineOpts = machines.map(m => `<option value="${m.id}">${m.machine_code} — ${m.name}</option>`).join('');
   const shiftOpts = ['Full Day','Day Shift','Night Shift'].map(s => `<option>${s}</option>`).join('');
 
-  $('page-machine-logs').innerHTML = `
+  $(cid).innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Machine Daily Logs</div>
@@ -5056,7 +5686,7 @@ async function renderMachineLogs() {
         if ($('new-cat-name')) $('new-cat-name').value = '';
         bindCatDelete();
         // Re-render the main page in background so new category is available
-        renderMachineLogs();
+        renderMachineLogs(cid);
       });
 
       function bindCatDelete() {
@@ -5065,7 +5695,7 @@ async function renderMachineLogs() {
             const r2 = await UFCL.machineLogCatsDelete(STORAGE.user.id, Number(btn.dataset.id));
             if (!r2.ok) { showOverlayError(r2.error); return; }
             btn.closest('tr').remove();
-            renderMachineLogs();
+            renderMachineLogs(cid);
           };
         });
       }
@@ -5078,7 +5708,7 @@ async function renderMachineLogs() {
       const r2 = await UFCL.machineLogsCreate(STORAGE.user.id, collectLog());
       if (!r2.ok) { showOverlayError(r2.error); return; }
       showOverlaySuccess('Log entry saved.');
-      await renderMachineLogs();
+      await renderMachineLogs(cid);
     });
   }
 
@@ -5091,7 +5721,7 @@ async function renderMachineLogs() {
           const r2 = await UFCL.machineLogsUpdate(STORAGE.user.id, row.id, collectLog());
           if (!r2.ok) { showOverlayError(r2.error); return; }
           showOverlaySuccess('Log updated.');
-          await renderMachineLogs();
+          await renderMachineLogs(cid);
         });
       };
     });
@@ -5103,7 +5733,7 @@ async function renderMachineLogs() {
         confirmDelete(`Delete log for <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}?`, async () => {
           const r2 = await UFCL.machineLogsDelete(STORAGE.user.id, row.id);
           if (!r2.ok) { showOverlayError(r2.error); return; }
-          showOverlaySuccess('Deleted.'); await renderMachineLogs();
+          showOverlaySuccess('Deleted.'); await renderMachineLogs(cid);
         });
       };
     });
@@ -5646,8 +6276,8 @@ async function renderLogTransport() {
 
 // ── Value-Added Timber ─────────────────────────────────────────────────────────
 
-async function renderValueAddedTimber() {
-  $('page-value-added-timber').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+async function renderValueAddedTimber(cid='page-value-added-timber') {
+  $(cid).innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
   const [res, productsRes] = await Promise.all([
     UFCL.valueAddedTimberList(STORAGE.user.id),
     UFCL.productsActiveForForm(STORAGE.user.id, 'Timber')
@@ -5669,7 +6299,7 @@ async function renderValueAddedTimber() {
     bySize[r.product_size].total += Number(r.num_timber);
   }
 
-  $('page-value-added-timber').innerHTML = `
+  $(cid).innerHTML = `
     <div class="ptitle"><i class="ti ti-certificate" style="color:var(--g-soft)"></i> Value-Added Timber</div>
     <div class="psub">Track kiln-dried and CCA treated timber production.</div>
     <div class="cards">
@@ -5766,7 +6396,7 @@ async function renderValueAddedTimber() {
           num_timber: $('vat-num').value
         });
         if (!r.ok) { showOverlayError(r.error); return; }
-        showOverlaySuccess('Entry saved.'); await renderValueAddedTimber();
+        showOverlaySuccess('Entry saved.'); await renderValueAddedTimber(cid);
       }
     );
   };
@@ -5775,7 +6405,7 @@ async function renderValueAddedTimber() {
     btn.onclick = () => confirmDelete('Delete this value-added timber entry?', async () => {
       const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
       if (!res2.ok) { showOverlayError(res2.error); return; }
-      showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber();
+      showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber(cid);
     });
   });
 }

@@ -158,23 +158,29 @@ ipcMain.handle('products:catalog', async (_evt, { userId }) => data.productCatal
 ipcMain.handle('kpi:budgets:list', async (_evt, { userId, month }) => data.kpiBudgetsList(userId, month));
 ipcMain.handle('kpi:budgets:save', async (_evt, { userId, payload }) => data.kpiBudgetSave(userId, payload));
 ipcMain.handle('monthly:dashboard', async (_evt, { userId, month }) => data.monthlyDashboard(userId, month));
-ipcMain.handle('inventory:list', async (_evt, { userId }) => data.inventoryList(userId));
+ipcMain.handle('inventory:list', async (_evt, { userId, workshopId }) => data.inventoryList(userId, workshopId));
 
 // Warehouses
-ipcMain.handle('warehouses:list', async (_evt, { userId }) => data.warehousesList(userId));
+ipcMain.handle('warehouses:list', async (_evt, { userId, workshopId }) => data.warehousesList(userId, workshopId));
 ipcMain.handle('warehouses:create', async (_evt, { userId, payload }) => data.warehousesCreate(userId, payload));
 ipcMain.handle('warehouses:update', async (_evt, { userId, warehouseId, payload }) => data.warehousesUpdate(userId, warehouseId, payload));
 
 // Stock catalog
-ipcMain.handle('stock-items:list', async (_evt, { userId }) => data.stockItemsList(userId));
+ipcMain.handle('stock-items:list', async (_evt, { userId, workshopId }) => data.stockItemsList(userId, workshopId));
 ipcMain.handle('stock-items:create', async (_evt, { userId, payload }) => data.stockItemsCreate(userId, payload));
 ipcMain.handle('stock-items:update', async (_evt, { userId, itemId, payload }) => data.stockItemsUpdate(userId, itemId, payload));
 
 // Stock movements
-ipcMain.handle('stock-movements:list', async (_evt, { userId }) => data.stockMovementsList(userId));
+ipcMain.handle('stock-movements:list', async (_evt, { userId, workshopId }) => data.stockMovementsList(userId, workshopId));
 ipcMain.handle('stock-movements:create', async (_evt, { userId, payload }) => data.stockMovementsCreate(userId, payload));
+ipcMain.handle('stock-movements:transfer-approve', async (_evt, { userId, movementId, action, rejectionReason }) => data.stockTransferApprove(userId, movementId, action, rejectionReason));
+ipcMain.handle('material-requests:list', async (_evt, { userId, workshopId }) => data.materialRequestsList(userId, workshopId));
+ipcMain.handle('material-requests:create', async (_evt, { userId, payload }) => data.materialRequestsCreate(userId, payload));
+ipcMain.handle('material-requests:approve', async (_evt, { userId, requestId, action, approvedQty, reviewNotes, sourceWarehouseId }) => data.materialRequestsApprove(userId, requestId, action, approvedQty, reviewNotes, sourceWarehouseId));
+ipcMain.handle('workshop:overview', async (_evt, { userId }) => data.workshopOverview(userId));
 
 // Vehicles
+ipcMain.handle('transport-companies:dropdown', async (_evt, { userId }) => data.transportCompaniesForDropdown(userId));
 ipcMain.handle('vehicles:list', async (_evt, { userId }) => data.vehiclesList(userId));
 ipcMain.handle('vehicles:create', async (_evt, { userId, payload }) => data.vehiclesCreate(userId, payload));
 ipcMain.handle('vehicles:update', async (_evt, { userId, vehicleId, payload }) => data.vehiclesUpdate(userId, vehicleId, payload));
