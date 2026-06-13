@@ -3225,6 +3225,17 @@ module.exports = {
   machineMaintScheduleList,
   machineMaintScheduleCreate,
   machineMaintScheduleUpdate,
+  machineMaintScheduleDelete,
+  machinesDelete,
+  machineCategoriesUpdate,
+  machineCategoriesDelete,
+  machineKpiDefinitionsUpdate,
+  machineKpiDefinitionsDelete,
+  maintenanceUpdate,
+  valueAddedTimberUpdate,
+  logTransportUpdate,
+  machineFuelLogsUpdate,
+  productsUpdate,
   compartmentsList,
   compartmentsCreate,
   compartmentsUpdate,
@@ -3710,6 +3721,158 @@ async function machineMaintScheduleUpdate(userId, schedId, payload) {
     [maintenance_type, frequency_days || 30, last_performed || null,
      next_due || null, estimated_hours || 1, notes || null, schedId]
   );
+  return { ok: true };
+}
+
+async function machineMaintScheduleDelete(userId, schedId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  await pool.query('delete from machine_maintenance_schedules where id=$1', [schedId]);
+  logAudit(user, `Deleted maintenance schedule #${schedId}`, 'ti-trash', { schedId });
+  return { ok: true };
+}
+
+async function machinesDelete(userId, machineId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  await pool.query('update machines set active=false where id=$1', [machineId]);
+  logAudit(user, `Deactivated machine #${machineId}`, 'ti-trash', { machineId });
+  return { ok: true };
+}
+
+async function machineCategoriesUpdate(userId, categoryId, payload) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { name, description, icon } = payload || {};
+  if (!name?.trim()) return { ok: false, error: 'Name is required' };
+  await pool.query(
+    `update machine_categories set name=$1, description=$2, icon=$3 where id=$4`,
+    [name.trim(), description || null, icon || 'ti-tool', categoryId]
+  );
+  logAudit(user, `Machine category updated: ${name}`, 'ti-tool', { categoryId, name });
+  return { ok: true };
+}
+
+async function machineCategoriesDelete(userId, categoryId) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query('select count(*) as cnt from machines where category_id=$1 and active=true', [categoryId]);
+  if (Number(rows[0].cnt) > 0) return { ok: false, error: 'Cannot delete: active machines use this category' };
+  await pool.query('delete from machine_categories where id=$1', [categoryId]);
+  logAudit(user, `Deleted machine category #${categoryId}`, 'ti-trash', { categoryId });
+  return { ok: true };
+}
+
+async function machineKpiDefinitionsUpdate(userId, kpiId, payload) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  const { category_id, kpi_code, kpi_name, unit, higher_is_better, weight, description } = payload || {};
+  if (!kpi_name?.trim()) return { ok: false, error: 'KPI name is required' };
+  await pool.query(
+    `update machine_kpi_definitions set category_id=$1, kpi_code=$2, kpi_name=$3, unit=$4,
+       higher_is_better=$5, weight=$6, description=$7 where id=$8`,
+    [category_id || null, kpi_code?.trim() || '', kpi_name.trim(),
+     unit || '', higher_is_better !== false, weight || 1.0, description || null, kpiId]
+  );
+  logAudit(user, `KPI definition updated: ${kpi_name}`, 'ti-target', { kpiId, kpi_name });
+  return { ok: true };
+}
+
+async function machineKpiDefinitionsDelete(userId, kpiId) {
+  const user = await getUser(userId);
+  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  await pool.query('update machine_kpi_definitions set active=false where id=$1', [kpiId]);
+  logAudit(user, `Deactivated KPI definition #${kpiId}`, 'ti-trash', { kpiId });
+  return { ok: true };
+}
+
+async function maintenanceUpdate(userId, recordId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.maintenance_type || !p.description || !p.maintenance_date)
+    return { ok: false, error: 'Type, description, and date are required' };
+  await pool.query(
+    `update maintenance_records set maintenance_type=$1, description=$2, cost=$3, maintenance_date=$4,
+       next_due_date=$5, performed_by=$6, notes=$7 where id=$8`,
+    [p.maintenance_type, p.description, p.cost ? Number(p.cost) : null,
+     p.maintenance_date, p.next_due_date || null, p.performed_by || null, p.notes || null, recordId]
+  );
+  logAudit(user, `Updated maintenance record #${recordId}`, 'ti-tool', { recordId });
+  return { ok: true };
+}
+
+async function valueAddedTimberUpdate(userId, id, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'value-added-timber')) && !['admin','ceo','operations','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.entry_date) return { ok: false, error: 'Date is required' };
+  if (!p.type_value_added) return { ok: false, error: 'Value-added type is required' };
+  if (!p.product_size) return { ok: false, error: 'Product size is required' };
+  if (!p.num_timber || Number(p.num_timber) <= 0) return { ok: false, error: 'Number of timber must be greater than 0' };
+  await pool.query(
+    `update value_added_timber set entry_date=$1, type_value_added=$2, product_size=$3, num_timber=$4 where id=$5`,
+    [p.entry_date, p.type_value_added, p.product_size, Number(p.num_timber), id]
+  );
+  logAudit(user, `Updated value-added timber #${id}`, 'ti-trees', { id, ...p });
+  return { ok: true };
+}
+
+async function logTransportUpdate(userId, id, payload) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations','logistics','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.transport_date) return { ok: false, error: 'Date is required' };
+  if (!p.qty_transported || Number(p.qty_transported) <= 0) return { ok: false, error: 'Quantity must be greater than 0' };
+  await pool.query(
+    `update log_transport set transport_date=$1, compt_id=$2, sub_name=$3, qty_transported=$4,
+       unit=$5, notes=$6, tractor_plate=$7, loggers_number=$8 where id=$9`,
+    [p.transport_date, p.compt_id ? Number(p.compt_id) : null, p.sub_name || null,
+     Number(p.qty_transported), p.unit || 'logs', p.notes || null,
+     p.tractor_plate?.trim() || null, p.loggers_number?.trim() || null, id]
+  );
+  logAudit(user, `Updated log transport #${id}`, 'ti-truck', { id });
+  return { ok: true };
+}
+
+async function machineFuelLogsUpdate(userId, id, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machine-fuel')) && !['admin','ceo','operations','logistics','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.log_date) return { ok: false, error: 'Date is required' };
+  if (!p.machine_id) return { ok: false, error: 'Machine is required' };
+  if (!p.fuel_type) return { ok: false, error: 'Fuel type is required' };
+  if (!p.quantity || Number(p.quantity) < 0) return { ok: false, error: 'Quantity is required' };
+  await pool.query(
+    `update machine_fuel_logs set log_date=$1, machine_id=$2, operator=$3, fuel_type=$4,
+       quantity=$5, unit=$6, notes=$7 where id=$8`,
+    [p.log_date, Number(p.machine_id), p.operator?.trim() || null,
+     p.fuel_type, Number(p.quantity), p.unit || 'liters', p.notes?.trim() || null, id]
+  );
+  logAudit(user, `Updated machine fuel log #${id}`, 'ti-droplet', { id });
+  return { ok: true };
+}
+
+async function productsUpdate(userId, productId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'products'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.type || !p.size) return { ok: false, error: 'Type and size are required' };
+  await pool.query(
+    `update products set type=$1, sub_type=$2, size=$3, ref=$4,
+       width_mm=$5, height_mm=$6, length_m=$7, diameter_mm=$8, machine=$9, updated_at=now()
+     where id=$10`,
+    [p.type, p.sub_type || null, p.size, p.ref || null,
+     p.width_mm  ? Number(p.width_mm)  : null,
+     p.height_mm ? Number(p.height_mm) : null,
+     p.length_m  ? Number(p.length_m)  : null,
+     p.diameter_mm ? Number(p.diameter_mm) : null,
+     p.machine || null, productId]
+  );
+  logAudit(user, `Updated product #${productId}`, 'ti-package', { productId, type: p.type, size: p.size });
   return { ok: true };
 }
 

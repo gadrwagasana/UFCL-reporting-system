@@ -116,6 +116,7 @@ ipcMain.handle('products:create', async (_evt, { userId, payload }) => data.prod
 ipcMain.handle('products:toggle', async (_evt, { userId, productId, reason }) =>
   data.productsToggle(userId, productId, reason)
 );
+ipcMain.handle('products:update', async (_evt, { userId, productId, payload }) => data.productsUpdate(userId, productId, payload));
 ipcMain.handle('products:active-for-form', async (_evt, { userId, type }) => data.productsActiveForForm(userId, type));
 ipcMain.handle('machines:for-dropdown', async (_evt, { userId }) => data.machinesForDropdown(userId));
 
@@ -188,6 +189,7 @@ ipcMain.handle('fuel-logs:list', async (_evt, { userId, vehicleId }) => data.fue
 ipcMain.handle('fuel-logs:create', async (_evt, { userId, payload }) => data.fuelLogsCreate(userId, payload));
 ipcMain.handle('maintenance:list', async (_evt, { userId, vehicleId }) => data.maintenanceList(userId, vehicleId));
 ipcMain.handle('maintenance:create', async (_evt, { userId, payload }) => data.maintenanceCreate(userId, payload));
+ipcMain.handle('maintenance:update', async (_evt, { userId, recordId, payload }) => data.maintenanceUpdate(userId, recordId, payload));
 
 // Deliveries
 ipcMain.handle('deliveries:list', async (_evt, { userId }) => data.deliveryOrdersList(userId));
@@ -245,9 +247,12 @@ ipcMain.handle('transport:jobs:updateStatus', async (_evt, { userId, jobId, stat
 // Machine Management
 ipcMain.handle('machines:categories:list',   async (_evt, { userId }) => data.machineCategoriesList(userId));
 ipcMain.handle('machines:categories:create', async (_evt, { userId, payload }) => data.machineCategoriesCreate(userId, payload));
+ipcMain.handle('machines:categories:update', async (_evt, { userId, categoryId, payload }) => data.machineCategoriesUpdate(userId, categoryId, payload));
+ipcMain.handle('machines:categories:delete', async (_evt, { userId, categoryId }) => data.machineCategoriesDelete(userId, categoryId));
 ipcMain.handle('machines:list',   async (_evt, { userId }) => data.machinesList(userId));
 ipcMain.handle('machines:create', async (_evt, { userId, payload }) => data.machinesCreate(userId, payload));
 ipcMain.handle('machines:update', async (_evt, { userId, machineId, payload }) => data.machinesUpdate(userId, machineId, payload));
+ipcMain.handle('machines:delete', async (_evt, { userId, machineId }) => data.machinesDelete(userId, machineId));
 
 // Machine Log Item Categories
 ipcMain.handle('machine-log-cats:list',   async (_evt, { userId }) => data.machineLogCategoriesList(userId));
@@ -263,6 +268,8 @@ ipcMain.handle('machine-logs:delete', async (_evt, { userId, logId }) => data.ma
 // Machine KPI
 ipcMain.handle('machine-kpi:definitions:list',   async (_evt, { userId }) => data.machineKpiDefinitionsList(userId));
 ipcMain.handle('machine-kpi:definitions:create', async (_evt, { userId, payload }) => data.machineKpiDefinitionsCreate(userId, payload));
+ipcMain.handle('machine-kpi:definitions:update', async (_evt, { userId, kpiId, payload }) => data.machineKpiDefinitionsUpdate(userId, kpiId, payload));
+ipcMain.handle('machine-kpi:definitions:delete', async (_evt, { userId, kpiId }) => data.machineKpiDefinitionsDelete(userId, kpiId));
 ipcMain.handle('machine-kpi:targets:list', async (_evt, { userId, machineId, month }) => data.machineKpiTargetsList(userId, machineId, month));
 ipcMain.handle('machine-kpi:targets:save', async (_evt, { userId, payload }) => data.machineKpiTargetsSave(userId, payload));
 ipcMain.handle('machine-kpi:performance',  async (_evt, { userId, month }) => data.machineKpiPerformance(userId, month));
@@ -271,6 +278,7 @@ ipcMain.handle('machine-kpi:performance',  async (_evt, { userId, month }) => da
 ipcMain.handle('machine-maint:list',   async (_evt, { userId, machineId }) => data.machineMaintScheduleList(userId, machineId));
 ipcMain.handle('machine-maint:create', async (_evt, { userId, payload }) => data.machineMaintScheduleCreate(userId, payload));
 ipcMain.handle('machine-maint:update', async (_evt, { userId, schedId, payload }) => data.machineMaintScheduleUpdate(userId, schedId, payload));
+ipcMain.handle('machine-maint:delete', async (_evt, { userId, schedId }) => data.machineMaintScheduleDelete(userId, schedId));
 
 // Compartments
 ipcMain.handle('compartments:list',   async (_evt, { userId }) => data.compartmentsList(userId));
@@ -282,11 +290,13 @@ ipcMain.handle('compartments:for-dropdown', async (_evt, { userId }) => data.com
 // Log Transport
 ipcMain.handle('log-transport:list',   async (_evt, { userId }) => data.logTransportList(userId));
 ipcMain.handle('log-transport:create', async (_evt, { userId, payload }) => data.logTransportCreate(userId, payload));
+ipcMain.handle('log-transport:update', async (_evt, { userId, id, payload }) => data.logTransportUpdate(userId, id, payload));
 ipcMain.handle('log-transport:delete', async (_evt, { userId, id }) => data.logTransportDelete(userId, id));
 
 // Value-Added Timber
 ipcMain.handle('value-added-timber:list',   async (_evt, { userId }) => data.valueAddedTimberList(userId));
 ipcMain.handle('value-added-timber:create', async (_evt, { userId, payload }) => data.valueAddedTimberCreate(userId, payload));
+ipcMain.handle('value-added-timber:update', async (_evt, { userId, id, payload }) => data.valueAddedTimberUpdate(userId, id, payload));
 ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id }) => data.valueAddedTimberDelete(userId, id));
 
 // Logistics Dashboard
@@ -295,6 +305,7 @@ ipcMain.handle('logistics:dashboard', async (_evt, { userId }) => data.logistics
 // Machine Fuel Logs
 ipcMain.handle('machine-fuel:list',   async (_evt, { userId }) => data.machineFuelLogsList(userId));
 ipcMain.handle('machine-fuel:create', async (_evt, { userId, payload }) => data.machineFuelLogsCreate(userId, payload));
+ipcMain.handle('machine-fuel:update', async (_evt, { userId, id, payload }) => data.machineFuelLogsUpdate(userId, id, payload));
 ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id }) => data.machineFuelLogsDelete(userId, id));
 
 // Casual Labour Requests
