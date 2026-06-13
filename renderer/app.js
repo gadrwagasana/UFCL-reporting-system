@@ -6355,7 +6355,8 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
                 <td style="font-weight:600;color:var(--g-dark)">${r.product_size}</td>
                 <td style="font-family:var(--fm);font-weight:600;color:var(--green)">${Number(r.num_timber).toLocaleString()}</td>
                 <td>${r.created_by_name || '—'}</td>
-                <td>
+                <td style="white-space:nowrap">
+                  <button class="bs1 vat-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
                   <button class="bs1 vat-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
                 </td>
               </tr>`).join('')}
@@ -6401,12 +6402,62 @@ async function renderValueAddedTimber(cid='page-value-added-timber') {
     );
   };
 
+  document.querySelectorAll('.vat-edit').forEach(btn => {
+    btn.onclick = async () => {
+      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      if (!r) return;
+      const isoDate = r.date_fmt.split('/').reverse().join('-');
+      const sizeOpts = tProducts.map(p =>
+        `<option value="${p.size}" ${r.product_size === p.size ? 'selected' : ''}>${p.size}</option>`
+      ).join('');
+      const hasCurrent = tProducts.find(p => p.size === r.product_size);
+      openOverlay('Edit Value-Added Timber Entry', r.date_fmt, `
+        <div class="frow">
+          <div class="fg"><label>Date *</label><input type="date" id="vat-date" value="${isoDate}"></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Type of value-added *</label>
+            <select id="vat-type">
+              <option value="Kiln-dried timber" ${r.type_value_added === 'Kiln-dried timber' ? 'selected' : ''}>Kiln-dried timber</option>
+              <option value="CCA treated timber" ${r.type_value_added === 'CCA treated timber' ? 'selected' : ''}>CCA treated timber</option>
+            </select>
+          </div>
+          <div class="fg"><label>Select size *</label>
+            <select id="vat-size">
+              <option value="">— Select product size —</option>
+              ${sizeOpts}
+              ${!hasCurrent && r.product_size ? `<option value="${r.product_size}" selected>${r.product_size} (inactive)</option>` : ''}
+            </select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Number of timber *</label><input type="number" id="vat-num" min="1" value="${r.num_timber}"></div>
+        </div>
+        <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+        async () => {
+          const res2 = await UFCL.valueAddedTimberUpdate(STORAGE.user.id, r.id, {
+            entry_date: $('vat-date').value,
+            type_value_added: $('vat-type').value,
+            product_size: $('vat-size').value,
+            num_timber: $('vat-num').value
+          });
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Entry updated.'); await renderValueAddedTimber(cid);
+        }
+      );
+    };
+  });
+
   document.querySelectorAll('.vat-del').forEach(btn => {
-    btn.onclick = () => confirmDelete('Delete this value-added timber entry?', async () => {
-      const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
-      if (!res2.ok) { showOverlayError(res2.error); return; }
-      showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber(cid);
-    });
+    btn.onclick = () => {
+      const r = rows.find(x => x.id === Number(btn.dataset.id));
+      if (!r) return;
+      confirmDelete(`Delete value-added timber entry for <strong>${r.date_fmt}</strong> — ${r.type_value_added}, ${r.product_size}?`, async () => {
+        const res2 = await UFCL.valueAddedTimberDelete(STORAGE.user.id, Number(btn.dataset.id));
+        if (!res2.ok) { showOverlayError(res2.error); return; }
+        showOverlaySuccess('Entry deleted.'); await renderValueAddedTimber(cid);
+      });
+    };
   });
 }
 
