@@ -422,7 +422,8 @@ async function updateRolePermissions() {
     supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
                  'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
                  'machine-logs', 'compartments', 'log-transport', 'value-added-timber',
-                 'machine-fuel', 'casual-requests', 'casuals'],
+                 'machine-fuel', 'casual-requests', 'casuals',
+                 'workshop-overview', 'material-requests'],
     storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
                   'warehouses', 'stock-items', 'stock-movements']
   };

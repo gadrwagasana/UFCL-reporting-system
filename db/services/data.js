@@ -62,8 +62,9 @@ const _roleCache = new Map(); // role → pages[]
 function expandPages(pages) {
   if (!Array.isArray(pages)) return pages;
   const out = [...pages];
-  if (out.includes('daily')) {
-    for (const t of ['daily-timber', 'daily-poles', 'daily-harvest'])
+  // 'daily' or legacy 'production' token expands to all 5 production sub-pages
+  if (out.includes('daily') || out.includes('production')) {
+    for (const t of ['daily-timber', 'daily-poles', 'daily-harvest', 'value-added-timber', 'machine-logs'])
       if (!out.includes(t)) out.push(t);
   }
   return out;
@@ -113,9 +114,9 @@ async function getRolePages(role) {
 
 async function getResolvedPages(user) {
   if (Array.isArray(user.user_permissions) && user.user_permissions.length)
-    return user.user_permissions;
+    return expandPages(user.user_permissions);
   if (_roleCache.has(user.role)) return _roleCache.get(user.role);
-  const pages = await getRolePages(user.role);
+  const pages = expandPages(await getRolePages(user.role));
   _roleCache.set(user.role, pages);
   return pages;
 }
@@ -2366,7 +2367,8 @@ async function harvestUpdate(userId, logId, payload) {
 
 async function harvestDelete(userId, logId) {
   const user = await getUser(userId);
-  if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  if (!(await mustRole(user, 'harvest')) && !(await mustRole(user, 'daily-harvest')))
+    return { ok: false, error: 'Access denied' };
   await pool.query('delete from harvest_logs where id=$1', [logId]);
   logAudit(user, `Deleted harvest log #${logId}`, 'ti-trash', { logId });
   return { ok: true };
