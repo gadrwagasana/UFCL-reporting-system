@@ -43,6 +43,13 @@ contextBridge.exposeInMainWorld('UFCL', {
   salesList: (userId) => ipcRenderer.invoke('sales:list', { userId }),
   salesCreate: (userId, payload) => ipcRenderer.invoke('sales:create', { userId, payload }),
   salesUpdateStatus: (userId, orderId, status) => ipcRenderer.invoke('sales:updateStatus', { userId, orderId, status }),
+  salesProductsForDropdown: (userId) => ipcRenderer.invoke('sales:products-for-dropdown', { userId }),
+  salesUpdatePayment: (userId, orderId, paymentStatus) => ipcRenderer.invoke('sales:update-payment', { userId, orderId, paymentStatus }),
+
+  customersForDropdown: (userId) => ipcRenderer.invoke('customers:for-dropdown', { userId }),
+  customersList:   (userId) => ipcRenderer.invoke('customers:list', { userId }),
+  customersCreate: (userId, payload) => ipcRenderer.invoke('customers:create', { userId, payload }),
+  customersUpdate: (userId, customerId, payload) => ipcRenderer.invoke('customers:update', { userId, customerId, payload }),
 
   productsList: (userId, filter) => ipcRenderer.invoke('products:list', { userId, filter }),
   productsCreate: (userId, payload) => ipcRenderer.invoke('products:create', { userId, payload }),
@@ -92,6 +99,9 @@ contextBridge.exposeInMainWorld('UFCL', {
   stockItemsList: (userId, workshopId) => ipcRenderer.invoke('stock-items:list', { userId, workshopId }),
   stockItemsCreate: (userId, payload) => ipcRenderer.invoke('stock-items:create', { userId, payload }),
   stockItemsUpdate: (userId, itemId, payload) => ipcRenderer.invoke('stock-items:update', { userId, itemId, payload }),
+  stockCategoriesList: (userId) => ipcRenderer.invoke('stock-categories:list', { userId }),
+  stockCategoriesCreate: (userId, name) => ipcRenderer.invoke('stock-categories:create', { userId, name }),
+  stockCategoriesDelete: (userId, categoryId) => ipcRenderer.invoke('stock-categories:delete', { userId, categoryId }),
 
   stockMovementsList: (userId, workshopId) => ipcRenderer.invoke('stock-movements:list', { userId, workshopId }),
   stockMovementsCreate: (userId, payload) => ipcRenderer.invoke('stock-movements:create', { userId, payload }),
@@ -102,6 +112,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   workshopOverview: (userId) => ipcRenderer.invoke('workshop:overview', { userId }),
 
   transportCompaniesDropdown: (userId) => ipcRenderer.invoke('transport-companies:dropdown', { userId }),
+  vehiclesForTransport: (userId) => ipcRenderer.invoke('vehicles:for-transport', { userId }),
   vehiclesList: (userId) => ipcRenderer.invoke('vehicles:list', { userId }),
   vehiclesCreate: (userId, payload) => ipcRenderer.invoke('vehicles:create', { userId, payload }),
   vehiclesUpdate: (userId, vehicleId, payload) => ipcRenderer.invoke('vehicles:update', { userId, vehicleId, payload }),
@@ -177,6 +188,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   machineLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-logs:create', { userId, payload }),
   machineLogsUpdate: (userId, logId, payload) => ipcRenderer.invoke('machine-logs:update', { userId, logId, payload }),
   machineLogsDelete: (userId, logId, reason) => ipcRenderer.invoke('machine-logs:delete', { userId, logId, reason }),
+  machineFuelIssuedLookup: (userId, machineId, logDate) => ipcRenderer.invoke('machine-logs:fuel-issued', { userId, machineId, logDate }),
 
   // Machine KPI
   machineKpiDefinitionsList:   (userId) => ipcRenderer.invoke('machine-kpi:definitions:list', { userId }),
@@ -216,6 +228,8 @@ contextBridge.exposeInMainWorld('UFCL', {
   logisticsDashboard: (userId) => ipcRenderer.invoke('logistics:dashboard', { userId }),
 
   // Machine Fuel Logs
+  machineFuelDropdown:   (userId) => ipcRenderer.invoke('machine-fuel:dropdown', { userId }),
+  machineFuelSummary:    (userId, month) => ipcRenderer.invoke('machine-fuel:summary', { userId, month }),
   machineFuelLogsList:   (userId) => ipcRenderer.invoke('machine-fuel:list', { userId }),
   machineFuelLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-fuel:create', { userId, payload }),
   machineFuelLogsUpdate: (userId, id, payload) => ipcRenderer.invoke('machine-fuel:update', { userId, id, payload }),
@@ -224,6 +238,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   // Casual Labour Requests
   casualLabourRequestsList:   (userId) => ipcRenderer.invoke('casual-requests:list', { userId }),
   casualLabourRequestsCreate: (userId, payload) => ipcRenderer.invoke('casual-requests:create', { userId, payload }),
+  casualLabourRequestsSubmit: (userId, payload) => ipcRenderer.invoke('casual-requests:submit', { userId, payload }),
   casualLabourRequestsReview: (userId, requestId, status) => ipcRenderer.invoke('casual-requests:review', { userId, requestId, status }),
   casualLabourRequestsDelete: (userId, id) => ipcRenderer.invoke('casual-requests:delete', { userId, id }),
 

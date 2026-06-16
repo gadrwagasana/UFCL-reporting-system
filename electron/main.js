@@ -110,6 +110,14 @@ ipcMain.handle('daily:harvest-data', async (_evt, { userId }) => data.dailyHarve
 ipcMain.handle('sales:list', async (_evt, { userId }) => data.salesList(userId));
 ipcMain.handle('sales:create', async (_evt, { userId, payload }) => data.salesCreate(userId, payload));
 ipcMain.handle('sales:updateStatus', async (_evt, { userId, orderId, status }) => data.salesUpdateStatus(userId, orderId, status));
+ipcMain.handle('sales:products-for-dropdown', async (_evt, { userId }) => data.salesProductsForDropdown(userId));
+ipcMain.handle('sales:update-payment', async (_evt, { userId, orderId, paymentStatus }) => data.salesUpdatePayment(userId, orderId, paymentStatus));
+
+// Customers
+ipcMain.handle('customers:for-dropdown', async (_evt, { userId }) => data.customersForDropdown(userId));
+ipcMain.handle('customers:list',   async (_evt, { userId }) => data.customersList(userId));
+ipcMain.handle('customers:create', async (_evt, { userId, payload }) => data.customersCreate(userId, payload));
+ipcMain.handle('customers:update', async (_evt, { userId, customerId, payload }) => data.customersUpdate(userId, customerId, payload));
 
 ipcMain.handle('products:list', async (_evt, { userId, filter }) => data.productsList(userId, filter));
 ipcMain.handle('products:create', async (_evt, { userId, payload }) => data.productsCreate(userId, payload));
@@ -170,6 +178,9 @@ ipcMain.handle('warehouses:update', async (_evt, { userId, warehouseId, payload 
 ipcMain.handle('stock-items:list', async (_evt, { userId, workshopId }) => data.stockItemsList(userId, workshopId));
 ipcMain.handle('stock-items:create', async (_evt, { userId, payload }) => data.stockItemsCreate(userId, payload));
 ipcMain.handle('stock-items:update', async (_evt, { userId, itemId, payload }) => data.stockItemsUpdate(userId, itemId, payload));
+ipcMain.handle('stock-categories:list', async (_evt, { userId }) => data.stockCategoriesList(userId));
+ipcMain.handle('stock-categories:create', async (_evt, { userId, name }) => data.stockCategoriesCreate(userId, name));
+ipcMain.handle('stock-categories:delete', async (_evt, { userId, categoryId }) => data.stockCategoriesDelete(userId, categoryId));
 
 // Stock movements
 ipcMain.handle('stock-movements:list', async (_evt, { userId, workshopId }) => data.stockMovementsList(userId, workshopId));
@@ -182,6 +193,7 @@ ipcMain.handle('workshop:overview', async (_evt, { userId }) => data.workshopOve
 
 // Vehicles
 ipcMain.handle('transport-companies:dropdown', async (_evt, { userId }) => data.transportCompaniesForDropdown(userId));
+ipcMain.handle('vehicles:for-transport', async (_evt, { userId }) => data.vehiclesForTransport(userId));
 ipcMain.handle('vehicles:list', async (_evt, { userId }) => data.vehiclesList(userId));
 ipcMain.handle('vehicles:create', async (_evt, { userId, payload }) => data.vehiclesCreate(userId, payload));
 ipcMain.handle('vehicles:update', async (_evt, { userId, vehicleId, payload }) => data.vehiclesUpdate(userId, vehicleId, payload));
@@ -264,6 +276,7 @@ ipcMain.handle('machine-logs:list',   async (_evt, { userId, machineId, month })
 ipcMain.handle('machine-logs:create', async (_evt, { userId, payload }) => data.machineLogsCreate(userId, payload));
 ipcMain.handle('machine-logs:update', async (_evt, { userId, logId, payload }) => data.machineLogsUpdate(userId, logId, payload));
 ipcMain.handle('machine-logs:delete', async (_evt, { userId, logId, reason }) => data.machineLogsDelete(userId, logId, reason));
+ipcMain.handle('machine-logs:fuel-issued', async (_evt, { userId, machineId, logDate }) => data.machineFuelIssuedLookup(userId, machineId, logDate));
 
 // Machine KPI
 ipcMain.handle('machine-kpi:definitions:list',   async (_evt, { userId }) => data.machineKpiDefinitionsList(userId));
@@ -303,6 +316,8 @@ ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id, reason })
 ipcMain.handle('logistics:dashboard', async (_evt, { userId }) => data.logisticsDashboard(userId));
 
 // Machine Fuel Logs
+ipcMain.handle('machine-fuel:dropdown', async (_evt, { userId }) => data.machineFuelDropdown(userId));
+ipcMain.handle('machine-fuel:summary', async (_evt, { userId, month }) => data.machineFuelSummary(userId, month));
 ipcMain.handle('machine-fuel:list',   async (_evt, { userId }) => data.machineFuelLogsList(userId));
 ipcMain.handle('machine-fuel:create', async (_evt, { userId, payload }) => data.machineFuelLogsCreate(userId, payload));
 ipcMain.handle('machine-fuel:update', async (_evt, { userId, id, payload }) => data.machineFuelLogsUpdate(userId, id, payload));
@@ -311,6 +326,7 @@ ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id, reason }) => da
 // Casual Labour Requests
 ipcMain.handle('casual-requests:list',   async (_evt, { userId }) => data.casualLabourRequestsList(userId));
 ipcMain.handle('casual-requests:create', async (_evt, { userId, payload }) => data.casualLabourRequestsCreate(userId, payload));
+ipcMain.handle('casual-requests:submit', async (_evt, { userId, payload }) => data.casualLabourRequestsSubmit(userId, payload));
 ipcMain.handle('casual-requests:review', async (_evt, { userId, requestId, status }) => data.casualLabourRequestsReview(userId, requestId, status));
 ipcMain.handle('casual-requests:delete', async (_evt, { userId, id }) => data.casualLabourRequestsDelete(userId, id));
 

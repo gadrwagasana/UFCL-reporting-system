@@ -78,6 +78,7 @@ const NAV = [
 
   // ── Commercial ────────────────────────────────────────────────────
   { id: 'sales',              icon: 'ti-shopping-cart',      label: 'Sales Orders',         sec: 'Commercial'      },
+  { id: 'customers',          icon: 'ti-users',              label: 'Customers',            sec: 'Commercial'      },
   { id: 'products',           icon: 'ti-tag',                label: 'Product Catalog',      sec: 'Commercial'      },
 
   // ── Reports & Analytics ───────────────────────────────────────────
@@ -605,6 +606,8 @@ async function showPage(id) {
       return renderPageDailyPoles();
     case 'sales':
       return renderSales();
+    case 'customers':
+      return renderCustomers();
     case 'products':
       return renderProducts();
     case 'logistics':
@@ -929,7 +932,7 @@ async function renderDashboard() {
 async function renderCeoOverview() {
   const pg = $('page-ceo');
   pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2 ti-spin"></i> Loading…</div>`;
-  const res = await window.api.ceoOverview(STORAGE.user.id);
+  const res = await UFCL.ceoOverview(STORAGE.user.id);
   if (!res.ok) { pg.innerHTML = `<div class="lerr" style="display:block">${res.error}</div>`; return; }
 
   const p  = res.production;
@@ -1146,14 +1149,19 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
     <div class="psub">Sawmill production records — timber output by size, stock levels, and transport received.</div>
     <div class="cards">
       <div class="mc" style="border-top:3px solid #0369A1">
-        <div class="mclbl">Logs Received</div>
+        <div class="mclbl">Inbound</div>
         <div class="mcval" style="color:#0369A1">${Number(transport.annualTransported || 0).toLocaleString()}</div>
         <div class="mcsub bp"><i class="ti ti-truck-loading"></i>${(Number(transport.annualTransported || 0) / 3.4).toFixed(1)} m³ &nbsp;|&nbsp; today: ${Number(transport.todayTransported || 0).toLocaleString()} · ${(Number(transport.todayTransported || 0) / 3.4).toFixed(2)} m³</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #7C3AED">
+        <div class="mclbl">Intake (Input)</div>
+        <div class="mcval" style="color:#7C3AED">${totalLogsReceived.toLocaleString()}</div>
+        <div class="mcsub" style="color:#7C3AED"><i class="ti ti-logs"></i>logs used &nbsp;|&nbsp; vol. expected: ${totalVolExpected} m³</div>
       </div>
       <div class="mc" style="border-top:3px solid #16A34A">
         <div class="mclbl">Remaining Logs</div>
         <div class="mcval" style="color:#16A34A">${remainingLogs.toLocaleString()}</div>
-        <div class="mcsub cg"><i class="ti ti-stack-2"></i>Vol. Expected: ${remainingVolM3} m³ &nbsp;|&nbsp; processed: ${totalLogsReceived.toLocaleString()} · ${totalVolExpected} m³</div>
+        <div class="mcsub cg"><i class="ti ti-stack-2"></i>Vol. Expected: ${remainingVolM3} m³ &nbsp;|&nbsp; from ${Number(transport.annualTransported || 0).toLocaleString()} inbound</div>
       </div>
       ${sizeEntries.map(([sz, d]) => `
         <div class="mc" style="border-top:3px solid #1D4ED8">
@@ -1224,6 +1232,10 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
         <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Intake — logs used</label><input type="number" id="dl-logs" placeholder="0" min="0"></div>
+        <div class="fg"><label>Vol. expected (m³)</label><input type="text" id="dl-vol-exp" readonly placeholder="—" style="background:var(--bg2);cursor:default"></div>
+      </div>
+      <div class="frow">
         <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" placeholder="0" min="0"></div>
         <div class="fg"><label>Select size</label><select id="dl-ps"><option value="">— Select product size —</option>${productOpts}</select></div>
       </div>
@@ -1242,6 +1254,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
           timber_units: units,
           timber_kiln_dried: 0, timber_cca_treated: 0, timber_untreated: units,
           timber_waste: 0, poles_units: 0, poles_waste: 0,
+          logs_received: Number($('dl-logs').value || 0),
           downtime_hours: $('dl-dt').value, downtime_reason: $('dl-dr').value,
           remarks: $('dl-rem').value
         });
@@ -1249,6 +1262,12 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
         showOverlaySuccess('Timber entry saved.'); await refresh();
       }
     );
+    const addLogsEl = document.getElementById('dl-logs');
+    const addVolExp = document.getElementById('dl-vol-exp');
+    if (addLogsEl && addVolExp) addLogsEl.oninput = () => {
+      const v = Number(addLogsEl.value || 0);
+      addVolExp.value = v > 0 ? (v / 3.4 * 0.5).toFixed(2) + ' m³' : '';
+    };
   };
 
   document.querySelectorAll('.dl-edit').forEach(btn => {
@@ -1268,11 +1287,16 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
       const mOpts = tMachines.map(m =>
         `<option value="${m.name}" ${r.machine === m.name ? 'selected' : ''}>${m.name} (${m.category_name})</option>`
       ).join('');
+      const initVolExp = Number(r.logs_received || 0) > 0 ? (Number(r.logs_received) / 3.4 * 0.5).toFixed(2) + ' m³' : '';
       openOverlay('Edit Sawmill Timber Entry', r.date, `
         <div class="frow three">
           <div class="fg"><label>Date *</label><input type="date" id="dl-date" value="${isoDate}"></div>
           <div class="fg"><label>Operators / Supervisor</label><input type="text" id="dl-sup" value="${r.supervisor||''}"></div>
           <div class="fg"><label>Machine</label><select id="dl-machine"><option value="">— Select machine —</option>${mOpts}</select></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Intake — logs used</label><input type="number" id="dl-logs" value="${r.logs_received||0}" min="0"></div>
+          <div class="fg"><label>Vol. expected (m³)</label><input type="text" id="dl-vol-exp" readonly value="${initVolExp}" style="background:var(--bg2);cursor:default"></div>
         </div>
         <div class="frow">
           <div class="fg"><label>Timber produced (units)</label><input type="number" id="dl-units" value="${r.timber_units||0}" min="0"></div>
@@ -1296,6 +1320,7 @@ function renderDailyTimber(stock, rows, cid = 'daily-content', onRefresh = null,
             timber_untreated: units,
             timber_waste: r.timber_waste || 0,
             poles_units: r.poles_units || 0, poles_waste: r.poles_waste || 0,
+            logs_received: Number($('dl-logs').value || 0),
             downtime_hours: $('dl-dt').value, downtime_reason: $('dl-dr').value,
             remarks: $('dl-rem').value
           };
@@ -1827,11 +1852,35 @@ function renderDailyHarvest(rows, summary, cid = 'daily-content', onRefresh = nu
   });
 }
 
+function soDeliveryBadge(deliveryNumber, deliveryStatus) {
+  if (!deliveryNumber) return '<span style="color:var(--t3);font-size:11px">None</span>';
+  const map = { Pending:'ba', Assigned:'bb', 'In Transit':'bp', Delivered:'bg', Failed:'br' };
+  return `<span class="badge ${map[deliveryStatus]||'ba'}" style="font-size:10px" title="${deliveryNumber}">${deliveryStatus||'Pending'}</span>`;
+}
+
+function soPaymentBadge(paymentStatus, dueDateStr) {
+  if (paymentStatus === 'Paid') return '<span class="badge bg" style="font-size:11px"><i class="ti ti-circle-check"></i> Paid</span>';
+  if (!dueDateStr) return '<span class="badge" style="color:var(--t3);font-size:11px">No due date</span>';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const due   = new Date(dueDateStr); due.setHours(0,0,0,0);
+  const diff  = Math.round((due - today) / 86400000);
+  if (diff < 0)  return `<span class="badge br" style="font-size:11px"><i class="ti ti-alert-circle"></i> Overdue ${Math.abs(diff)}d</span>`;
+  if (diff === 0) return `<span class="badge ba" style="font-size:11px"><i class="ti ti-clock"></i> Due today</span>`;
+  if (diff <= 7)  return `<span class="badge ba" style="font-size:11px"><i class="ti ti-clock"></i> Due in ${diff}d</span>`;
+  return `<span class="badge bt" style="font-size:11px">Due ${due.toLocaleDateString('en-GB')}</span>`;
+}
+
 async function renderSales() {
-  const res = await UFCL.salesList(STORAGE.user.id);
+  const [res, prodsRes, custsRes] = await Promise.all([
+    UFCL.salesList(STORAGE.user.id),
+    UFCL.salesProductsForDropdown(STORAGE.user.id),
+    UFCL.customersForDropdown(STORAGE.user.id)
+  ]);
   if (!res.ok) return renderDenied('sales', res.error);
   const rows = res.rows || [];
   const stock = res.stock || {};
+  const catalogProducts = prodsRes.ok ? (prodsRes.rows || []) : [];
+  const registeredCustomers = custsRes.ok ? (custsRes.rows || []) : [];
 
   const timberLow = stock.timberStock < 10;
   const polesLow  = stock.polesStock  < 10;
@@ -1875,12 +1924,14 @@ async function renderSales() {
       </div>
       <div class="tw">
         <table class="dt">
-          <thead><tr><th>Order #</th><th>Customer</th><th>Category</th><th>Type</th><th>Size / Spec</th><th>Qty</th><th>Unit (RWF)</th><th>Total (RWF)</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Order #</th><th>Customer</th><th>Category</th><th>Type</th><th>Size / Spec</th><th>Qty</th><th>Unit price</th><th>Total</th><th>Transport</th><th>Delivery</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody>
             ${rows.length === 0
-              ? '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
+              ? '<tr><td colspan="14" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
               : rows.map((r) => {
                   const subBadge = r.product_sub_type === 'Kiln-dried' ? 'ba' : r.product_sub_type === 'CCA-treated' ? 'bg' : r.product_sub_type === 'Untreated' ? 'bt' : '';
+                  const cur = r.currency || 'RWF';
+                  const total = (Number(r.quantity)*Number(r.unit_price)).toLocaleString();
                   return `<tr>
                     <td style="font-family:var(--fm);font-weight:500">${r.order_number}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                     <td>${r.customer_name}</td>
@@ -1888,13 +1939,18 @@ async function renderSales() {
                     <td>${r.product_sub_type ? `<span class="badge ${subBadge}">${r.product_sub_type}</span>` : '<span style="color:var(--t3)">—</span>'}</td>
                     <td style="font-family:var(--fm)">${r.product_size}</td>
                     <td style="font-weight:500">${Number(r.quantity).toLocaleString()}</td>
-                    <td style="font-family:var(--fm)">${Number(r.unit_price).toLocaleString()}</td>
-                    <td style="font-family:var(--fm);font-weight:500">${(Number(r.quantity)*Number(r.unit_price)).toLocaleString()}</td>
+                    <td style="font-family:var(--fm)">${Number(r.unit_price).toLocaleString()} <small style="color:var(--t3)">${cur}</small></td>
+                    <td style="font-family:var(--fm);font-weight:500">${total} <small style="color:var(--t3)">${cur}</small></td>
+                    <td><span class="badge ${r.price_tax_type==='Inclusive'?'bg':'bt'}" style="font-size:10px">${r.price_tax_type==='Inclusive'?'+ Transport':'Ex-works'}</span></td>
+                    <td>${soDeliveryBadge(r.delivery_number, r.delivery_status)}</td>
+                    <td>${soPaymentBadge(r.payment_status||'Unpaid', r.payment_due_date)}</td>
                     <td><button class="so-status-btn" data-so="${r.id}" data-cur="${r.status||'Pending'}" style="all:unset;cursor:pointer">${soStatusBadge(r.status||'Pending')}</button></td>
                     <td style="color:var(--t3)">${new Date(r.created_at).toLocaleDateString('en-GB')}</td>
                     <td style="white-space:nowrap;display:flex;gap:4px">
                       <button class="bs1 so-edit-btn" data-so="${r.id}"><i class="ti ti-edit"></i>Edit</button>
-                      <button class="bs1 so-transport-btn" data-so="${r.id}"><i class="ti ti-truck-loading"></i>Transport</button>
+                      ${(r.payment_status||'Unpaid')==='Unpaid' ? `<button class="bs1 so-pay-btn" data-so="${r.id}" style="color:var(--green)"><i class="ti ti-cash"></i>Pay</button>` : ''}
+                      <button class="bs1 so-deliver-btn" data-so="${r.id}" title="Create delivery order"><i class="ti ti-truck-delivery"></i>Deliver</button>
+                      <button class="bs1 so-transport-btn" data-so="${r.id}" title="Assign 3rd-party transport"><i class="ti ti-building"></i>Transport</button>
                       <button class="bs1 so-del-btn" data-so="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
                     </td>
                   </tr>`;
@@ -1906,13 +1962,42 @@ async function renderSales() {
   `;
 
   $('newSO').onclick = () => {
+    const allProds = catalogProducts;
     openOverlay(
       'New sales order',
       `Stock — Kiln: <strong>${Number(stock.kilnDriedStock||0).toLocaleString()}</strong> &nbsp;CCA: <strong>${Number(stock.ccaTreatedStock||0).toLocaleString()}</strong> &nbsp;Untreated: <strong>${Number(stock.untreatedStock||0).toLocaleString()}</strong> &nbsp;Poles: <strong>${Number(stock.polesStock||0).toLocaleString()}</strong>`,
       `
       <div class="frow">
         <div class="fg"><label>Order number</label><input type="text" placeholder="SO-2026-XXX" id="so-num"></div>
-        <div class="fg"><label>Customer name</label><input type="text" placeholder="Customer company" id="so-cust"></div>
+        <div class="fg">
+          <label>Customer</label>
+          <div style="display:flex;gap:6px;align-items:flex-start">
+            <select id="so-cust" style="flex:1">
+              <option value="">— Select customer —</option>
+              ${registeredCustomers.map(c => `<option value="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}">${c.name}${c.phone?' · '+c.phone:''}</option>`).join('')}
+            </select>
+            <button type="button" class="bs1" id="so-cust-add" title="Register new customer" style="flex-shrink:0;padding:6px 10px"><i class="ti ti-plus"></i> New</button>
+          </div>
+          <div id="so-cust-new" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:6px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--t2)"><i class="ti ti-user-plus"></i> Register new customer</div>
+            <div class="frow" style="margin-bottom:6px">
+              <div class="fg"><label style="font-size:11px">Company / Name *</label><input type="text" id="so-nc-name" placeholder="e.g. RSSB, MTN Rwanda"></div>
+              <div class="fg"><label style="font-size:11px">Contact person</label><input type="text" id="so-nc-contact" placeholder="Full name"></div>
+            </div>
+            <div class="frow" style="margin-bottom:6px">
+              <div class="fg"><label style="font-size:11px">Phone</label><input type="text" id="so-nc-phone" placeholder="+250 7xx xxx xxx"></div>
+              <div class="fg"><label style="font-size:11px">Email</label><input type="text" id="so-nc-email" placeholder="company@example.com"></div>
+            </div>
+            <div class="frow" style="margin-bottom:6px">
+              <div class="fg"><label style="font-size:11px">Address</label><input type="text" id="so-nc-addr" placeholder="Kigali, Rwanda"></div>
+              <div class="fg"><label style="font-size:11px">TIN (optional)</label><input type="text" id="so-nc-tin" placeholder="Tax ID number"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="bp1" id="so-nc-save" style="font-size:12px;padding:5px 14px"><i class="ti ti-check"></i> Register</button>
+              <button type="button" class="bs1" id="so-nc-cancel" style="font-size:12px;padding:5px 14px">Cancel</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="frow">
         <div class="fg">
@@ -1925,25 +2010,91 @@ async function renderSales() {
         </div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Size / spec</label><input type="text" id="so-size" placeholder="e.g. 100x200x4m or O255x9m"></div>
+        <div class="fg">
+          <label>Size / spec</label>
+          <div style="display:flex;gap:6px;align-items:flex-start">
+            <select id="so-size" style="flex:1"><option value="">— Select size —</option></select>
+            <button type="button" class="bs1" id="so-size-add" title="Add new size to Product Catalog" style="flex-shrink:0;padding:6px 10px"><i class="ti ti-plus"></i> New</button>
+          </div>
+          <div id="so-size-new" style="display:none;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:6px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px;color:var(--t2)"><i class="ti ti-book"></i> Add to Product Catalog</div>
+            <div class="frow" style="margin-bottom:6px">
+              <div class="fg"><label style="font-size:11px">Size / spec</label><input type="text" id="so-np-size" placeholder="e.g. 50x100x4m"></div>
+              <div class="fg"><label style="font-size:11px">Reason</label><input type="text" id="so-np-reason" placeholder="e.g. New product for export"></div>
+            </div>
+            <div style="display:flex;gap:6px">
+              <button type="button" class="bp1" id="so-np-save" style="font-size:12px;padding:5px 14px"><i class="ti ti-check"></i> Add to catalog</button>
+              <button type="button" class="bs1" id="so-np-cancel" style="font-size:12px;padding:5px 14px">Cancel</button>
+            </div>
+          </div>
+        </div>
         <div class="fg"><label>Quantity</label><input type="number" placeholder="0" min="1" id="so-qty"></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Unit price (RWF)</label><input type="number" placeholder="0" min="0" id="so-price"></div>
-        <div class="fg"><label>Notes (optional)</label><input type="text" id="so-notes" placeholder="Delivery or special instructions"></div>
+        <div class="fg" style="flex:0 0 110px">
+          <label>Currency</label>
+          <select id="so-currency"><option value="RWF">RWF</option><option value="USD">USD</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select>
+        </div>
+        <div class="fg">
+          <label>Unit price</label>
+          <input type="number" placeholder="0" min="0" id="so-price">
+        </div>
+        <div class="fg" style="flex:0 0 200px">
+          <label>Unit price includes</label>
+          <select id="so-tax"><option value="Exclusive">Without transport (Ex-works)</option><option value="Inclusive">With transport (Delivered)</option></select>
+        </div>
       </div>
-      <div class="frow full"><div class="fg"><label>Reason / description</label><input type="text" id="so-reason" placeholder="Required for audit trail"></div></div>
+      <div class="frow">
+        <div class="fg">
+          <label>Payment terms</label>
+          <select id="so-terms">
+            <option value="cash">Cash / immediate</option>
+            <option value="net7">Net 7 days</option>
+            <option value="net14">Net 14 days</option>
+            <option value="net30">Net 30 days</option>
+            <option value="net60">Net 60 days</option>
+            <option value="custom">Custom date…</option>
+          </select>
+        </div>
+        <div class="fg" id="so-due-row" style="display:none">
+          <label>Payment due date</label>
+          <input type="date" id="so-due-date">
+        </div>
+        <div class="fg" id="so-due-display" style="display:none">
+          <label>Calculated due date</label>
+          <input type="text" id="so-due-calc" readonly style="background:var(--bg2);color:var(--t2)">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg"><label>Notes (optional)</label><input type="text" id="so-notes" placeholder="Delivery or special instructions"></div>
+        <div class="fg"><label>Reason / description</label><input type="text" id="so-reason" placeholder="Required for audit trail"></div>
+      </div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy" style="font-size:13px;vertical-align:-1px"></i> Save order</button><button class="bs1" id="ovCancel">Cancel</button></div>
       `,
       async () => {
+        let dueDate = null;
+        const terms = $('so-terms')?.value;
+        if (terms === 'custom') dueDate = $('so-due-date')?.value || null;
+        else if (terms && terms.startsWith('net')) {
+          const days = parseInt(terms.replace('net',''), 10);
+          const d = new Date(); d.setDate(d.getDate() + days);
+          dueDate = d.toISOString().slice(0,10);
+        }
+        const custSel  = $('so-cust');
+        const custId   = custSel?.value || null;
+        const custName = custSel?.options[custSel.selectedIndex]?.dataset?.name || '';
         const payload = {
           order_number:      $('so-num').value.trim(),
-          customer_name:     $('so-cust').value.trim(),
+          customer_id:       custId,
+          customer_name:     custName,
           product_type:      $('so-type').value,
           product_sub_type:  $('so-type').value === 'Timber' ? $('so-sub').value : null,
           product_size:      $('so-size').value.trim(),
           quantity:          $('so-qty').value,
           unit_price:        $('so-price').value,
+          currency:          $('so-currency')?.value || 'RWF',
+          price_tax_type:    $('so-tax')?.value || 'Exclusive',
+          payment_due_date:  dueDate,
           notes:             $('so-notes').value.trim(),
           reason:            $('so-reason').value.trim()
         };
@@ -1954,11 +2105,127 @@ async function renderSales() {
       }
     );
     setTimeout(() => {
-      const soType = $('so-type');
-      const soSubRow = $('so-sub-row');
-      if (soType && soSubRow) soType.onchange = () => {
-        soSubRow.style.display = soType.value === 'Timber' ? '' : 'none';
+      const soType    = $('so-type');
+      const soSubRow  = $('so-sub-row');
+      const soSizeSel = $('so-size');
+      const soTerms   = $('so-terms');
+      const soDueRow  = $('so-due-row');
+      const soDueDisp = $('so-due-display');
+      const soCalc    = $('so-due-calc');
+
+      // Customer inline registration
+      const custAddBtn   = $('so-cust-add');
+      const custNewPanel = $('so-cust-new');
+      const custSel      = $('so-cust');
+      if (custAddBtn && custNewPanel) {
+        custAddBtn.onclick = () => {
+          custNewPanel.style.display = custNewPanel.style.display === 'none' ? '' : 'none';
+          if (custNewPanel.style.display !== 'none') $('so-nc-name')?.focus();
+        };
+        $('so-nc-cancel').onclick = () => { custNewPanel.style.display = 'none'; };
+        $('so-nc-save').onclick = async () => {
+          const name = $('so-nc-name')?.value.trim();
+          if (!name) return showOverlayError('Customer name is required.');
+          $('so-nc-save').disabled = true;
+          const r = await UFCL.customersCreate(STORAGE.user.id, {
+            name,
+            contact_person: $('so-nc-contact')?.value.trim(),
+            phone:          $('so-nc-phone')?.value.trim(),
+            email:          $('so-nc-email')?.value.trim(),
+            address:        $('so-nc-addr')?.value.trim(),
+            tin:            $('so-nc-tin')?.value.trim()
+          });
+          $('so-nc-save').disabled = false;
+          if (!r.ok) return showOverlayError(r.error || 'Failed to register customer.');
+          registeredCustomers.push({ id: r.id, name: r.name, phone: $('so-nc-phone')?.value.trim() });
+          const opt = document.createElement('option');
+          opt.value = r.id; opt.dataset.name = r.name;
+          opt.textContent = r.name + ($('so-nc-phone')?.value.trim() ? ' · ' + $('so-nc-phone').value.trim() : '');
+          opt.selected = true;
+          if (custSel) custSel.appendChild(opt);
+          custNewPanel.style.display = 'none';
+          ['so-nc-name','so-nc-contact','so-nc-phone','so-nc-email','so-nc-addr','so-nc-tin'].forEach(id => { const el = $(id); if (el) el.value = ''; });
+          showOverlaySuccess(`Customer "${r.name}" registered.`);
+        };
+      }
+
+      const rebuildSizes = () => {
+        const type = soType?.value;
+        const sub  = $('so-sub')?.value;
+        const filtered = allProds.filter(p =>
+          (!type || p.type === type) &&
+          (type !== 'Timber' || !sub || p.sub_type === sub)
+        );
+        if (soSizeSel) {
+          soSizeSel.innerHTML = '<option value="">— Select size —</option>' +
+            filtered.map(p => `<option value="${p.size}">${p.sub_type ? p.sub_type + ' — ' : ''}${p.size}</option>`).join('') +
+            '<option value="__other__">Other (type manually)…</option>';
+        }
       };
+
+      if (soType && soSubRow) {
+        soType.onchange = () => {
+          soSubRow.style.display = soType.value === 'Timber' ? '' : 'none';
+          rebuildSizes();
+        };
+      }
+      if ($('so-sub')) $('so-sub').onchange = rebuildSizes;
+      rebuildSizes();
+
+      if (soSizeSel) soSizeSel.onchange = () => {
+        if (soSizeSel.value === '__other__') {
+          soSizeSel.insertAdjacentHTML('afterend', '<input type="text" id="so-size-manual" placeholder="Type size / spec" style="margin-top:4px;width:100%">');
+          soSizeSel.style.display = 'none';
+        }
+      };
+
+      const sizeAddBtn   = $('so-size-add');
+      const sizeNewPanel = $('so-size-new');
+      if (sizeAddBtn && sizeNewPanel) {
+        sizeAddBtn.onclick = () => {
+          sizeNewPanel.style.display = sizeNewPanel.style.display === 'none' ? '' : 'none';
+          if (sizeNewPanel.style.display !== 'none') $('so-np-size')?.focus();
+        };
+        $('so-np-cancel').onclick = () => { sizeNewPanel.style.display = 'none'; };
+        $('so-np-save').onclick = async () => {
+          const npSize   = $('so-np-size')?.value.trim();
+          const npReason = $('so-np-reason')?.value.trim();
+          if (!npSize) return showOverlayError('Size is required.');
+          if (!npReason) return showOverlayError('Reason is required.');
+          const type = soType?.value;
+          const sub  = type === 'Timber' ? ($('so-sub')?.value || null) : null;
+          if (!type) return showOverlayError('Select a product category first.');
+          $('so-np-save').disabled = true;
+          const r = await UFCL.productsCreate(STORAGE.user.id, { type, sub_type: sub, size: npSize, reason: npReason });
+          $('so-np-save').disabled = false;
+          if (!r.ok) return showOverlayError(r.error || 'Failed to add product.');
+          allProds.push({ type, sub_type: sub, size: npSize });
+          rebuildSizes();
+          if (soSizeSel) soSizeSel.value = npSize;
+          sizeNewPanel.style.display = 'none';
+          $('so-np-size').value = '';
+          $('so-np-reason').value = '';
+          showOverlaySuccess('Product added to catalog.');
+        };
+      }
+
+      const updateDueDisplay = () => {
+        const val = soTerms?.value;
+        if (val === 'custom') {
+          if (soDueRow) soDueRow.style.display = '';
+          if (soDueDisp) soDueDisp.style.display = 'none';
+        } else if (val && val.startsWith('net')) {
+          const days = parseInt(val.replace('net',''), 10);
+          const d = new Date(); d.setDate(d.getDate() + days);
+          if (soCalc) soCalc.value = d.toLocaleDateString('en-GB');
+          if (soDueRow) soDueRow.style.display = 'none';
+          if (soDueDisp) soDueDisp.style.display = '';
+        } else {
+          if (soDueRow) soDueRow.style.display = 'none';
+          if (soDueDisp) soDueDisp.style.display = 'none';
+        }
+      };
+      if (soTerms) soTerms.onchange = updateDueDisplay;
     }, 30);
   };
 
@@ -1968,10 +2235,28 @@ async function renderSales() {
     btn.onclick = () => {
       const r = rows.find(x => x.id === btn.dataset.so);
       if (!r) return;
+      const eCur = r.currency || 'RWF';
+      const eTax = r.price_tax_type || 'Exclusive';
+      const eDue = r.payment_due_date ? r.payment_due_date.slice(0,10) : '';
+      const eProds = catalogProducts.filter(p =>
+        p.type === r.product_type && (r.product_type !== 'Timber' || p.sub_type === r.product_sub_type)
+      );
+      const eSizeOpts = eProds.map(p => `<option value="${p.size}" ${p.size===r.product_size?'selected':''}>${p.sub_type?p.sub_type+' — ':''}${p.size}</option>`).join('');
+      const eCustOpts = registeredCustomers.map(c =>
+        `<option value="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" ${Number(r.customer_id)===c.id?'selected':''}>${c.name}${c.phone?' · '+c.phone:''}</option>`
+      ).join('');
+      const eCustMatch = registeredCustomers.find(c => Number(c.id) === Number(r.customer_id));
       openOverlay('Edit sales order', r.order_number, `
         <div class="frow">
           <div class="fg"><label>Order number</label><input id="soe-num" type="text" value="${r.order_number}"></div>
-          <div class="fg"><label>Customer name</label><input id="soe-cust" type="text" value="${r.customer_name}"></div>
+          <div class="fg">
+            <label>Customer</label>
+            <select id="soe-cust">
+              <option value="">— Select customer —</option>
+              ${eCustOpts}
+              ${!eCustMatch && r.customer_name ? `<option value="" data-name="${r.customer_name.replace(/"/g,'&quot;')}" selected>${r.customer_name} (not in registry)</option>` : ''}
+            </select>
+          </div>
         </div>
         <div class="frow">
           <div class="fg"><label>Product category</label>
@@ -1986,23 +2271,62 @@ async function renderSales() {
           </div>
         </div>
         <div class="frow">
-          <div class="fg"><label>Size / spec</label><input id="soe-size" type="text" value="${r.product_size}"></div>
+          <div class="fg">
+            <label>Size / spec</label>
+            <select id="soe-size">
+              <option value="">— Select size —</option>
+              ${eSizeOpts}
+              ${!eProds.find(p=>p.size===r.product_size) ? `<option value="${r.product_size}" selected>${r.product_size}</option>` : ''}
+            </select>
+          </div>
           <div class="fg"><label>Quantity</label><input id="soe-qty" type="number" min="1" value="${r.quantity}"></div>
         </div>
         <div class="frow">
-          <div class="fg"><label>Unit price (RWF)</label><input id="soe-price" type="number" min="0" value="${r.unit_price}"></div>
+          <div class="fg" style="flex:0 0 110px">
+            <label>Currency</label>
+            <select id="soe-currency">
+              <option value="RWF" ${eCur==='RWF'?'selected':''}>RWF</option>
+              <option value="USD" ${eCur==='USD'?'selected':''}>USD</option>
+              <option value="EUR" ${eCur==='EUR'?'selected':''}>EUR</option>
+              <option value="GBP" ${eCur==='GBP'?'selected':''}>GBP</option>
+            </select>
+          </div>
+          <div class="fg">
+            <label>Unit price</label>
+            <input id="soe-price" type="number" min="0" value="${r.unit_price}">
+          </div>
+          <div class="fg" style="flex:0 0 200px">
+            <label>Unit price includes</label>
+            <select id="soe-tax">
+              <option value="Exclusive" ${eTax==='Exclusive'?'selected':''}>Without transport (Ex-works)</option>
+              <option value="Inclusive" ${eTax==='Inclusive'?'selected':''}>With transport (Delivered)</option>
+            </select>
+          </div>
+        </div>
+        <div class="frow">
+          <div class="fg">
+            <label>Payment due date</label>
+            <input id="soe-due" type="date" value="${eDue}">
+          </div>
           <div class="fg"><label>Notes</label><input id="soe-notes" type="text" value="${r.notes||''}"></div>
         </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
+          const soeCust     = $('soe-cust');
+          const soeCustId   = soeCust?.value || null;
+          const soeCustName = soeCust?.options[soeCust.selectedIndex]?.dataset?.name || r.customer_name || '';
           const payload = {
-            order_number: $('soe-num').value.trim(),
-            customer_name: $('soe-cust').value.trim(),
-            product_type: $('soe-type').value,
+            order_number:  $('soe-num').value.trim(),
+            customer_id:   soeCustId,
+            customer_name: soeCustName,
+            product_type:  $('soe-type').value,
             product_sub_type: $('soe-type').value === 'Timber' ? $('soe-sub').value : null,
             product_size: $('soe-size').value.trim(),
             quantity: $('soe-qty').value,
             unit_price: $('soe-price').value,
+            currency: $('soe-currency')?.value || 'RWF',
+            price_tax_type: $('soe-tax')?.value || 'Exclusive',
+            payment_due_date: $('soe-due')?.value || null,
             notes: $('soe-notes').value.trim()
           };
           if (isSupervisor()) {
@@ -2038,6 +2362,84 @@ async function renderSales() {
           showOverlaySuccess('Order moved to Trash.'); await renderSales();
         });
       }
+    };
+  });
+
+  $('page-sales').querySelectorAll('.so-deliver-btn').forEach((btn) => {
+    btn.onclick = async () => {
+      const soId  = Number(btn.dataset.so);
+      const order = rows.find(x => Number(x.id) === soId);
+      if (!order) return;
+      const vRes = await UFCL.deliveriesList(STORAGE.user.id);
+      const vehicles = vRes.ok ? (vRes.vehicles || []) : [];
+      const vOpts = vehicles.map(v => `<option value="${v.id}">${v.registration}${v.make ? ' — ' + v.make : ''}</option>`).join('');
+      const transportIncl = order.price_tax_type === 'Inclusive';
+      openOverlay(
+        'Create delivery order',
+        `${order.order_number} — ${order.customer_name}`,
+        `
+        ${transportIncl ? `<div style="background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46"><i class="ti ti-truck-delivery"></i> <strong>Transport included in price</strong> — this client's unit price already covers delivery.</div>` : ''}
+        <div class="frow">
+          <div class="fg"><label>Driver name *</label><input id="sod-driver" type="text" placeholder="Full name of driver"></div>
+          <div class="fg"><label>Vehicle</label><select id="sod-vehicle"><option value="">— None —</option>${vOpts}</select></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Delivery date</label><input id="sod-date" type="date" value="${new Date().toISOString().slice(0,10)}"></div>
+          <div class="fg"><label>Route</label><input id="sod-route" type="text" placeholder="e.g. Kigali → Musanze"></div>
+        </div>
+        <div class="fg" style="margin-bottom:.75rem"><label>Notes</label><input id="sod-notes" type="text" placeholder="Any instructions for the driver"></div>
+        <div class="brow">
+          <button class="bp1" id="ovSave"><i class="ti ti-truck-delivery"></i> Create delivery order</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const driver = $('sod-driver')?.value.trim();
+          if (!driver) return showOverlayError('Driver name is required.');
+          const r = await UFCL.deliveriesCreate(STORAGE.user.id, {
+            sales_order_id: soId,
+            vehicle_id:     $('sod-vehicle')?.value || null,
+            driver_name:    driver,
+            delivery_date:  $('sod-date')?.value || null,
+            route:          $('sod-route')?.value.trim() || null,
+            notes:          $('sod-notes')?.value.trim() || null
+          });
+          if (!r.ok) return showOverlayError(r.error || 'Failed to create delivery order.');
+          closeOverlay();
+          showOverlaySuccess('Delivery order created.');
+          await renderSales();
+        }
+      );
+    };
+  });
+
+  $('page-sales').querySelectorAll('.so-pay-btn').forEach((btn) => {
+    btn.onclick = () => {
+      const orderId = Number(btn.dataset.so);
+      const order = rows.find(x => Number(x.id) === orderId);
+      if (!order) return;
+      openOverlay(
+        'Mark as Paid',
+        `Order <strong>${order.order_number}</strong> — ${order.customer_name}`,
+        `
+          <div style="padding:8px 0 16px;color:var(--t2)">
+            Confirm that full payment has been received for this order.<br>
+            <span style="font-size:13px;color:var(--t3)">
+              Amount: <strong>${(Number(order.quantity)*Number(order.unit_price)).toLocaleString()} ${order.currency||'RWF'}</strong>
+              ${order.payment_due_date ? ` &nbsp;·&nbsp; Due: <strong>${new Date(order.payment_due_date).toLocaleDateString('en-GB')}</strong>` : ''}
+            </span>
+          </div>
+          <div class="brow">
+            <button class="bp1" id="ovSave" style="background:var(--green)"><i class="ti ti-cash"></i> Confirm payment received</button>
+            <button class="bs1" id="ovCancel">Cancel</button>
+          </div>
+        `,
+        async () => {
+          const r = await UFCL.salesUpdatePayment(STORAGE.user.id, orderId, 'Paid');
+          if (!r.ok) return showOverlayError(r.error || 'Failed to update payment.');
+          closeOverlay();
+          await renderSales();
+        }
+      );
     };
   });
 
@@ -2085,6 +2487,99 @@ async function renderSales() {
 
   await insertPendingPanel($('page-sales'), ['sales_order'], renderSales);
   await insertDeletionPanel($('page-sales'), ['sales_order'], renderSales);
+}
+
+async function renderCustomers() {
+  const res = await UFCL.customersList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('customers', res.error);
+  const rows = res.rows || [];
+  const active = rows.filter(r => r.active);
+
+  $('page-customers').innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div class="ptitle">Customers</div>
+        <div class="psub">Registered customers used across sales orders. Add a customer here or directly from the New Sales Order form.</div>
+      </div>
+      <button class="bp1" id="custAdd"><i class="ti ti-user-plus"></i> Register customer</button>
+    </div>
+
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc"><div class="mclbl">Total customers</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-users"></i>registered</div></div>
+      <div class="mc"><div class="mclbl">Active</div><div class="mcval">${active.length}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i></div></div>
+    </div>
+
+    <div class="card" style="padding:0">
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Company / Name</th><th>Contact person</th><th>Phone</th><th>Email</th><th>Address</th><th>TIN</th><th>Registered</th><th>Actions</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r => `<tr>
+          <td style="font-weight:600">${r.name}</td>
+          <td>${r.contact_person||'—'}</td>
+          <td style="font-family:var(--fm)">${r.phone||'—'}</td>
+          <td style="color:var(--t3)">${r.email||'—'}</td>
+          <td>${r.address||'—'}</td>
+          <td style="font-family:var(--fm);font-size:12px;color:var(--t3)">${r.tin||'—'}</td>
+          <td style="color:var(--t3);font-size:12px">${r.created_at}</td>
+          <td><button class="bs1 cust-edit-btn" data-id="${r.id}"><i class="ti ti-edit"></i> Edit</button></td>
+        </tr>`).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-users" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No customers registered yet. Click <strong>Register customer</strong> to add the first one.</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>
+  `;
+
+  $('custAdd').onclick = () => openCustomerOverlay(null, null, renderCustomers);
+
+  $('page-customers').querySelectorAll('.cust-edit-btn').forEach(btn => {
+    btn.onclick = () => {
+      const r = rows.find(x => Number(x.id) === Number(btn.dataset.id));
+      if (r) openCustomerOverlay(r.id, r, renderCustomers);
+    };
+  });
+}
+
+function openCustomerOverlay(customerId, existing, onDone) {
+  const isEdit = !!customerId;
+  const e = existing || {};
+  openOverlay(
+    isEdit ? 'Edit customer' : 'Register customer',
+    isEdit ? e.name : 'Fill in the customer details',
+    `
+    <div class="frow">
+      <div class="fg"><label>Company / Name *</label><input type="text" id="co-name" value="${e.name||''}" placeholder="e.g. RSSB, Kigali Homes Ltd"></div>
+      <div class="fg"><label>Contact person</label><input type="text" id="co-contact" value="${e.contact_person||''}" placeholder="Full name of main contact"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Phone</label><input type="text" id="co-phone" value="${e.phone||''}" placeholder="+250 7xx xxx xxx"></div>
+      <div class="fg"><label>Email</label><input type="text" id="co-email" value="${e.email||''}" placeholder="company@example.com"></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Address</label><input type="text" id="co-addr" value="${e.address||''}" placeholder="Kigali, Rwanda"></div>
+      <div class="fg"><label>TIN number</label><input type="text" id="co-tin" value="${e.tin||''}" placeholder="Tax ID number"></div>
+    </div>
+    <div class="frow full"><div class="fg"><label>Notes</label><input type="text" id="co-notes" value="${e.notes||''}" placeholder="Any additional information"></div></div>
+    <div class="brow">
+      <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i> ${isEdit ? 'Save changes' : 'Register'}</button>
+      <button class="bs1" id="ovCancel">Cancel</button>
+    </div>
+    `,
+    async () => {
+      const payload = {
+        name:           $('co-name').value.trim(),
+        contact_person: $('co-contact').value.trim(),
+        phone:          $('co-phone').value.trim(),
+        email:          $('co-email').value.trim(),
+        address:        $('co-addr').value.trim(),
+        tin:            $('co-tin').value.trim(),
+        notes:          $('co-notes').value.trim()
+      };
+      const r = isEdit
+        ? await UFCL.customersUpdate(STORAGE.user.id, customerId, payload)
+        : await UFCL.customersCreate(STORAGE.user.id, payload);
+      if (!r.ok) return showOverlayError(r.error || 'Failed to save customer.');
+      closeOverlay();
+      await onDone();
+    }
+  );
 }
 
 async function renderProducts() {
@@ -3934,13 +4429,25 @@ async function renderWarehouses() {
 
 // ── Stock Catalog ─────────────────────────────────────────────────────────────
 
-const STOCK_CATEGORIES = ['Timber', 'Poles', 'Fuel', 'Spare Parts', 'Tools', 'Packaging', 'Raw Materials', 'Other'];
+// Stock categories are loaded from DB; this is only used as a fallback for new installs
+const STOCK_CATEGORIES_DEFAULT = ['Timber', 'Poles', 'Fuel', 'Spare Parts', 'Tools', 'Packaging', 'Raw Materials', 'Other'];
 
 async function renderStockItems() {
   const res = await UFCL.stockItemsList(STORAGE.user.id, WORKSHOP_FILTER);
   if (!res.ok) return renderDenied('stock-items', res.error);
   const rows = res.rows || [];
   const warehouses = res.warehouses || [];
+  const categories = res.categories || [];
+
+  // managers (no workshop assignment) see per-warehouse breakdown when no filter is active
+  const isManager = !res.user_workshop_id;
+  const showBreakdown = isManager && !WORKSHOP_FILTER && warehouses.length > 0;
+
+  // 'stock-movements' permission controls whether consumption can be recorded
+  const canConsume = (STORAGE.pages || []).includes('stock-movements');
+  // resolved warehouse for consumption: restricted users → their shop; managers with filter → filter; else user picks
+  const defaultWhId = res.user_workshop_id || (WORKSHOP_FILTER ? Number(WORKSHOP_FILTER) : null);
+  const defaultWhName = defaultWhId ? (warehouses.find(w => w.id === defaultWhId)?.name || '') : '';
 
   const lowRows = rows.filter(r => r.total_stock <= Number(r.min_stock));
   const totalValue = rows.reduce((s,r) => s + Number(r.total_stock) * Number(r.unit_cost), 0);
@@ -3950,6 +4457,12 @@ async function renderStockItems() {
     catTotals[r.category] = (catTotals[r.category] || 0) + 1;
   }
 
+  // Dynamic column headers: one column per warehouse + Total, or single Stock column
+  const whHeaders = showBreakdown
+    ? warehouses.map(w => `<th style="text-align:center;white-space:nowrap;font-size:11px">${w.name}</th>`).join('') + '<th style="text-align:center">Total</th>'
+    : '<th>Stock</th>';
+  const tableColCount = 9 + (showBreakdown ? warehouses.length + 1 : 1);
+
   $('page-stock-items').innerHTML = `
     ${workshopBannerHtml(res.warehouses, res.user_workshop_id)}
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
@@ -3957,8 +4470,12 @@ async function renderStockItems() {
         <div class="ptitle">Stock Catalog</div>
         <div class="psub">Maintain your master item list with categories, costs, and warehouse-level stock tracking.</div>
       </div>
-      <button class="bp1" id="siAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>Add item</button>
+      <div style="display:flex;gap:.5rem;flex-shrink:0">
+        <button class="bs1" id="siManageCats" style="white-space:nowrap"><i class="ti ti-tag"></i>Manage categories</button>
+        <button class="bp1" id="siAdd" style="white-space:nowrap"><i class="ti ti-plus"></i>Add item</button>
+      </div>
     </div>
+    ${categories.length === 0 ? `<div style="display:flex;align-items:center;gap:.625rem;padding:.75rem 1rem;background:rgba(124,58,237,.07);border:1px solid rgba(124,58,237,.2);border-radius:7px;margin-bottom:1.25rem;font-size:13px;color:#7C3AED"><i class="ti ti-tag" style="font-size:16px;flex-shrink:0"></i>No custom categories yet — click <strong style="margin:0 .25rem">Manage categories</strong> to define your own before adding items.</div>` : ''}
     <div class="cards" style="margin-bottom:1.25rem">
       <div class="mc"><div class="mclbl">Total SKUs</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-package"></i>catalog</div></div>
       <div class="mc"><div class="mclbl">Alerts</div><div class="mcval" style="${lowRows.length>0?'color:var(--red)':''}">${lowRows.length}</div><div class="mcsub ${lowRows.length>0?'cr':'cg'}"><i class="ti ti-alert-triangle"></i>low stock</div></div>
@@ -3972,38 +4489,54 @@ async function renderStockItems() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} item${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>UoM</th><th>Stock</th><th>Min / Max</th><th>Unit cost (RWF)</th><th>Value (RWF)</th><th>Status</th><th>Actions</th></tr></thead>
+        <thead><tr><th>Category</th><th>Name</th><th>SKU</th><th>UoM</th>${whHeaders}<th>Min / Max</th><th>Unit cost (RWF)</th><th>Value (RWF)</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>${rows.length ? rows.map(r => {
           const low = r.total_stock <= Number(r.min_stock);
           const out = r.total_stock === 0;
           const over = r.max_stock && r.total_stock > Number(r.max_stock);
           const status = out ? 'Out of stock' : low ? 'Reorder' : over ? 'Overstock' : 'OK';
           const cls = out||low ? 'br' : over ? 'ba' : 'bg';
+          const whb = r.wh_breakdown || {};
+          const stockCells = showBreakdown
+            ? warehouses.map(w => {
+                const qty = Number(whb[String(w.id)] || 0);
+                const isOut = qty === 0;
+                const isLow = qty <= Number(r.min_stock);
+                return `<td style="text-align:center;${isOut?'color:var(--red);font-weight:700':isLow?'color:var(--amber);font-weight:600':''}">${qty}</td>`;
+              }).join('') + `<td style="text-align:center;font-weight:700;${out?'color:var(--red)':low?'color:var(--amber)':''}">${r.total_stock}</td>`
+            : `<td style="${out?'color:var(--red);font-weight:700':low?'color:var(--amber);font-weight:600':''}">${r.total_stock}</td>`;
           return `<tr>
             <td><span class="badge bt">${r.category}</span></td>
             <td style="font-weight:500">${r.name}</td>
             <td style="font-family:var(--fm);color:var(--t3)">${r.sku||'—'}</td>
             <td>${r.uom}</td>
-            <td style="${out?'color:var(--red);font-weight:700':low?'color:var(--amber);font-weight:600':''}">${r.total_stock}</td>
+            ${stockCells}
             <td style="font-family:var(--fm);color:var(--t3)">${r.min_stock} / ${r.max_stock||'∞'}</td>
             <td style="font-family:var(--fm)">${Number(r.unit_cost).toLocaleString()}</td>
             <td style="font-family:var(--fm)">${Math.round(r.total_stock*Number(r.unit_cost)).toLocaleString()}</td>
             <td><span class="badge ${cls}">${status}</span></td>
             <td style="white-space:nowrap">
+              ${canConsume ? `<button class="bs1 si-use" data-id="${r.id}" data-name="${r.name.replace(/"/g,'&quot;')}" data-uom="${r.uom}" data-stock="${r.total_stock}" style="color:var(--amber)"><i class="ti ti-minus"></i>Use</button>` : ''}
               <button class="bs1 si-edit" data-id="${r.id}"><i class="ti ti-edit"></i>Edit</button>
               <button class="bs1 si-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
             </td>
           </tr>`;
-        }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-package" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No items yet. Click <strong>Add item</strong> to build your catalog.</td></tr>'}
+        }).join('') : `<tr><td colspan="${tableColCount}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-package" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No items yet. Click <strong>Add item</strong> to build your catalog.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
 
   function itemForm(r) {
-    const catOpts = STOCK_CATEGORIES.map(c=>`<option value="${c}" ${r&&r.category===c?'selected':''}>${c}</option>`).join('');
+    const catListOpts = categories.length
+      ? categories.map(c => `<option value="${c.name}">`).join('')
+      : STOCK_CATEGORIES_DEFAULT.map(c => `<option value="${c}">`).join('');
     return `
+      <datalist id="si-cat-list">${catListOpts}</datalist>
       <div class="frow">
-        <div class="fg"><label>Category *</label><select id="si-cat">${catOpts}</select></div>
+        <div class="fg">
+          <label>Category *</label>
+          <input id="si-cat" type="text" list="si-cat-list" value="${r ? r.category : ''}" placeholder="Select or type a category" autocomplete="off">
+        </div>
         <div class="fg"><label>Name *</label><input id="si-name" type="text" value="${r?r.name:''}" placeholder="Item name"></div>
       </div>
       <div class="frow">
@@ -4067,7 +4600,100 @@ async function renderStockItems() {
       });
     };
   });
+  if (canConsume) {
+    const whDropdown = !defaultWhId && warehouses.length
+      ? `<div class="fg"><label>Workshop *</label><select id="su-wh">${warehouses.map(w=>`<option value="${w.id}">${w.name}</option>`).join('')}</select></div>`
+      : `<div class="fg"><label>Workshop</label><input type="text" value="${defaultWhName}" readonly style="background:var(--bg2);cursor:default"></div>`;
+
+    document.querySelectorAll('.si-use').forEach(btn => {
+      btn.onclick = () => {
+        const itemId   = btn.dataset.id;
+        const itemName = btn.dataset.name;
+        const uom      = btn.dataset.uom;
+        const inStock  = Number(btn.dataset.stock);
+        const today    = new Date().toISOString().slice(0, 10);
+        openOverlay(`Record Consumption — ${itemName}`, null, `
+          <div style="display:flex;align-items:center;gap:.75rem;padding:.65rem 1rem;background:var(--bg2);border-radius:8px;margin-bottom:1rem;font-size:13px">
+            <i class="ti ti-package" style="color:var(--t3);font-size:18px"></i>
+            <span>Current stock: <strong style="${inStock===0?'color:var(--red)':inStock<=5?'color:var(--amber)':''}">${inStock} ${uom}</strong></span>
+          </div>
+          <div class="frow">
+            <div class="fg"><label>Date</label><input id="su-date" type="date" value="${today}"></div>
+            <div class="fg"><label>Quantity consumed (${uom}) *</label><input id="su-qty" type="number" min="1" step="1" placeholder="0"></div>
+          </div>
+          <div class="frow">
+            ${whDropdown}
+            <div class="fg"><label>Notes</label><input id="su-notes" type="text" placeholder="Who used it, purpose, etc."></div>
+          </div>
+          <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Record</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+        async () => {
+          const qty = Number(document.getElementById('su-qty')?.value || 0);
+          if (!qty || qty <= 0) { showOverlayError('Enter a quantity greater than zero.'); return; }
+          const warehouseId = defaultWhId || ($('su-wh') ? Number($('su-wh').value) : null);
+          if (!warehouseId) { showOverlayError('Select a workshop.'); return; }
+          const dateVal = document.getElementById('su-date')?.value || today;
+          const notesVal = document.getElementById('su-notes')?.value.trim() || '';
+          const ref = `Consumption ${dateVal}`;
+          const r2 = await UFCL.stockMovementsCreate(STORAGE.user.id, {
+            item_id: itemId,
+            movement_type: 'out',
+            quantity: qty,
+            warehouse_id: warehouseId,
+            reference: ref,
+            notes: notesVal
+          });
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess(`${qty} ${uom} of ${itemName} recorded as consumed.`);
+          await renderStockItems();
+        });
+      };
+    });
+  }
+
   bindWorkshopBanner(renderStockItems);
+
+  $('siManageCats').onclick = () => {
+    function catManagerHtml(cats) {
+      const list = cats.length
+        ? cats.map(c => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:.45rem .75rem;border-radius:6px;background:var(--bg2);margin-bottom:.35rem">
+              <span style="font-weight:500">${c.name}</span>
+              <button class="bs1 sc-del" data-id="${c.id}" style="color:var(--red);padding:2px 8px;font-size:11px"><i class="ti ti-trash"></i></button>
+            </div>`).join('')
+        : `<div style="color:var(--t3);font-size:13px;padding:.5rem 0">No categories yet. Add your first one below.</div>`;
+      return `
+        <div style="margin-bottom:1rem">${list}</div>
+        <div class="frow" style="gap:.5rem;align-items:flex-end">
+          <div class="fg"><label>New category name</label><input id="sc-new-name" type="text" placeholder="e.g. Lubricants, Safety Gear…"></div>
+          <button class="bp1" id="sc-add-btn" style="flex-shrink:0;margin-bottom:0"><i class="ti ti-plus"></i>Add</button>
+        </div>`;
+    }
+
+    async function openCatManager() {
+      const r2 = await UFCL.stockCategoriesList(STORAGE.user.id);
+      const cats = r2.ok ? r2.rows : [];
+      openOverlay('Manage Stock Categories', null, catManagerHtml(cats), null);
+
+      document.querySelectorAll('.sc-del').forEach(btn => {
+        btn.onclick = async () => {
+          const r3 = await UFCL.stockCategoriesDelete(STORAGE.user.id, btn.dataset.id);
+          if (!r3.ok) { showOverlayError(r3.error); return; }
+          openCatManager();
+        };
+      });
+
+      const addBtn = document.getElementById('sc-add-btn');
+      if (addBtn) addBtn.onclick = async () => {
+        const name = document.getElementById('sc-new-name')?.value.trim();
+        if (!name) return;
+        const r3 = await UFCL.stockCategoriesCreate(STORAGE.user.id, name);
+        if (!r3.ok) { showOverlayError(r3.error); return; }
+        openCatManager();
+      };
+    }
+
+    openCatManager();
+  };
 }
 
 // ── Stock Movements ───────────────────────────────────────────────────────────
@@ -4804,7 +5430,10 @@ async function renderDeliveries() {
         <thead><tr><th>Order #</th><th>Sales order</th><th>Customer</th><th>Driver</th><th>Vehicle</th><th>Delivery date</th><th>Route</th><th>Status</th><th>Actions</th></tr></thead>
         <tbody>${rows.length ? rows.map(r=>`<tr>
           <td style="font-family:var(--fm);font-weight:700">${r.order_number}</td>
-          <td style="font-family:var(--fm);color:var(--t3)">${r.sales_order_number||'—'}</td>
+          <td style="font-family:var(--fm);color:var(--t3)">
+            ${r.sales_order_number||'—'}
+            ${r.so_price_tax_type==='Inclusive' ? '<span class="badge bg" style="font-size:10px;margin-left:4px"><i class="ti ti-truck-delivery"></i> Transport incl.</span>' : ''}
+          </td>
           <td style="font-weight:500">${r.customer_name||'—'}</td>
           <td>${r.driver_name||'—'}</td>
           <td style="font-family:var(--fm)">${r.vehicle_registration||'—'}</td>
@@ -4825,8 +5454,11 @@ async function renderDeliveries() {
 
   $('doAdd').onclick = () => {
     const vOpts = vehicles.map(v=>`<option value="${v.id}">${v.registration}${v.make?' — '+v.make:''}</option>`).join('');
-    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s=>`<option value="${s.id}">${s.order_number} — ${s.customer_name}</option>`).join('');
+    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s=>`<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}">${s.order_number} — ${s.customer_name}${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
     openOverlay('Create delivery order', null, `
+      <div id="do-incl-banner" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
+        <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — the client's unit price already covers this delivery.
+      </div>
       <div class="frow">
         <div class="fg"><label>Driver name *</label><input id="do-driver" type="text" placeholder="Full name"></div>
         <div class="fg"><label>Vehicle</label><select id="do-vehicle">${vOpts||'<option>No vehicles</option>'}</select></div>
@@ -4852,6 +5484,18 @@ async function renderDeliveries() {
       showOverlaySuccess('Delivery order created.');
       await renderDeliveries();
     });
+    setTimeout(() => {
+      const doSo     = $('do-so');
+      const doBanner = $('do-incl-banner');
+      if (doSo && doBanner) {
+        const check = () => {
+          const sel = doSo.options[doSo.selectedIndex];
+          doBanner.style.display = sel?.dataset?.incl === '1' ? '' : 'none';
+        };
+        doSo.addEventListener('change', check);
+        check();
+      }
+    }, 30);
   };
 
   document.querySelectorAll('.do-status-sel').forEach(sel => {
@@ -4943,9 +5587,11 @@ async function renderDispatch() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} request${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Request #</th><th>Delivery order</th><th>Driver</th><th>Vehicle</th><th>Route</th><th>Status</th><th>Raised by</th><th>Approved by</th><th>Date</th>${canApprove?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Request #</th><th>Sales order</th><th>Customer</th><th>Delivery order</th><th>Driver</th><th>Vehicle</th><th>Route</th><th>Status</th><th>Raised by</th><th>Approved by</th><th>Date</th>${canApprove?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r=>`<tr${r.status==='Pending'?' style="background:rgba(245,158,11,.04)"':''}>
           <td style="font-family:var(--fm);font-weight:700">${r.request_number}</td>
+          <td style="font-family:var(--fm);color:#1D4ED8">${r.so_order_number||'—'}</td>
+          <td style="font-weight:500">${r.customer_name||'—'}</td>
           <td style="font-family:var(--fm);color:var(--t3)">${r.delivery_order_number||'—'}</td>
           <td style="font-weight:500">${r.driver_name||'—'}</td>
           <td style="font-family:var(--fm)">${r.vehicle_registration||'—'}</td>
@@ -4961,13 +5607,13 @@ async function renderDispatch() {
             <button class="bs1 ds-reject" data-id="${r.id}" style="padding:4px 10px;font-size:12px;color:var(--red)"><i class="ti ti-x"></i>Reject</button>
             <button class="bs1 ds-del" data-id="${r.id}" style="padding:4px 8px;font-size:12px;color:var(--red)"><i class="ti ti-trash"></i></button>
           </td>` : canApprove ? `<td><button class="bs1 ds-del" data-id="${r.id}" style="padding:4px 8px;font-size:12px;color:var(--red)"><i class="ti ti-trash"></i></button></td>` : ''}
-        </tr>`).join('') : `<tr><td colspan="${canApprove?10:9}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-send" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No dispatch requests yet.</td></tr>`}
+        </tr>`).join('') : `<tr><td colspan="${canApprove?12:11}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-send" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No dispatch requests yet.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
 
   $('dsAdd').onclick = () => {
-    const doOpts = pendingDeliveries.map(d=>`<option value="${d.id}">${d.order_number} — ${d.driver_name}</option>`).join('');
+    const doOpts = pendingDeliveries.map(d=>`<option value="${d.id}">${d.order_number} — ${d.customer_name||d.driver_name||''}${d.so_order_number?' ('+d.so_order_number+')':''}</option>`).join('');
     openOverlay('New dispatch request', null, `
       <div class="fg"><label>Delivery order *</label><select id="ds-do">${doOpts||'<option>No assigned delivery orders</option>'}</select></div>
       <div class="fg"><label>Notes</label><input id="ds-notes" type="text" placeholder="Reason or instructions"></div>
@@ -5365,9 +6011,12 @@ async function renderTransport() {
 function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, onDone) {
   const coOpts = companies.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
   const soOpts = `<option value="">— None (standalone job) —</option>` +
-    salesOrders.map(s => `<option value="${s.id}" ${prefillSalesOrderId && Number(prefillSalesOrderId) === s.id ? 'selected' : ''}>${s.order_number} — ${s.customer_name} (${s.product_type} ${s.product_size}, qty ${s.quantity})</option>`).join('');
+    salesOrders.map(s => `<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}" ${prefillSalesOrderId && Number(prefillSalesOrderId) === s.id ? 'selected' : ''}>${s.order_number} — ${s.customer_name} (${s.product_type} ${s.product_size}, qty ${s.quantity})${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
 
   openOverlay('Log transport job', 'Assign a third-party company to move goods', `
+    <div id="tj-so-banner" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
+      <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — this client's unit price already covers delivery. The transport cost for this job is pre-set to <strong>0</strong> (already covered in SO). Update if you need to track a separate charge.
+    </div>
     <div class="frow">
       <div class="fg"><label>Transport company *</label>
         <select id="tj-co">${coOpts || '<option>No companies registered</option>'}</select>
@@ -5416,6 +6065,20 @@ function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, on
       await onDone();
     }
   );
+  setTimeout(() => {
+    const tjSo     = $('tj-so');
+    const tjBanner = $('tj-so-banner');
+    const tjCost   = $('tj-cost');
+    const tjNotes  = $('tj-notes');
+    const applyBanner = () => {
+      const sel = tjSo?.options[tjSo.selectedIndex];
+      const incl = sel?.dataset?.incl === '1';
+      if (tjBanner) tjBanner.style.display = incl ? '' : 'none';
+      if (incl && tjCost && !tjCost.value) { tjCost.value = '0'; }
+      if (incl && tjNotes && !tjNotes.value) { tjNotes.value = 'Transport cost included in sales order price'; }
+    };
+    if (tjSo) { tjSo.addEventListener('change', applyBanner); applyBanner(); }
+  }, 30);
 }
 
 // ── Timber Inventory ──────────────────────────────────────────────────────────
@@ -5707,13 +6370,25 @@ async function renderMachines() {
 
 // ── Machine Daily Logs ────────────────────────────────────────────────────────
 
-async function renderMachineLogs(cid = 'page-machine-logs') {
+async function renderMachineLogs(cid = 'page-machine-logs', selectedMonth = null) {
   $(cid).innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
 
   const today = new Date();
-  const defaultMonth = today.toISOString().slice(0, 7);
+  const currentMonth = today.toISOString().slice(0, 7);
 
-  const res = await UFCL.machineLogsList(STORAGE.user.id, null, defaultMonth);
+  // Build last 24 months for the picker
+  const monthOpts = (() => {
+    const opts = [`<option value="">All time</option>`];
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      const val = d.toISOString().slice(0, 7);
+      const lbl = d.toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+      opts.push(`<option value="${val}" ${selectedMonth === val ? 'selected' : ''}>${lbl}</option>`);
+    }
+    return opts.join('');
+  })();
+
+  const res = await UFCL.machineLogsList(STORAGE.user.id, null, selectedMonth || null);
   if (!res.ok) return renderDenied('machine-logs', res.error);
 
   const rows = res.rows || [];
@@ -5728,9 +6403,9 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
   const totalProduction = rows.reduce((s, r) => s + Number(r.daily_production), 0);
   const totalCapacity = rows.reduce((s, r) => s + Number(r.capacity_per_day), 0);
   const avgEfficiency = totalCapacity > 0 ? Math.round((totalProduction / totalCapacity) * 100) : 0;
-
-  const machineOpts = machines.map(m => `<option value="${m.id}">${m.machine_code} — ${m.name}</option>`).join('');
-  const shiftOpts = ['Full Day','Day Shift','Night Shift'].map(s => `<option>${s}</option>`).join('');
+  const periodLabel = selectedMonth
+    ? new Date(selectedMonth + '-02').toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+    : 'All time';
 
   $(cid).innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
@@ -5738,29 +6413,35 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
         <div class="ptitle">Machine Daily Logs</div>
         <div class="psub">Log daily production, hours worked, downtime, fuel consumption, and item category for each machine.</div>
       </div>
-      <div style="display:flex;gap:.5rem;flex-shrink:0">
+      <div style="display:flex;gap:.5rem;flex-shrink:0;align-items:center">
+        <select id="mlMonthFilter" style="font-size:13px;padding:6px 10px;border:1px solid var(--bdr);border-radius:6px;background:var(--bg);color:var(--t1);cursor:pointer">${monthOpts}</select>
         ${canManageCats ? `<button class="bs1" id="mlManageCats"><i class="ti ti-tag"></i>Categories</button>` : ''}
         ${canAdd ? `<button class="bp1" id="mlAdd"><i class="ti ti-plus"></i>Add log entry</button>` : ''}
       </div>
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
-      <div class="mc"><div class="mclbl">Entries This Month</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-list-details"></i>${defaultMonth}</div></div>
+      <div class="mc"><div class="mclbl">Entries — ${periodLabel}</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-list-details"></i>${rows.length} record${rows.length!==1?'s':''}</div></div>
       <div class="mc"><div class="mclbl">Total Hours Worked</div><div class="mcval">${totalHours.toFixed(1)}</div><div class="mcsub cg"><i class="ti ti-clock"></i>productive hrs</div></div>
       <div class="mc"><div class="mclbl">Total Downtime</div><div class="mcval" style="${totalDowntime>0?'color:var(--amber)':''}">${totalDowntime.toFixed(1)}</div><div class="mcsub ca"><i class="ti ti-clock-x"></i>hrs</div></div>
       <div class="mc"><div class="mclbl">Avg Efficiency</div><div class="mcval" style="${avgEfficiency<75?'color:var(--amber)':'color:var(--green)'}">${avgEfficiency}%</div><div class="mcsub ${avgEfficiency>=75?'cg':'ca'}"><i class="ti ti-chart-line"></i>production vs capacity</div></div>
     </div>
     <div class="card" style="padding:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
-        <h3 style="margin:0"><i class="ti ti-list-details"></i>Log entries — ${defaultMonth}</h3>
+        <h3 style="margin:0"><i class="ti ti-list-details"></i>Log entries — ${periodLabel}</h3>
         <span style="font-size:12px;color:var(--t3)">${rows.length} entr${rows.length!==1?'ies':'y'}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Machine</th><th>Machine Cat.</th><th>Item Category</th><th>Shift</th><th>Hrs Worked</th><th>Downtime</th><th>Production</th><th>Capacity</th><th>Efficiency</th><th>Fuel (L)</th>${canDelete?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Date</th><th>Machine</th><th>Machine Cat.</th><th>Item Category</th><th>Shift</th><th>Hrs Worked</th><th>Downtime</th><th>Production</th><th>Capacity</th><th>Efficiency</th><th>Fuel Issued (L)</th><th>Fuel Consumed (L)</th><th>Variance</th>${canDelete?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r => {
           const eff = Number(r.capacity_per_day) > 0
             ? Math.round((Number(r.daily_production) / Number(r.capacity_per_day)) * 100)
             : null;
           const effCol = eff === null ? 'color:var(--t3)' : eff >= 90 ? 'color:var(--green);font-weight:600' : eff >= 70 ? 'color:var(--amber)' : 'color:var(--red);font-weight:600';
+          const fIssued   = Number(r.fuel_issued   || 0);
+          const fConsumed = Number(r.fuel_consumed  || 0);
+          const fVar      = fIssued - fConsumed;
+          const fVarCol   = Math.abs(fVar) < 0.05 ? 'color:var(--green)' : fVar > 0 ? 'color:var(--amber)' : 'color:var(--red)';
+          const fVarTxt   = fIssued === 0 && fConsumed === 0 ? '—' : (fVar > 0 ? '+' : '') + fVar.toFixed(1);
           return `<tr>
             <td>${new Date(r.log_date+'T12:00:00').toLocaleDateString('en-GB')}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
             <td style="font-weight:500">${r.machine_code} — ${r.machine_name}</td>
@@ -5772,17 +6453,23 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
             <td style="font-family:var(--fm)">${Number(r.daily_production) > 0 ? Number(r.daily_production).toLocaleString() : '—'}</td>
             <td style="font-family:var(--fm);color:var(--t3)">${Number(r.capacity_per_day) > 0 ? Number(r.capacity_per_day).toLocaleString() : '—'}</td>
             <td style="font-family:var(--fm);${effCol}">${eff !== null ? eff+'%' : '—'}</td>
-            <td style="font-family:var(--fm);color:var(--t3)">${Number(r.fuel_consumed) > 0 ? Number(r.fuel_consumed).toFixed(1) : '—'}</td>
+            <td style="font-family:var(--fm);color:var(--t3)">${fIssued > 0 ? fIssued.toFixed(1) : '—'}</td>
+            <td style="font-family:var(--fm);font-weight:${fConsumed>0?'600':'400'}">${fConsumed > 0 ? fConsumed.toFixed(1) : '—'}</td>
+            <td style="font-family:var(--fm);${fVarCol};font-size:12px">${fVarTxt}</td>
             ${canDelete ? `<td style="white-space:nowrap">
               <button class="bs1 ml-edit" data-id="${r.id}" style="margin-right:4px"><i class="ti ti-edit"></i></button>
               <button class="bs1 ml-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
             </td>` : ''}
           </tr>`;
         }).join('')
-        : `<tr><td colspan="${canDelete?12:11}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-list-details" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No log entries for this month.</td></tr>`}
+        : `<tr><td colspan="${canDelete?14:13}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-list-details" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No log entries for ${periodLabel}.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
+
+  document.getElementById('mlMonthFilter')?.addEventListener('change', e => {
+    renderMachineLogs(cid, e.target.value || null);
+  });
 
   function logForm(r) {
     const mOpts = machines.map(m => `<option value="${m.id}" ${r&&r.machine_id===m.id?'selected':''}>${m.machine_code} — ${m.name} (${m.category_name})</option>`).join('');
@@ -5809,9 +6496,16 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
         <div class="fg"><label>Hours Worked</label><input id="ml-hours" type="number" min="0" step="0.25" value="${r?r.hours_worked:0}"></div>
         <div class="fg"><label>Downtime (hrs)</label><input id="ml-dt" type="number" min="0" step="0.25" value="${r?r.downtime_hours:0}"></div>
       </div>
+      <div class="fg"><label>Downtime Reason</label><input id="ml-dtr" type="text" value="${r?r.downtime_reason||'':''}" placeholder="Reason if any"></div>
       <div class="frow">
-        <div class="fg"><label>Downtime Reason</label><input id="ml-dtr" type="text" value="${r?r.downtime_reason||'':''}" placeholder="Reason if any"></div>
-        <div class="fg"><label>Fuel Consumed (L)</label><input id="ml-fuel" type="number" min="0" step="0.1" value="${r?r.fuel_consumed:0}"></div>
+        <div class="fg">
+          <label>Fuel Consumed (L) <span id="ml-fuel-hint" style="font-weight:400;color:var(--t3);font-size:11px"></span></label>
+          <input id="ml-fuel" type="number" min="0" step="0.1" value="${r?r.fuel_consumed:0}">
+        </div>
+        <div class="fg">
+          <label>Fuel Issued (L) <span style="font-weight:400;color:var(--t3);font-size:11px">— from Fuel Logs</span></label>
+          <input id="ml-fuel-issued" type="text" readonly placeholder="Loading…" style="background:var(--bg2);cursor:default">
+        </div>
       </div>
       <div class="frow">
         <div class="fg"><label>Daily Production</label><input id="ml-prod" type="number" min="0" step="0.1" value="${r?r.daily_production:0}"></div>
@@ -5894,7 +6588,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
         if ($('new-cat-name')) $('new-cat-name').value = '';
         bindCatDelete();
         // Re-render the main page in background so new category is available
-        renderMachineLogs(cid);
+        renderMachineLogs(cid, selectedMonth);
       });
 
       function bindCatDelete() {
@@ -5903,7 +6597,7 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
             const r2 = await UFCL.machineLogCatsDelete(STORAGE.user.id, Number(btn.dataset.id));
             if (!r2.ok) { showOverlayError(r2.error); return; }
             btn.closest('tr').remove();
-            renderMachineLogs(cid);
+            renderMachineLogs(cid, selectedMonth);
           };
         });
       }
@@ -5911,13 +6605,37 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
     });
   }
 
+  async function refreshFuelIssued(fixedMachineId) {
+    const machId = fixedMachineId || document.getElementById('ml-machine')?.value;
+    const date   = document.getElementById('ml-date')?.value;
+    const issuedEl = document.getElementById('ml-fuel-issued');
+    const hintEl   = document.getElementById('ml-fuel-hint');
+    if (!machId || !date || !issuedEl) return;
+    const res = await UFCL.machineFuelIssuedLookup(STORAGE.user.id, machId, date);
+    const issued = res.ok ? Number(res.issued || 0) : 0;
+    issuedEl.value = issued > 0 ? issued.toFixed(1) + ' L' : '— (no Fuel Log entry)';
+    if (hintEl) hintEl.textContent = issued > 0 ? `(issued: ${issued.toFixed(1)} L)` : '';
+    return issued;
+  }
+
   if (canAdd) {
-    $('mlAdd').onclick = () => openOverlay('Add machine log', null, logForm(null), async () => {
-      const r2 = await UFCL.machineLogsCreate(STORAGE.user.id, collectLog());
-      if (!r2.ok) { showOverlayError(r2.error); return; }
-      showOverlaySuccess('Log entry saved.');
-      await renderMachineLogs(cid);
-    });
+    $('mlAdd').onclick = () => {
+      openOverlay('Add machine log', null, logForm(null), async () => {
+        const r2 = await UFCL.machineLogsCreate(STORAGE.user.id, collectLog());
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Log entry saved.');
+        await renderMachineLogs(cid, selectedMonth);
+      });
+      // Auto-lookup fuel issued when machine or date changes; pre-fill consumed if still 0
+      async function onMachDateChange() {
+        const issued = await refreshFuelIssued(null);
+        const fuelEl = document.getElementById('ml-fuel');
+        if (fuelEl && Number(fuelEl.value) === 0 && issued > 0) fuelEl.value = issued.toFixed(1);
+      }
+      document.getElementById('ml-machine')?.addEventListener('change', onMachDateChange);
+      document.getElementById('ml-date')?.addEventListener('change', onMachDateChange);
+      onMachDateChange();
+    };
   }
 
   if (canDelete) {
@@ -5933,14 +6651,17 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
               entity_id: row.id, entity_ref: `${row.machine_code} — ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}`, payload
             });
             if (!r2.ok) { showOverlayError(r2.error); return; }
-            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderMachineLogs(cid);
+            showOverlaySuccess('Change submitted for approval.'); closeOverlay(); await renderMachineLogs(cid, selectedMonth);
           } else {
             const r2 = await UFCL.machineLogsUpdate(STORAGE.user.id, row.id, payload);
             if (!r2.ok) { showOverlayError(r2.error); return; }
             showOverlaySuccess('Log updated.');
-            await renderMachineLogs(cid);
+            await renderMachineLogs(cid, selectedMonth);
           }
         });
+        // Show fuel issued for this machine+date; re-fetch if date is changed
+        refreshFuelIssued(row.machine_id);
+        document.getElementById('ml-date')?.addEventListener('change', () => refreshFuelIssued(row.machine_id));
       };
     });
 
@@ -5952,21 +6673,21 @@ async function renderMachineLogs(cid = 'page-machine-logs') {
           confirmDeleteSoft(`Submit delete request for log <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}? A manager must approve before it is moved to Trash.`, async (reason) => {
             const r2 = await UFCL.deletionRequestCreate(STORAGE.user.id, 'machine_daily_logs', row.id, 'machine_daily_log', `${row.machine_code} — ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')}`, reason);
             if (!r2.ok) { showOverlayError(r2.error); return; }
-            showOverlaySuccess('Deletion request submitted for approval.'); await renderMachineLogs(cid);
+            showOverlaySuccess('Deletion request submitted for approval.'); await renderMachineLogs(cid, selectedMonth);
           });
         } else {
           confirmDeleteSoft(`Move log for <strong>${row.machine_code}</strong> on ${new Date(row.log_date+'T12:00:00').toLocaleDateString('en-GB')} to Trash?`, async (reason) => {
             const r2 = await UFCL.machineLogsDelete(STORAGE.user.id, row.id, reason);
             if (!r2.ok) { showOverlayError(r2.error); return; }
-            showOverlaySuccess('Entry moved to Trash.'); await renderMachineLogs(cid);
+            showOverlaySuccess('Entry moved to Trash.'); await renderMachineLogs(cid, selectedMonth);
           });
         }
       };
     });
   }
 
-  await insertPendingPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid));
-  await insertDeletionPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid));
+  await insertPendingPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid, selectedMonth));
+  await insertDeletionPanel($(cid), ['machine_daily_log'], () => renderMachineLogs(cid, selectedMonth));
 }
 
 // ── Machine KPI Performance ───────────────────────────────────────────────────
@@ -6387,14 +7108,18 @@ async function renderCompartments() {
 
 async function renderLogTransport() {
   $('page-log-transport').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
-  const [res, comptsRes] = await Promise.all([
+  const [res, comptsRes, vehRes, machRes] = await Promise.all([
     UFCL.logTransportList(STORAGE.user.id),
-    UFCL.compartmentsForDropdown(STORAGE.user.id)
+    UFCL.compartmentsForDropdown(STORAGE.user.id),
+    UFCL.vehiclesForTransport(STORAGE.user.id),
+    UFCL.machinesForDropdown(STORAGE.user.id)
   ]);
   if (!res.ok) return renderDenied('log-transport', res.error);
   const rows = res.rows || [];
   const totals = res.totals || {};
   const compts = comptsRes.ok ? comptsRes.rows : [];
+  const transportVehicles = vehRes.ok ? (vehRes.rows || []) : [];
+  const allMachines = machRes.ok ? (machRes.rows || []) : [];
   const today = new Date().toISOString().split('T')[0];
   const logsM3 = (totals.totalLogsHarvested / 3.4).toFixed(1);
   const transportedM3 = (totals.totalLogsTransported / 3.4).toFixed(1);
@@ -6455,6 +7180,29 @@ async function renderLogTransport() {
 
   $('newLT').onclick = () => {
     const comptOpts = compts.map(c => `<option value="${c.id}" data-sub="${c.sub_name||''}" data-species="${c.species}" data-status="${c.status}">${c.compt_name}${c.sub_name ? ' / '+c.sub_name : ''} [${c.status}]</option>`).join('');
+
+    // Build vehicle options grouped by category
+    const trucks   = transportVehicles.filter(v => v.vehicle_category === 'Truck');
+    const tractors = transportVehicles.filter(v => v.vehicle_category === 'Tractor');
+    const vehOptGroup = (label, list) => list.length
+      ? `<optgroup label="${label}">${list.map(v =>
+          `<option value="${v.registration}">${v.registration}${v.make ? ' — ' + v.make : ''}${v.model ? ' ' + v.model : ''}${v.driver_assigned ? ' [' + v.driver_assigned + ']' : ''}</option>`
+        ).join('')}</optgroup>`
+      : '';
+    const vehOpts = vehOptGroup('Tractor', tractors) + vehOptGroup('Truck', trucks);
+
+    // Build machine options grouped by category
+    const machByCategory = {};
+    allMachines.forEach(m => {
+      if (!machByCategory[m.category_name]) machByCategory[m.category_name] = [];
+      machByCategory[m.category_name].push(m);
+    });
+    const machOpts = Object.entries(machByCategory).map(([cat, list]) =>
+      `<optgroup label="${cat}">${list.map(m =>
+        `<option value="${m.machine_code}">${m.machine_code}${m.name ? ' — ' + m.name : ''}${m.plate_number ? ' [' + m.plate_number + ']' : ''}</option>`
+      ).join('')}</optgroup>`
+    ).join('');
+
     openOverlay('Log Transport Entry', 'Record logs transported from forest to sawmill', `
       <div class="frow">
         <div class="fg"><label>Date *</label><input type="date" id="lt-date" value="${today}"></div>
@@ -6469,30 +7217,55 @@ async function renderLogTransport() {
         <div class="fg"><label>Volume total (auto m³)</label><input type="text" id="lt-vol" readonly style="background:var(--surf)" placeholder="0.00 m³"></div>
       </div>
       <div class="frow">
-        <div class="fg"><label>Tractor plate number</label><input type="text" id="lt-tractor" placeholder="e.g. RAA 123B (if used)"></div>
-        <div class="fg"><label>Loggers' number</label><input type="text" id="lt-loggers" placeholder="e.g. 3 or L-007 (if used)"></div>
+        <div class="fg">
+          <label>Tractor / Truck plate number</label>
+          ${vehOpts
+            ? `<input type="text" id="lt-veh-search" placeholder="Search by plate, make, driver…" autocomplete="off" style="margin-bottom:4px">
+               <select id="lt-tractor">
+                 <option value="">— select vehicle —</option>
+                 ${vehOpts}
+               </select>`
+            : `<input type="text" id="lt-tractor" placeholder="e.g. RAA 123B — no Truck/Tractor registered yet">`}
+        </div>
+        <div class="fg">
+          <label>Loggers' number (Machine Registry)</label>
+          ${machOpts
+            ? `<input type="text" id="lt-mach-search" placeholder="Search by code, name…" autocomplete="off" style="margin-bottom:4px">
+               <select id="lt-loggers">
+                 <option value="">— select machine —</option>
+                 ${machOpts}
+               </select>`
+            : `<input type="text" id="lt-loggers" placeholder="e.g. L-007 — no machines registered yet">`}
+        </div>
       </div>
       <div class="fg"><label>Notes</label><input type="text" id="lt-notes" placeholder="Route, driver, additional details…"></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
       async () => {
         const r = await UFCL.logTransportCreate(STORAGE.user.id, {
-          transport_date: $('lt-date').value,
-          compt_id: $('lt-compt').value || null,
-          sub_name: $('lt-sub')?.value || null,
+          transport_date:  $('lt-date').value,
+          compt_id:        $('lt-compt').value || null,
+          sub_name:        $('lt-sub')?.value || null,
           qty_transported: $('lt-qty').value,
-          tractor_plate: $('lt-tractor').value.trim() || null,
-          loggers_number: $('lt-loggers').value.trim() || null,
-          notes: $('lt-notes').value.trim() || null
+          tractor_plate:   $('lt-tractor').value.trim() || null,
+          loggers_number:  $('lt-loggers').value.trim() || null,
+          notes:           $('lt-notes').value.trim() || null
         });
         if (!r.ok) { showOverlayError(r.error); return; }
         showOverlaySuccess('Transport entry saved.'); await renderLogTransport();
       }
     );
+
+    // openOverlay is synchronous — wire all event listeners now
     const comptSel = document.getElementById('lt-compt');
-    const subRow = document.getElementById('lt-sub-row');
-    const subSel = document.getElementById('lt-sub');
-    const qtyEl = document.getElementById('lt-qty');
-    const volEl = document.getElementById('lt-vol');
+    const subRow   = document.getElementById('lt-sub-row');
+    const subSel   = document.getElementById('lt-sub');
+    const qtyEl    = document.getElementById('lt-qty');
+    const volEl    = document.getElementById('lt-vol');
+    const searchEl  = document.getElementById('lt-veh-search');
+    const vehSel    = document.getElementById('lt-tractor');
+    const machSearchEl = document.getElementById('lt-mach-search');
+    const machSel      = document.getElementById('lt-loggers');
+
     if (comptSel) {
       comptSel.onchange = () => {
         const opt = comptSel.options[comptSel.selectedIndex];
@@ -6505,12 +7278,29 @@ async function renderLogTransport() {
         }
       };
     }
+
     if (qtyEl && volEl) {
       qtyEl.oninput = () => {
         const v = Number(qtyEl.value);
         volEl.value = v > 0 ? (v / 3.4).toFixed(2) + ' m³' : '';
       };
     }
+
+    // Live search filter helper (reused for both dropdowns)
+    const wireSearch = (searchInput, selectEl) => {
+      if (!searchInput || !selectEl) return;
+      searchInput.addEventListener('input', () => {
+        const q = searchInput.value.trim().toLowerCase();
+        Array.from(selectEl.options).forEach(opt => {
+          if (!opt.value) return;
+          opt.style.display = !q || opt.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+        const cur = selectEl.options[selectEl.selectedIndex];
+        if (cur?.value && cur.style.display === 'none') selectEl.value = '';
+      });
+    };
+    wireSearch(searchEl, vehSel);
+    wireSearch(machSearchEl, machSel);
   };
 
   document.querySelectorAll('.lt-del').forEach(btn => {
@@ -6750,64 +7540,184 @@ async function renderMachineFuelLogs() {
   const pg = $('page-machine-fuel');
   pg.innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
 
-  const [logsRes, machRes] = await Promise.all([
+  const selectedMonth = null;
+  const [logsRes, machRes, stockRes, summaryRes] = await Promise.all([
     UFCL.machineFuelLogsList(STORAGE.user.id),
-    UFCL.machinesForDropdown(STORAGE.user.id)
+    UFCL.machineFuelDropdown(STORAGE.user.id),
+    UFCL.stockItemsList(STORAGE.user.id, null),
+    UFCL.machineFuelSummary(STORAGE.user.id, selectedMonth)
   ]);
   if (!logsRes.ok) return renderDenied('machine-fuel', logsRes.error);
 
   const rows = logsRes.rows || [];
-  const machines = machRes.ok ? (machRes.rows || []) : [];
+  const fuelItems = machRes.ok ? (machRes.rows || []) : [];
+
+  const allStockItems = stockRes.ok ? (stockRes.rows || []) : [];
+  const stockWarehouses = stockRes.ok ? (stockRes.warehouses || []) : [];
+  const fuelCatalogItems = allStockItems.filter(r =>
+    (r.category || '').toLowerCase().includes('fuel') ||
+    ['diesel', 'petrol', 'petroleum', 'oil', 'essence'].some(k => (r.name || '').toLowerCase().includes(k))
+  );
   const today = new Date().toISOString().split('T')[0];
   const canManage = ['admin', 'ceo', 'operations', 'logistics', 'supervisor'].includes(STORAGE.user?.role);
 
-  const totalLiters = rows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  // UX helpers — pre-fill form from last entry
+  const todayRows   = rows.filter(r => r.log_date === today);
+  const lastRow     = rows[0];
+  const lastMachine = lastRow ? (lastRow.machine_id ? `m:${lastRow.machine_id}` : lastRow.vehicle_id ? `v:${lastRow.vehicle_id}` : '') : '';
+  const lastFuelType = lastRow?.fuel_type || 'Diesel';
+  const defaultOperator = (STORAGE.user?.name || '').replace(/"/g, '&quot;');
+
   const fuelTypes = [...new Set(rows.map(r => r.fuel_type))];
 
-  const machOpts = machines.map(m =>
-    `<option value="${m.id}">${m.machine_code} — ${m.machine_name}${m.plate_number ? ' [' + m.plate_number + ']' : ''}</option>`
-  ).join('');
+  const byMachine = summaryRes.ok ? (summaryRes.byMachine || []) : [];
+  const byDate    = summaryRes.ok ? (summaryRes.byDate    || []) : [];
+  const totalIssued   = byMachine.reduce((s, r) => s + Number(r.fuel_issued   || 0), 0);
+  const totalConsumed = byMachine.reduce((s, r) => s + Number(r.fuel_consumed || 0), 0);
+  const totalVariance = totalIssued - totalConsumed;
+
+  const fuelMachines = fuelItems.filter(m => m.source === 'machine');
+  const fuelVehicles = fuelItems.filter(m => m.source === 'vehicle');
+  const machOpts = [
+    fuelMachines.length ? `<optgroup label="Machines">${fuelMachines.map(m =>
+      `<option value="m:${m.id}" ${`m:${m.id}` === lastMachine ? 'selected' : ''}>${m.code}${m.label ? ' — ' + m.label : ''}${m.plate_number ? ' [' + m.plate_number + ']' : ''}</option>`
+    ).join('')}</optgroup>` : '',
+    fuelVehicles.length ? `<optgroup label="Company Vehicles">${fuelVehicles.map(m =>
+      `<option value="v:${m.id}" ${`v:${m.id}` === lastMachine ? 'selected' : ''}>${m.code}${m.label ? ' — ' + m.label : ''}</option>`
+    ).join('')}</optgroup>` : ''
+  ].join('');
 
   const fuelDropOpts = ['Diesel', 'Petroleum/Essence', 'Petrol', 'Chain Oil', 'Engine Oil']
-    .map(f => `<option value="${f}">${f}</option>`).join('');
+    .map(f => `<option value="${f}" ${f === lastFuelType ? 'selected' : ''}>${f}</option>`).join('');
+
+  // Today's activity strip
+  const todayTotal = todayRows.reduce((s, r) => s + Number(r.quantity || 0), 0);
+  const todayStrip = todayRows.length ? `
+    <div style="background:rgba(0,160,100,.06);border:1px solid rgba(0,160,100,.2);border-radius:8px;padding:.55rem 1rem;margin-bottom:1rem;display:flex;align-items:center;gap:.75rem;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--g-dark);white-space:nowrap"><i class="ti ti-sun"></i> Today's issues:</span>
+      ${todayRows.map(r => `<span class="badge bg" style="font-size:12px">${r.machine_code || '—'} &mdash; ${Number(r.quantity).toFixed(1)} L ${r.fuel_type}</span>`).join('')}
+      <span style="font-size:12px;color:var(--g-dark);font-weight:600;margin-left:auto;white-space:nowrap">${todayTotal.toFixed(1)} L total today</span>
+    </div>` : '';
 
   pg.innerHTML = `
-    <div class="ptitle"><i class="ti ti-droplet" style="color:var(--g-soft)"></i> Machine Fuel Logs</div>
-    <div class="psub">Track daily fuel and oil consumption per machine.</div>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap">
+      <div>
+        <div class="ptitle" style="margin-bottom:.2rem"><i class="ti ti-droplet" style="color:var(--g-soft)"></i> Machine Fuel Logs</div>
+        <div class="psub" style="margin:0">Record fuel issued to machines · reconcile against daily consumption</div>
+      </div>
+      ${canManage ? `<button class="appbtn" id="newFuelLog" style="padding:.55rem 1.2rem;font-size:14px;font-weight:600;white-space:nowrap;flex-shrink:0"><i class="ti ti-droplet-plus"></i> Log Fuel</button>` : ''}
+    </div>
+
+    ${todayStrip}
+
     <div class="cards" style="margin-bottom:1.25rem">
       <div class="mc" style="border-top:3px solid var(--g-soft)">
+        <div class="mclbl">Total issued</div>
+        <div class="mcval">${totalIssued.toFixed(1)} L</div>
+        <div class="mcsub cg"><i class="ti ti-droplet"></i>all time</div>
+      </div>
+      <div class="mc" style="border-top:3px solid #7C3AED">
+        <div class="mclbl">Total consumed</div>
+        <div class="mcval" style="color:#7C3AED">${totalConsumed.toFixed(1)} L</div>
+        <div class="mcsub" style="color:#7C3AED"><i class="ti ti-flame"></i>from daily logs</div>
+      </div>
+      <div class="mc" style="border-top:3px solid ${Math.abs(totalVariance) < 0.05 ? 'var(--green)' : totalVariance > 0 ? 'var(--amber)' : 'var(--red)'}">
+        <div class="mclbl">Variance</div>
+        <div class="mcval" style="color:${Math.abs(totalVariance) < 0.05 ? 'var(--green)' : totalVariance > 0 ? 'var(--amber)' : 'var(--red)'}">${totalVariance > 0 ? '+' : ''}${totalVariance.toFixed(1)} L</div>
+        <div class="mcsub" style="color:${Math.abs(totalVariance) < 0.05 ? 'var(--green)' : 'var(--amber)'}"><i class="ti ti-math-equal"></i>issued − consumed</div>
+      </div>
+      <div class="mc">
         <div class="mclbl">Total entries</div>
         <div class="mcval">${rows.length}</div>
-        <div class="mcsub cg"><i class="ti ti-list"></i>all time</div>
-      </div>
-      <div class="mc">
-        <div class="mclbl">Total consumption</div>
-        <div class="mcval">${totalLiters.toFixed(1)} L</div>
-        <div class="mcsub cg"><i class="ti ti-droplet"></i>all entries</div>
-      </div>
-      <div class="mc">
-        <div class="mclbl">Fuel types tracked</div>
-        <div class="mcval">${fuelTypes.length}</div>
-        <div class="mcsub cg"><i class="ti ti-list-details"></i>${fuelTypes.slice(0,3).join(', ') || '—'}</div>
+        <div class="mcsub cg"><i class="ti ti-list-details"></i>${fuelTypes.slice(0,2).join(', ') || '—'}</div>
       </div>
     </div>
+
+    ${byMachine.length ? `
+    <div class="card" style="padding:0;margin-bottom:1.25rem">
+      <div style="padding:.65rem 1.25rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:.5rem;cursor:pointer;user-select:none" id="toggleReconcile">
+        <h3 style="margin:0;font-size:14px"><i class="ti ti-chart-bar"></i> Per-machine reconciliation</h3>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto">Issued vs Consumed</span>
+        <i class="ti ti-chevron-down" id="reconcileChevron" style="color:var(--t3);font-size:14px"></i>
+      </div>
+      <div id="reconcileBody">
+        <div style="font-size:11px;color:var(--t3);padding:.5rem 1.25rem .25rem;border-bottom:1px solid var(--bdr)">
+          <i class="ti ti-info-circle"></i>
+          <strong>Issued</strong> = fuel recorded on this page &nbsp;·&nbsp;
+          <strong>Consumed</strong> = fuel entered in <em>Machine Daily Logs</em> (fuel_consumed field)
+        </div>
+        <div class="tw"><table class="dt">
+          <thead><tr><th>Machine</th><th>Category</th><th style="text-align:right">Issued (L)</th><th style="text-align:right">Consumed (L) <span style="font-size:10px;font-weight:400;color:var(--t3)">daily logs</span></th><th style="text-align:right">Variance (L)</th></tr></thead>
+          <tbody>${byMachine.map(r => {
+            const issued   = Number(r.fuel_issued   || 0);
+            const consumed = Number(r.fuel_consumed || 0);
+            const variance = Number(r.variance      || 0);
+            const varCol   = Math.abs(variance) < 0.05 ? 'var(--green)' : variance > 0 ? 'var(--amber)' : 'var(--red)';
+            const varTxt   = (variance > 0 ? '+' : '') + variance.toFixed(1);
+            return `<tr>
+              <td><span style="font-weight:600">${r.machine_code}</span><br><span style="font-size:11px;color:var(--t3)">${r.machine_name}</span></td>
+              <td><span class="badge bt">${r.category_name}</span></td>
+              <td style="text-align:right;font-family:var(--fm)">${issued.toFixed(1)}</td>
+              <td style="text-align:right;font-family:var(--fm);color:#7C3AED">${consumed.toFixed(1)}</td>
+              <td style="text-align:right;font-family:var(--fm);font-weight:700;color:${varCol}">${varTxt}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>` : ''}
+
+    ${byDate.length ? `
+    <div class="card" style="padding:0;margin-bottom:1.25rem">
+      <div style="padding:.65rem 1.25rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:.5rem;cursor:pointer;user-select:none" id="toggleDaily">
+        <h3 style="margin:0;font-size:14px"><i class="ti ti-calendar-stats"></i> Daily breakdown</h3>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto">Last 60 records</span>
+        <i class="ti ti-chevron-right" id="dailyChevron" style="color:var(--t3);font-size:14px"></i>
+      </div>
+      <div id="dailyBody" style="display:none">
+        <div style="font-size:11px;color:var(--t3);padding:.5rem 1.25rem .25rem;border-bottom:1px solid var(--bdr)">
+          <i class="ti ti-info-circle"></i>
+          <strong>Consumed</strong> is taken from the <em>Fuel Consumed</em> field in Machine Daily Logs. If it shows — , open Machine Daily Logs and fill in fuel consumption for that day.
+        </div>
+        <div class="tw"><table class="dt">
+          <thead><tr><th>Date</th><th>Machine</th><th style="text-align:right">Issued (L)</th><th style="text-align:right">Consumed (L) <span style="font-size:10px;font-weight:400;color:var(--t3)">daily logs</span></th><th style="text-align:right">Variance</th></tr></thead>
+          <tbody>${byDate.map(r => {
+            const issued   = Number(r.fuel_issued   || 0);
+            const consumed = Number(r.fuel_consumed || 0);
+            const variance = Number(r.variance      || 0);
+            const varCol   = Math.abs(variance) < 0.05 ? 'var(--green)' : variance > 0 ? 'var(--amber)' : 'var(--red)';
+            const varTxt   = issued === 0 && consumed === 0 ? '—' : (variance > 0 ? '+' : '') + variance.toFixed(1);
+            return `<tr>
+              <td style="font-family:var(--fm);color:var(--t3)">${r.date_fmt}</td>
+              <td><span style="font-weight:500">${r.machine_code}</span> <span style="font-size:11px;color:var(--t3)">${r.machine_name}</span></td>
+              <td style="text-align:right;font-family:var(--fm)">${issued > 0 ? issued.toFixed(1) : '—'}</td>
+              <td style="text-align:right;font-family:var(--fm);color:#7C3AED">${consumed > 0 ? consumed.toFixed(1) : '—'}</td>
+              <td style="text-align:right;font-family:var(--fm);font-weight:600;color:${varCol}">${varTxt}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table></div>
+      </div>
+    </div>` : ''}
+
     <div class="card" style="padding:0">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
-        <h3 style="margin:0"><i class="ti ti-droplet"></i>Fuel Consumption Log</h3>
-        ${canManage ? `<button class="appbtn" id="newFuelLog"><i class="ti ti-plus" style="font-size:12px"></i> Add entry</button>` : ''}
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.75rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0;font-size:14px"><i class="ti ti-list"></i> Fuel Issue Log</h3>
+        <span style="font-size:12px;color:var(--t3)">${rows.length} entr${rows.length === 1 ? 'y' : 'ies'}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Machine</th><th>Plate No.</th><th>Operator</th><th>Fuel Type</th><th>Quantity (L)</th><th>Notes</th><th>Logged by</th>${canManage ? '<th>Action</th>' : ''}</tr></thead>
+        <thead><tr><th>Date</th><th>Machine / Vehicle</th><th>Operator</th><th>Fuel Type</th><th style="text-align:right">Qty (L)</th><th>Notes</th><th>By</th>${canManage ? '<th></th>' : ''}</tr></thead>
         <tbody>
           ${rows.length === 0
-            ? `<tr><td colspan="${canManage ? 9 : 8}" style="text-align:center;color:var(--t3);padding:2rem">No fuel logs yet.</td></tr>`
-            : rows.map(r => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.log_date}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
+            ? `<tr><td colspan="${canManage ? 8 : 7}" style="text-align:center;padding:2.5rem 1rem">
+                <i class="ti ti-droplet" style="font-size:28px;color:var(--t3);opacity:.4;display:block;margin-bottom:.5rem"></i>
+                <div style="color:var(--t3);font-size:13px;margin-bottom:.4rem">No fuel logs yet</div>
+                ${canManage ? `<div style="font-size:12px;color:var(--t3)">Click <strong>Log Fuel</strong> at the top to record the first entry.</div>` : ''}
+               </td></tr>`
+            : rows.map(r => `<tr${r.log_date === today ? ' style="background:rgba(0,160,100,.05)"' : ''}>
+                <td style="font-family:var(--fm);font-weight:500;white-space:nowrap">${r.log_date}${r.log_date === today ? ' <span class="badge bg" style="font-size:10px;vertical-align:middle">Today</span>' : ''}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Del. pending</span>' : ''}</td>
                 <td style="font-weight:600">${r.machine_code || '—'}<br><span style="font-size:11px;font-weight:400;color:var(--t3)">${r.machine_name || ''}</span></td>
-                <td style="font-family:var(--fm);color:var(--t3)">${r.plate_number || '—'}</td>
-                <td>${r.operator || '—'}</td>
+                <td style="color:var(--t3);font-size:12px">${r.operator || '—'}</td>
                 <td><span class="badge bt">${r.fuel_type}</span></td>
-                <td style="font-family:var(--fm);font-weight:600;color:var(--g-dark)">${Number(r.quantity).toFixed(1)}</td>
+                <td style="text-align:right;font-family:var(--fm);font-weight:600;color:var(--g-dark)">${Number(r.quantity).toFixed(1)}</td>
                 <td style="color:var(--t3);font-size:12px">${r.notes || '—'}</td>
                 <td style="color:var(--t3);font-size:12px">${r.logged_by_name || '—'}</td>
                 ${canManage ? `<td><button class="bs1 mfl-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button></td>` : ''}
@@ -6816,40 +7726,140 @@ async function renderMachineFuelLogs() {
       </table></div>
     </div>`;
 
+  // Collapsible reconciliation table (open by default)
+  document.getElementById('toggleReconcile')?.addEventListener('click', () => {
+    const body = document.getElementById('reconcileBody');
+    const chev = document.getElementById('reconcileChevron');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    chev.className = `ti ti-chevron-${open ? 'right' : 'down'}`;
+  });
+  // Collapsible daily breakdown (collapsed by default)
+  document.getElementById('toggleDaily')?.addEventListener('click', () => {
+    const body = document.getElementById('dailyBody');
+    const chev = document.getElementById('dailyChevron');
+    const open = body.style.display !== 'none';
+    body.style.display = open ? 'none' : '';
+    chev.className = `ti ti-chevron-${open ? 'right' : 'down'}`;
+  });
+
   if (canManage) {
-    $('newFuelLog')?.addEventListener('click', () => openOverlay('Log Fuel / Oil Consumption', null, `
-      <div class="frow">
-        <div class="fg"><label>Date *</label><input type="date" id="mfl-date" value="${today}"></div>
-        <div class="fg"><label>Operator</label><input type="text" id="mfl-operator" placeholder="Name of operator"></div>
-      </div>
-      <div class="fg"><label>Machine *</label>
-        <select id="mfl-machine"><option value="">— select machine —</option>${machOpts}</select>
-      </div>
-      <div class="frow">
-        <div class="fg"><label>Fuel type *</label>
-          <select id="mfl-fuel"><option value="">— select type —</option>${fuelDropOpts}</select>
+    const fuelCatOpts = fuelCatalogItems.length
+      ? fuelCatalogItems.map(i =>
+          `<option value="${i.id}" data-stock="${i.total_stock}" data-uom="${i.uom}">${i.name} — ${i.total_stock} ${i.uom} available</option>`
+        ).join('')
+      : '';
+    const whOpts = stockWarehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+
+    $('newFuelLog')?.addEventListener('click', () => {
+      openOverlay('Log Fuel / Oil Consumption', null, `
+        <div class="fg"><label>Machine / Vehicle *</label>
+          <select id="mfl-machine"><option value="">— select machine or vehicle —</option>${machOpts}</select>
         </div>
-        <div class="fg"><label>Quantity (litres) *</label>
-          <input type="number" id="mfl-qty" step="0.1" min="0.1" placeholder="0.0">
+        <div class="frow">
+          <div class="fg"><label>Fuel type *</label>
+            <select id="mfl-fuel"><option value="">— select —</option>${fuelDropOpts}</select>
+          </div>
+          <div class="fg"><label>Quantity (litres) *</label>
+            <input type="number" id="mfl-qty" step="0.1" min="0.1" placeholder="0.0">
+          </div>
         </div>
-      </div>
-      <div class="fg"><label>Notes</label><input type="text" id="mfl-notes" placeholder="Optional notes"></div>
-      <div class="brow">
-        <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button>
-        <button class="bs1" id="ovCancel">Cancel</button>
-      </div>`,
-      async () => {
-        const res2 = await UFCL.machineFuelLogsCreate(STORAGE.user.id, {
-          log_date:   $('mfl-date').value,
-          machine_id: $('mfl-machine').value || null,
-          operator:   $('mfl-operator').value.trim() || null,
-          fuel_type:  $('mfl-fuel').value,
-          quantity:   $('mfl-qty').value,
-          notes:      $('mfl-notes').value.trim() || null
-        });
-        if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Fuel log saved.'); await renderMachineFuelLogs();
-      }));
+        <div class="frow">
+          <div class="fg"><label>Date *</label><input type="date" id="mfl-date" value="${today}"></div>
+          <div class="fg"><label>Operator</label><input type="text" id="mfl-operator" value="${defaultOperator}" placeholder="Name of operator"></div>
+        </div>
+        <div class="fg"><label>Notes</label><input type="text" id="mfl-notes" placeholder="Optional notes"></div>
+        <div style="border-top:1px solid var(--bdr);margin:.75rem 0 .5rem;padding-top:.75rem">
+          <label style="display:flex;align-items:center;gap:.5rem;cursor:pointer;user-select:none">
+            <input type="checkbox" id="mfl-deduct-toggle" style="width:auto;accent-color:var(--g-soft)">
+            <span style="font-size:13px;font-weight:600"><i class="ti ti-package"></i> Deduct from stock catalog</span>
+          </label>
+          <div id="mfl-deduct-body" style="display:none;margin-top:.75rem">
+            ${fuelCatalogItems.length ? `
+            <div class="frow">
+              <div class="fg">
+                <label>Fuel item</label>
+                <select id="mfl-stock-item">
+                  <option value="">— select item —</option>
+                  ${fuelCatOpts}
+                </select>
+              </div>
+              <div class="fg">
+                <label>Workshop / storage location</label>
+                <select id="mfl-stock-wh">
+                  <option value="">— select —</option>
+                  ${whOpts}
+                </select>
+              </div>
+            </div>
+            <div id="mfl-stock-hint" style="font-size:12px;color:var(--t3);margin-top:.25rem"></div>
+            ` : `<div style="font-size:12px;color:var(--t3);padding:.4rem 0"><i class="ti ti-info-circle"></i> No fuel items in Stock Catalog. Add items under category "Fuel" to enable automatic deduction.</div>`}
+          </div>
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Save</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const selVal = $('mfl-machine').value || '';
+          const [selType, selId] = selVal.split(':');
+          const qty = Number($('mfl-qty').value || 0);
+          const res2 = await UFCL.machineFuelLogsCreate(STORAGE.user.id, {
+            log_date:   $('mfl-date').value,
+            machine_id: selType === 'm' && selId ? selId : null,
+            vehicle_id: selType === 'v' && selId ? selId : null,
+            operator:   $('mfl-operator').value.trim() || null,
+            fuel_type:  $('mfl-fuel').value,
+            quantity:   qty,
+            notes:      $('mfl-notes').value.trim() || null
+          });
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+
+          // Deduct from stock catalog only when checkbox is ticked
+          const deductEnabled = document.getElementById('mfl-deduct-toggle')?.checked;
+          const stockItemId = deductEnabled ? document.getElementById('mfl-stock-item')?.value : null;
+          const stockWhId   = deductEnabled ? document.getElementById('mfl-stock-wh')?.value   : null;
+          if (stockItemId && stockWhId && qty > 0) {
+            const mvRes = await UFCL.stockMovementsCreate(STORAGE.user.id, {
+              item_id:       stockItemId,
+              movement_type: 'out',
+              quantity:      qty,
+              warehouse_id:  stockWhId,
+              reference:     `Fuel issued ${$('mfl-date').value}`,
+              notes:         `Issued to machine/vehicle — ${$('mfl-fuel').value}`
+            });
+            if (!mvRes.ok) {
+              showOverlaySuccess(`Fuel log saved. Stock deduction failed: ${mvRes.error}`);
+              await renderMachineFuelLogs();
+              return;
+            }
+          }
+
+          showOverlaySuccess('Fuel log saved' + (stockItemId && stockWhId ? ' and stock deducted.' : '.'));
+          await renderMachineFuelLogs();
+        }
+      );
+
+      // openOverlay is synchronous — wire event listeners now that overlay DOM exists
+      document.getElementById('mfl-deduct-toggle')?.addEventListener('change', e => {
+        document.getElementById('mfl-deduct-body').style.display = e.target.checked ? '' : 'none';
+      });
+      const updateStockHint = () => {
+        const sel   = document.getElementById('mfl-stock-item');
+        const hint  = document.getElementById('mfl-stock-hint');
+        if (!sel || !hint) return;
+        if (!sel.value) { hint.textContent = ''; return; }
+        const opt     = sel.selectedOptions[0];
+        const avail   = Number(opt?.dataset.stock || 0);
+        const uom     = opt?.dataset.uom || 'L';
+        const entered = Number(document.getElementById('mfl-qty')?.value || 0);
+        hint.innerHTML = avail <= 0
+          ? `<span style="color:var(--red)"><i class="ti ti-alert-triangle"></i> Out of stock — 0 ${uom} available</span>`
+          : `<span style="color:${entered > 0 && entered > avail ? 'var(--red)' : 'var(--green)'}"><i class="ti ti-${entered > 0 && entered > avail ? 'alert-triangle' : 'check'}"></i> ${avail} ${uom} available${entered > avail ? ` — quantity exceeds stock by ${(entered - avail).toFixed(1)} ${uom}` : ''}</span>`;
+      };
+      document.getElementById('mfl-stock-item')?.addEventListener('change', updateStockHint);
+      document.getElementById('mfl-qty')?.addEventListener('input', updateStockHint);
+    });
 
     pg.querySelectorAll('.mfl-del').forEach(btn => {
       const r = rows.find(x => x.id === btn.dataset.id);
@@ -6886,7 +7896,7 @@ async function renderCasualLabourRequests() {
   const rows = res.rows || [];
   const today = new Date().toISOString().split('T')[0];
   const canManage = ['admin', 'ceo', 'operations', 'supervisor'].includes(STORAGE.user?.role);
-  const canReview = ['admin', 'ceo', 'operations'].includes(STORAGE.user?.role);
+  const canReview = ['ceo', 'operations'].includes(STORAGE.user?.role);
 
   const pending = rows.filter(r => r.status === 'Pending').length;
   const approved = rows.filter(r => r.status === 'Approved').length;
@@ -6920,61 +7930,168 @@ async function renderCasualLabourRequests() {
     <div class="card" style="padding:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
         <h3 style="margin:0"><i class="ti ti-users"></i>Requests</h3>
-        ${canManage ? `<button class="appbtn" id="newCasReq"><i class="ti ti-plus" style="font-size:12px"></i> New request</button>` : ''}
+        ${canManage ? `<button class="appbtn" id="newCasReq"><i class="ti ti-send" style="font-size:12px"></i> Submit Request</button>` : ''}
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Start Date</th><th>End Date</th><th>Task</th><th># Casuals</th><th>Description</th><th>Comments</th><th>Status</th><th>Submitted by</th>${canReview ? '<th>Review</th>' : ''}<th>Action</th></tr></thead>
+        <thead><tr><th>Period</th><th>Work Site / Task</th><th>Labour Breakdown</th><th>Total</th><th>Status</th><th>Submitted by</th>${canReview ? '<th>Review</th>' : ''}<th></th></tr></thead>
         <tbody>
           ${rows.length === 0
-            ? `<tr><td colspan="${canReview ? 10 : 9}" style="text-align:center;color:var(--t3);padding:2rem">No requests yet.</td></tr>`
-            : rows.map(r => `<tr>
-                <td style="font-family:var(--fm);font-weight:500">${r.start_date}</td>
-                <td style="font-family:var(--fm)">${r.end_date}</td>
-                <td style="font-weight:600">${r.task}</td>
-                <td style="font-family:var(--fm);font-weight:700;color:var(--g-dark)">${r.num_casuals}</td>
-                <td style="color:var(--t3);font-size:12px">${r.description || '—'}</td>
-                <td style="color:var(--t3);font-size:12px">${r.comments || '—'}</td>
-                <td>${statusBadge(r.status)}</td>
-                <td style="font-size:12px;color:var(--t3)">${r.created_by_name || '—'}</td>
-                ${canReview && r.status === 'Pending' ? `
-                <td style="white-space:nowrap">
-                  <button class="bp1 clr-approve" data-id="${r.id}" style="padding:4px 10px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
-                  <button class="bs1 clr-reject" data-id="${r.id}" style="padding:4px 10px;font-size:12px;color:var(--red)"><i class="ti ti-x"></i>Reject</button>
-                </td>` : canReview ? `<td style="color:var(--t3);font-size:12px">${r.reviewed_by_name || '—'}</td>` : ''}
-                <td>
-                  <button class="bs1 clr-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
-                </td>
-              </tr>`).join('')}
+            ? `<tr><td colspan="${canReview ? 8 : 7}" style="text-align:center;color:var(--t3);padding:2rem">No requests yet.</td></tr>`
+            : rows.map(r => {
+                const items = Array.isArray(r.labour_items) ? r.labour_items : [];
+                const breakdownHtml = items.length
+                  ? items.map(i => `<span class="badge bt" style="font-size:11px;margin:1px 2px 1px 0">${i.role} <strong>×${i.quantity}</strong></span>`).join('')
+                  : `<span style="color:var(--t3);font-size:12px">${r.description || '—'}</span>`;
+                return `<tr>
+                  <td style="font-family:var(--fm);white-space:nowrap">
+                    <div style="font-weight:500">${r.start_fmt}</div>
+                    <div style="color:var(--t3);font-size:11px">to ${r.end_fmt}</div>
+                  </td>
+                  <td style="font-weight:600">${r.task}</td>
+                  <td style="max-width:280px">${breakdownHtml}</td>
+                  <td style="font-family:var(--fm);font-weight:700;color:var(--g-dark);font-size:15px;white-space:nowrap">${r.num_casuals} <span style="font-size:11px;font-weight:400;color:var(--t3)">casuals</span></td>
+                  <td>${statusBadge(r.status)}</td>
+                  <td style="font-size:12px;color:var(--t3)">${r.created_by_name || '—'}</td>
+                  ${canReview && r.status === 'Pending' ? `
+                  <td style="white-space:nowrap">
+                    <button class="bp1 clr-approve" data-id="${r.id}" style="padding:4px 10px;font-size:12px"><i class="ti ti-check"></i>Approve</button>
+                    <button class="bs1 clr-reject" data-id="${r.id}" style="padding:4px 10px;font-size:12px;color:var(--red)"><i class="ti ti-x"></i>Reject</button>
+                  </td>` : canReview ? `<td style="color:var(--t3);font-size:12px">${r.reviewed_by_name || '—'}</td>` : ''}
+                  <td>
+                    <button class="bs1 clr-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+                  </td>
+                </tr>`;
+              }).join('')}
         </tbody>
       </table></div>
     </div>`;
 
   if (canManage) {
-    $('newCasReq')?.addEventListener('click', () => openOverlay('New Casual Labour Request', null, `
-      <div class="frow">
-        <div class="fg"><label>Starting date *</label><input type="date" id="clr-start" value="${today}"></div>
-        <div class="fg"><label>Ending date *</label><input type="date" id="clr-end"></div>
-      </div>
-      <div class="fg"><label>Task / Work description *</label><input type="text" id="clr-task" placeholder="e.g. Tree planting, loading logs"></div>
-      <div class="fg"><label>Number of casuals needed *</label><input type="number" id="clr-num" min="1" step="1" placeholder="0"></div>
-      <div class="fg"><label>Description</label><textarea id="clr-desc" rows="2" placeholder="Additional details about the work"></textarea></div>
-      <div class="fg"><label>Comments</label><textarea id="clr-comments" rows="2" placeholder="Any other comments"></textarea></div>
-      <div class="brow">
-        <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i>Submit request</button>
-        <button class="bs1" id="ovCancel">Cancel</button>
-      </div>`,
-      async () => {
-        const r2 = await UFCL.casualLabourRequestsCreate(STORAGE.user.id, {
-          start_date:   $('clr-start').value,
-          end_date:     $('clr-end').value,
-          task:         $('clr-task').value.trim(),
-          num_casuals:  $('clr-num').value,
-          description:  $('clr-desc').value.trim() || null,
-          comments:     $('clr-comments').value.trim() || null
+    $('newCasReq')?.addEventListener('click', () => {
+      let nextIdx = 3;
+
+      function rowHtml(idx) {
+        return `<tr id="clr-row-${idx}">
+          <td style="padding:3px 4px 3px 0">
+            <input type="text" class="clr-role" placeholder="e.g. Woodmez, Manpower, Assistance" style="width:100%">
+          </td>
+          <td style="padding:3px 4px;width:90px">
+            <input type="number" class="clr-qty" min="1" step="1" placeholder="0" style="width:100%">
+          </td>
+          <td style="padding:3px 0;width:32px;text-align:center">
+            <button type="button" class="bs1 clr-rmrow" data-idx="${idx}" style="padding:3px 7px;color:var(--red)"><i class="ti ti-x"></i></button>
+          </td>
+        </tr>`;
+      }
+
+      openOverlay('New Casual Labour Request', null, `
+        <div class="fg"><label>Work site / Task *</label>
+          <input type="text" id="clr-task" placeholder="e.g. Sawmill, Compartment A, Loading bay">
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Starting date *</label><input type="date" id="clr-start" value="${today}"></div>
+          <div class="fg"><label>Ending date *</label><input type="date" id="clr-end"></div>
+        </div>
+        <div style="margin:.75rem 0 .25rem">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--t3);margin-bottom:.5rem">
+            Labour Breakdown *
+          </div>
+          <table style="width:100%;border-collapse:collapse">
+            <thead>
+              <tr style="font-size:11px;color:var(--t3)">
+                <th style="text-align:left;padding-bottom:.3rem;font-weight:600">Role / Type</th>
+                <th style="text-align:left;width:90px;padding:0 4px .3rem;font-weight:600">Quantity</th>
+                <th style="width:32px"></th>
+              </tr>
+            </thead>
+            <tbody id="clr-items-body">
+              ${rowHtml(0)}${rowHtml(1)}${rowHtml(2)}
+            </tbody>
+          </table>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:.5rem">
+            <button type="button" class="bs1" id="clr-add-row" style="font-size:12px;padding:4px 10px">
+              <i class="ti ti-plus"></i> Add row
+            </button>
+            <span style="font-size:13px;color:var(--t3)">
+              Total: <strong id="clr-total" style="color:var(--g-dark);font-size:15px">0</strong> casuals
+            </span>
+          </div>
+        </div>
+        <div class="fg"><label>Description</label>
+          <textarea id="clr-desc" rows="2" placeholder="Additional details about the work"></textarea>
+        </div>
+        <div class="fg"><label>Comments</label>
+          <textarea id="clr-comments" rows="2" placeholder="Any other comments"></textarea>
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave"><i class="ti ti-send"></i>Submit Request</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const task = $('clr-task').value.trim();
+          if (!task) { showOverlayError('Work site / Task is required.'); return; }
+          const items = [];
+          document.querySelectorAll('#clr-items-body tr').forEach(tr => {
+            const role = tr.querySelector('.clr-role')?.value.trim();
+            const qty  = Number(tr.querySelector('.clr-qty')?.value || 0);
+            if (role && qty > 0) items.push({ role, quantity: qty });
+          });
+          if (items.length === 0) { showOverlayError('Add at least one role with a quantity.'); return; }
+          const totalCasuals = items.reduce((s, i) => s + i.quantity, 0);
+          const r2 = await UFCL.casualLabourRequestsSubmit(STORAGE.user.id, {
+            start_date:   $('clr-start').value,
+            end_date:     $('clr-end').value,
+            task,
+            num_casuals:  totalCasuals,
+            labour_items: items,
+            description:  $('clr-desc').value.trim() || null,
+            comments:     $('clr-comments').value.trim() || null
+          });
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          showOverlaySuccess('Request submitted — awaiting approval.');
+          await renderCasualLabourRequests();
+        }
+      );
+
+      // openOverlay is synchronous — wire dynamic row logic now
+      const updateTotal = () => {
+        let t = 0;
+        document.querySelectorAll('#clr-items-body .clr-qty').forEach(inp => { t += Number(inp.value || 0); });
+        const el = document.getElementById('clr-total');
+        if (el) el.textContent = t;
+      };
+
+      const wireRow = tr => {
+        tr.querySelector('.clr-qty')?.addEventListener('input', updateTotal);
+        tr.querySelector('.clr-rmrow')?.addEventListener('click', () => {
+          const tbody = document.getElementById('clr-items-body');
+          if (tbody && tbody.querySelectorAll('tr').length > 1) { tr.remove(); updateTotal(); }
         });
-        if (!r2.ok) { showOverlayError(r2.error); return; }
-        showOverlaySuccess('Request submitted.'); await renderCasualLabourRequests();
-      }));
+      };
+
+      document.querySelectorAll('#clr-items-body tr').forEach(tr => wireRow(tr));
+
+      document.getElementById('clr-add-row')?.addEventListener('click', () => {
+        const tbody = document.getElementById('clr-items-body');
+        if (!tbody) return;
+        const tr = document.createElement('tr');
+        tr.id = `clr-row-${nextIdx}`;
+        tr.innerHTML = `
+          <td style="padding:3px 4px 3px 0">
+            <input type="text" class="clr-role" placeholder="e.g. Woodmez, Manpower, Assistance" style="width:100%">
+          </td>
+          <td style="padding:3px 4px;width:90px">
+            <input type="number" class="clr-qty" min="1" step="1" placeholder="0" style="width:100%">
+          </td>
+          <td style="padding:3px 0;width:32px;text-align:center">
+            <button type="button" class="bs1 clr-rmrow" style="padding:3px 7px;color:var(--red)"><i class="ti ti-x"></i></button>
+          </td>`;
+        tbody.appendChild(tr);
+        wireRow(tr);
+        nextIdx++;
+        tr.querySelector('.clr-role')?.focus();
+      });
+    });
   }
 
   if (canReview) {

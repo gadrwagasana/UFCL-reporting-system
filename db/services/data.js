@@ -1,15 +1,21 @@
 const { pool } = require('../pool');
 const bcrypt = require('bcryptjs');
 
-// All-time stock balance: total produced minus total sold, broken down by timber sub-type
+// All-time stock balance: total produced minus total sold, broken down by timber sub-type.
+// Kiln-dried and CCA-treated volumes come from value_added_timber (not daily_logs, which
+// always records all timber as untreated at the point of production).
 const STOCK_SQL = `
   WITH produced AS (
-    SELECT COALESCE(SUM(timber_units),0)::int         AS timber,
-           COALESCE(SUM(timber_kiln_dried),0)::int    AS kiln_dried,
-           COALESCE(SUM(timber_cca_treated),0)::int   AS cca_treated,
-           COALESCE(SUM(timber_untreated),0)::int     AS untreated,
-           COALESCE(SUM(poles_units),0)::int          AS poles
+    SELECT COALESCE(SUM(timber_units),0)::int AS timber,
+           COALESCE(SUM(poles_units),0)::int  AS poles
     FROM daily_logs
+    WHERE deleted_at IS NULL
+  ),
+  value_added AS (
+    SELECT COALESCE(SUM(CASE WHEN type_value_added='Kiln-dried timber'  THEN num_timber ELSE 0 END),0)::int AS kiln_dried,
+           COALESCE(SUM(CASE WHEN type_value_added='CCA treated timber' THEN num_timber ELSE 0 END),0)::int AS cca_treated
+    FROM value_added_timber
+    WHERE deleted_at IS NULL
   ),
   sold AS (
     SELECT COALESCE(SUM(CASE WHEN product_type='Timber' THEN quantity ELSE 0 END),0)::int AS timber,
@@ -18,17 +24,21 @@ const STOCK_SQL = `
            COALESCE(SUM(CASE WHEN product_type='Timber' AND COALESCE(product_sub_type,'')='Untreated'   THEN quantity ELSE 0 END),0)::int AS untreated,
            COALESCE(SUM(CASE WHEN product_type='Poles'  THEN quantity ELSE 0 END),0)::int AS poles
     FROM sales_orders
+    WHERE deleted_at IS NULL
   )
-  SELECT p.timber AS timber_produced, p.poles AS poles_produced,
-         p.kiln_dried AS kiln_dried_produced, p.cca_treated AS cca_treated_produced, p.untreated AS untreated_produced,
-         s.timber AS timber_sold,     s.poles AS poles_sold,
+  SELECT p.timber                                                AS timber_produced,
+         p.poles                                                AS poles_produced,
+         va.kiln_dried                                          AS kiln_dried_produced,
+         va.cca_treated                                         AS cca_treated_produced,
+         GREATEST(p.timber - va.kiln_dried - va.cca_treated, 0) AS untreated_produced,
+         s.timber     AS timber_sold,     s.poles     AS poles_sold,
          s.kiln_dried AS kiln_dried_sold, s.cca_treated AS cca_treated_sold, s.untreated AS untreated_sold,
-         (p.timber    - s.timber)    AS timber_stock,
-         (p.poles     - s.poles)     AS poles_stock,
-         (p.kiln_dried  - s.kiln_dried)  AS kiln_dried_stock,
-         (p.cca_treated - s.cca_treated) AS cca_treated_stock,
-         (p.untreated   - s.untreated)   AS untreated_stock
-  FROM produced p, sold s
+         (p.timber    - s.timber)                               AS timber_stock,
+         (p.poles     - s.poles)                                AS poles_stock,
+         (va.kiln_dried  - s.kiln_dried)                       AS kiln_dried_stock,
+         (va.cca_treated - s.cca_treated)                      AS cca_treated_stock,
+         (GREATEST(p.timber - va.kiln_dried - va.cca_treated, 0) - s.untreated) AS untreated_stock
+  FROM produced p, value_added va, sold s
 `;
 
 function buildStock(st) {
@@ -81,18 +91,19 @@ const ROLE_PAGES = {
           'logistics-dashboard', 'workshop-overview', 'warehouses', 'stock-items', 'stock-movements', 'material-requests',
           'vehicles', 'deliveries', 'dispatch', 'timber-inventory', 'transport',
           'machines', 'machine-kpi', 'compartments', 'log-transport',
-          'machine-fuel', 'casual-requests', 'casuals'],
+          'machine-fuel', 'casual-requests', 'casuals', 'customers'],
   ceo: ['dashboard', 'ceo', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
         'daily-harvest', 'value-added-timber',
-        'logistics-dashboard', 'workshop-overview', 'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
+        'logistics-dashboard', 'workshop-overview', 'warehouses', 'stock-items', 'inventory', 'stock-movements', 'timber-inventory',
+        'vehicles', 'deliveries', 'dispatch', 'transport',
         'machines', 'machine-kpi', 'compartments', 'log-transport',
-        'casual-requests', 'casuals'],
+        'casual-requests', 'casuals', 'customers', 'sales', 'products'],
   operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'value-added-timber', 'machine-logs',
                'products', 'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
                'logistics-dashboard', 'workshop-overview', 'timber-inventory', 'stock-items', 'stock-movements', 'material-requests', 'transport',
                'machines', 'machine-kpi', 'compartments', 'log-transport',
-               'machine-fuel', 'casual-requests', 'casuals'],
-  sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
+               'machine-fuel', 'casual-requests', 'casuals', 'customers', 'sales'],
+  sales: ['dashboard', 'sales', 'customers', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
   finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
   logistics: ['dashboard', 'logistics-dashboard', 'workshop-overview', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
               'warehouses', 'stock-items', 'stock-movements', 'material-requests', 'vehicles', 'deliveries', 'dispatch', 'transport',
@@ -150,7 +161,7 @@ function invalidateUserCache(userId) {
 
 function isWorkshopRestricted(user) {
   return user.workshop_id != null &&
-    !['admin', 'ceo', 'operations', 'logistics', 'storekeeper'].includes(user.role);
+    !['admin', 'ceo', 'operations', 'logistics'].includes(user.role);
 }
 
 async function logAudit(user, action, icon = 'ti-check', meta = {}) {
@@ -494,10 +505,24 @@ async function salesList(userId) {
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
   const [{ rows }, { rows: stockRows }] = await Promise.all([
     pool.query(
-      `select id, order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, status, created_at, pending_deletion
-       from sales_orders
-       where deleted_at is null
-       order by created_at desc, id desc
+      `select so.id, so.order_number, so.customer_name, so.customer_id,
+              so.product_type, so.product_sub_type, so.product_size,
+              so.quantity, so.unit_price, so.currency, so.price_tax_type,
+              so.payment_due_date, so.payment_status,
+              so.notes, so.status, so.created_at, so.pending_deletion,
+              c.name as customer_registered_name,
+              del.delivery_number, del.delivery_status
+       from sales_orders so
+       left join customers c on c.id = so.customer_id
+       left join lateral (
+         select order_number as delivery_number, status as delivery_status
+         from delivery_orders
+         where sales_order_id = so.id
+         order by created_at desc
+         limit 1
+       ) del on true
+       where so.deleted_at is null
+       order by so.created_at desc, so.id desc
        limit 50`
     ),
     pool.query('select * from mv_stock_summary')
@@ -515,25 +540,49 @@ async function salesCreate(userId, payload) {
   if (p.product_type === 'Timber' && !p.product_sub_type) {
     return { ok: false, error: 'Sub-type is required for timber orders' };
   }
+  const currency     = p.currency || 'RWF';
+  const priceTaxType = ['Inclusive','Exclusive'].includes(p.price_tax_type) ? p.price_tax_type : 'Exclusive';
+  const paymentDue   = p.payment_due_date || null;
+  const customerId   = p.customer_id ? Number(p.customer_id) : null;
+  let customerName   = p.customer_name || '';
+  if (customerId) {
+    const { rows: cRows } = await pool.query('select name from customers where id=$1', [customerId]);
+    if (cRows.length) customerName = cRows[0].name;
+  }
   await pool.query(
-    `insert into sales_orders(order_number, customer_name, product_type, product_sub_type, product_size, quantity, unit_price, notes, reason, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
+    `insert into sales_orders(order_number, customer_name, customer_id, product_type, product_sub_type, product_size,
+                              quantity, unit_price, currency, price_tax_type, payment_due_date, payment_status,
+                              notes, reason, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
     [
-      p.order_number,
-      p.customer_name,
-      p.product_type,
-      p.product_sub_type || null,
-      p.product_size,
-      Number(p.quantity),
-      Number(p.unit_price),
-      p.notes || null,
-      p.reason,
-      user.id
+      p.order_number, customerName, customerId, p.product_type, p.product_sub_type || null, p.product_size,
+      Number(p.quantity), Number(p.unit_price), currency, priceTaxType, paymentDue, 'Unpaid',
+      p.notes || null, p.reason, user.id
     ]
   );
   const label = p.product_sub_type ? `${p.product_sub_type} ${p.product_size}` : `${p.product_type} ${p.product_size}`;
   logAudit(user, `Created order ${p.order_number} — ${p.customer_name}: ${p.quantity} × ${label}`, 'ti-shopping-cart', { order_number: p.order_number, sub_type: p.product_sub_type });
   refreshStockView();
+  return { ok: true };
+}
+
+async function salesProductsForDropdown(userId) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select id, type, sub_type, size from products where active = true order by type, sub_type, size`
+  );
+  return { ok: true, rows };
+}
+
+async function salesUpdatePayment(userId, orderId, paymentStatus) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
+  if (!['Paid', 'Unpaid'].includes(paymentStatus)) return { ok: false, error: 'Invalid payment status' };
+  const { rows } = await pool.query('select order_number from sales_orders where id=$1 and deleted_at is null', [orderId]);
+  if (!rows.length) return { ok: false, error: 'Order not found' };
+  await pool.query('update sales_orders set payment_status=$1 where id=$2', [paymentStatus, orderId]);
+  logAudit(user, `Marked order ${rows[0].order_number} payment as ${paymentStatus}`, 'ti-cash', { orderId, paymentStatus });
   return { ok: true };
 }
 
@@ -653,11 +702,30 @@ async function machinesForDropdown(userId) {
   const user = await getUser(userId);
   if (!user) return { ok: false, error: 'Not authenticated' };
   const { rows } = await pool.query(
-    `select m.id, m.name, m.plate_number, mc.name as category_name
+    `select m.id, m.machine_code, m.name, m.plate_number, mc.name as category_name
      from machines m
      join machine_categories mc on mc.id = m.category_id
      where m.active = true
      order by mc.name, m.name`
+  );
+  return { ok: true, rows };
+}
+
+async function machineFuelDropdown(userId) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select 'machine' as source, m.id, m.machine_code as code, m.name as label, m.plate_number
+     from machines m
+     where m.active = true
+     union all
+     select 'vehicle' as source, v.id, v.registration as code,
+            trim(coalesce(v.make,'') || case when v.model is not null then ' ' || v.model else '' end) as label,
+            v.registration as plate_number
+     from vehicles v
+     where coalesce(v.ownership_type,'') != 'Third-Party Car'
+       and coalesce(v.status,'Active') = 'Active'
+     order by source, code`
   );
   return { ok: true, rows };
 }
@@ -1306,25 +1374,31 @@ async function stockItemsList(userId, workshopId) {
   const filterWh = restricted ? user.workshop_id : (workshopId || null);
   const { rows: items } = filterWh
     ? await pool.query(
+        // restricted users: INNER JOIN so only items with a stock_levels entry at their warehouse are shown
         `select sc.id, sc.category, sc.name, sc.sku, sc.uom, sc.unit_cost,
                 sc.min_stock, sc.max_stock, sc.notes, sc.active,
-                coalesce(sum(sl.quantity),0)::int as total_stock
+                coalesce(sl.quantity,0)::int as total_stock
          from stock_catalog sc
-         left join stock_levels sl on sl.item_id=sc.id and sl.warehouse_id=$1
+         inner join stock_levels sl on sl.item_id=sc.id and sl.warehouse_id=$1
          where sc.active=true
-         group by sc.id
          order by sc.category, sc.name`, [filterWh])
     : await pool.query(
         `select sc.id, sc.category, sc.name, sc.sku, sc.uom, sc.unit_cost,
                 sc.min_stock, sc.max_stock, sc.notes, sc.active,
-                coalesce(sum(sl.quantity),0)::int as total_stock
+                coalesce(sum(sl.quantity),0)::int as total_stock,
+                coalesce(
+                  json_object_agg(w.id::text, coalesce(sl.quantity,0)) filter (where w.id is not null),
+                  '{}'::json
+                ) as wh_breakdown
          from stock_catalog sc
          left join stock_levels sl on sl.item_id=sc.id
+         left join warehouses w on w.id=sl.warehouse_id and w.active=true
          where sc.active=true
          group by sc.id
          order by sc.category, sc.name`);
   const { rows: wh } = await pool.query(`select id, name from warehouses where active=true order by name`);
-  return { ok: true, rows: items, warehouses: wh, user_workshop_id: user.workshop_id };
+  const { rows: cats } = await pool.query(`select id, name from stock_categories order by name`);
+  return { ok: true, rows: items, warehouses: wh, categories: cats, user_workshop_id: user.workshop_id };
 }
 
 async function stockItemsCreate(userId, payload) {
@@ -1339,7 +1413,15 @@ async function stockItemsCreate(userId, payload) {
      Number(p.min_stock || 0), p.max_stock ? Number(p.max_stock) : null,
      p.notes || null, user.id]
   );
-  logAudit(user, `Added stock item: ${p.name}`, 'ti-package', { id: rows[0].id, category: p.category });
+  const newId = rows[0].id;
+  // Workshop-restricted users: register item at their warehouse so it appears in their catalog immediately
+  if (isWorkshopRestricted(user)) {
+    await pool.query(
+      `insert into stock_levels(item_id, warehouse_id, quantity) values ($1,$2,0) on conflict do nothing`,
+      [newId, user.workshop_id]
+    );
+  }
+  logAudit(user, `Added stock item: ${p.name}`, 'ti-package', { id: newId, category: p.category });
   return { ok: true };
 }
 
@@ -1357,6 +1439,44 @@ async function stockItemsUpdate(userId, itemId, payload) {
      p.notes || null, p.active !== false, itemId]
   );
   logAudit(user, `Updated stock item #${itemId}`, 'ti-package', { id: itemId });
+  return { ok: true };
+}
+
+// ── Stock Categories ──────────────────────────────────────────────────────────
+
+async function stockCategoriesList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(`select id, name from stock_categories order by name`);
+  return { ok: true, rows };
+}
+
+async function stockCategoriesCreate(userId, name) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  if (!name?.trim()) return { ok: false, error: 'Category name is required' };
+  try {
+    await pool.query(`insert into stock_categories(name, created_by) values ($1,$2)`, [name.trim(), user.id]);
+    logAudit(user, `Created stock category: ${name.trim()}`, 'ti-tag', { name: name.trim() });
+    return { ok: true };
+  } catch (e) {
+    if (e.code === '23505') return { ok: false, error: 'Category already exists' };
+    throw e;
+  }
+}
+
+async function stockCategoriesDelete(userId, categoryId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-items'))) return { ok: false, error: 'Access denied' };
+  const { rows: sc } = await pool.query(`select name from stock_categories where id=$1`, [categoryId]);
+  if (!sc.length) return { ok: false, error: 'Category not found' };
+  const catName = sc[0].name;
+  const { rows: used } = await pool.query(
+    `select count(*)::int as n from stock_catalog where category=$1 and active=true`, [catName]
+  );
+  if (used[0].n > 0) return { ok: false, error: `Cannot delete — ${used[0].n} item(s) still use this category` };
+  await pool.query(`delete from stock_categories where id=$1`, [categoryId]);
+  logAudit(user, `Deleted stock category: ${catName}`, 'ti-tag', { name: catName });
   return { ok: true };
 }
 
@@ -1707,6 +1827,19 @@ async function workshopOverview(userId) {
 
 // ── Vehicles ──────────────────────────────────────────────────────────────────
 
+async function vehiclesForTransport(userId) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select id, registration, make, model, vehicle_category, driver_assigned, status
+     from vehicles
+     where vehicle_category in ('Truck','Tractor')
+       and status = 'Active'
+     order by vehicle_category, registration`
+  );
+  return { ok: true, rows };
+}
+
 async function vehiclesList(userId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'vehicles'))) return { ok: false, error: 'Access denied' };
@@ -1895,6 +2028,7 @@ async function deliveryOrdersList(userId) {
             v.registration as vehicle_registration,
             so.order_number as sales_order_number,
             so.customer_name,
+            so.price_tax_type as so_price_tax_type,
             u.name as created_by
      from delivery_orders do2
      left join vehicles v on v.id=do2.vehicle_id
@@ -1907,7 +2041,9 @@ async function deliveryOrdersList(userId) {
     `select id, registration, make, model from vehicles where status='Active' order by registration`
   );
   const { rows: salesOrders } = await pool.query(
-    `select id, order_number, customer_name from sales_orders where status in ('Confirmed') order by created_at desc limit 50`
+    `select id, order_number, customer_name, price_tax_type from sales_orders
+     where status in ('Pending','Confirmed') and deleted_at is null
+     order by created_at desc limit 100`
   );
   return { ok: true, rows, vehicles, salesOrders };
 }
@@ -1935,6 +2071,15 @@ async function deliveryOrdersUpdateStatus(userId, orderId, status) {
   const valid = ['Pending', 'Assigned', 'In Transit', 'Delivered', 'Failed'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query('update delivery_orders set status=$1 where id=$2', [status, orderId]);
+  if (status === 'Delivered' || status === 'In Transit') {
+    const soStatus = status === 'Delivered' ? 'Delivered' : 'Dispatched';
+    await pool.query(
+      `update sales_orders set status=$1
+       where id=(select sales_order_id from delivery_orders where id=$2) and sales_order_id is not null`,
+      [soStatus, orderId]
+    );
+    refreshStockView();
+  }
   logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
   return { ok: true };
 }
@@ -1951,10 +2096,13 @@ async function dispatchList(userId) {
             do2.order_number as delivery_order_number,
             do2.driver_name, do2.route,
             v.registration as vehicle_registration,
+            so.order_number as so_order_number,
+            so.customer_name,
             u.name as created_by,
             au.name as approved_by
      from dispatch_requests dr
      left join delivery_orders do2 on do2.id=dr.delivery_order_id
+     left join sales_orders so on so.id=do2.sales_order_id
      left join vehicles v on v.id=do2.vehicle_id
      left join app_users u on u.id=dr.created_by
      left join app_users au on au.id=dr.approved_by
@@ -1962,7 +2110,10 @@ async function dispatchList(userId) {
      limit 100`
   );
   const { rows: pendingDeliveries } = await pool.query(
-    `select id, order_number, driver_name from delivery_orders where status='Assigned' order by created_at desc`
+    `select do2.id, do2.order_number, do2.driver_name, so.order_number as so_order_number, so.customer_name
+     from delivery_orders do2
+     left join sales_orders so on so.id=do2.sales_order_id
+     where do2.status='Assigned' order by do2.created_at desc`
   );
   return { ok: true, rows, pendingDeliveries };
 }
@@ -2000,6 +2151,17 @@ async function dispatchReview(userId, requestId, status, notes) {
        where id=(select delivery_order_id from dispatch_requests where id=$1)`,
       [requestId]
     );
+    // Cascade: mark linked sales order as Dispatched
+    await pool.query(
+      `update sales_orders set status='Dispatched'
+       where id=(
+         select do2.sales_order_id from dispatch_requests dr
+         join delivery_orders do2 on do2.id=dr.delivery_order_id
+         where dr.id=$1 and do2.sales_order_id is not null
+       )`,
+      [requestId]
+    );
+    refreshStockView();
   }
   logAudit(user, `Dispatch request #${requestId} ${status}`, 'ti-send', { requestId, status });
   return { ok: true };
@@ -2416,14 +2578,25 @@ async function salesUpdate(userId, orderId, payload) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
-  if (!p.customer_name || !p.product_type) return { ok: false, error: 'Customer and product type are required' };
+  if (!p.product_type) return { ok: false, error: 'Product type is required' };
+  const priceTaxType = ['Inclusive','Exclusive'].includes(p.price_tax_type) ? p.price_tax_type : 'Exclusive';
+  const customerId   = p.customer_id ? Number(p.customer_id) : null;
+  let customerName   = p.customer_name || '';
+  if (customerId) {
+    const { rows: cRows } = await pool.query('select name from customers where id=$1', [customerId]);
+    if (cRows.length) customerName = cRows[0].name;
+  }
+  if (!customerName) return { ok: false, error: 'Customer is required' };
   await pool.query(
     `update sales_orders
-     set order_number=$1, customer_name=$2, product_type=$3, product_sub_type=$4,
-         product_size=$5, quantity=$6, unit_price=$7, notes=$8
-     where id=$9`,
-    [p.order_number, p.customer_name, p.product_type, p.product_sub_type || null,
-     p.product_size, Number(p.quantity), Number(p.unit_price), p.notes || null, orderId]
+     set order_number=$1, customer_name=$2, customer_id=$3, product_type=$4, product_sub_type=$5,
+         product_size=$6, quantity=$7, unit_price=$8, currency=$9, price_tax_type=$10,
+         payment_due_date=$11, notes=$12
+     where id=$13`,
+    [p.order_number, customerName, customerId, p.product_type, p.product_sub_type || null,
+     p.product_size, Number(p.quantity), Number(p.unit_price),
+     p.currency || 'RWF', priceTaxType, p.payment_due_date || null,
+     p.notes || null, orderId]
   );
   logAudit(user, `Updated sales order #${orderId}`, 'ti-edit', { orderId });
   refreshStockView();
@@ -2441,6 +2614,62 @@ async function salesDelete(userId, orderId, reason) {
   );
   logAudit(user, `Moved sales order ${rows[0].order_number} to trash`, 'ti-trash', { orderId, reason });
   refreshStockView();
+  return { ok: true };
+}
+
+// ── Customer Registry ─────────────────────────────────────────────────────────
+
+async function customersForDropdown(userId) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const { rows } = await pool.query(
+    `select id, name, contact_person, phone from customers where active = true order by name`
+  );
+  return { ok: true, rows };
+}
+
+async function customersList(userId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'customers'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select c.id, c.name, c.contact_person, c.phone, c.email, c.address, c.tin, c.notes, c.active,
+            to_char(c.created_at,'DD Mon YYYY') as created_at,
+            u.name as created_by
+     from customers c
+     left join app_users u on u.id = c.created_by
+     order by c.name`
+  );
+  return { ok: true, rows };
+}
+
+async function customersCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  const p = payload || {};
+  if (!p.name?.trim()) return { ok: false, error: 'Customer name is required' };
+  const { rows } = await pool.query(
+    `insert into customers(name, contact_person, phone, email, address, tin, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning id, name`,
+    [p.name.trim(), p.contact_person?.trim() || null, p.phone?.trim() || null,
+     p.email?.trim() || null, p.address?.trim() || null, p.tin?.trim() || null,
+     p.notes?.trim() || null, user.id]
+  );
+  logAudit(user, `Registered customer: ${p.name.trim()}`, 'ti-users', { id: rows[0].id });
+  return { ok: true, id: rows[0].id, name: rows[0].name };
+}
+
+async function customersUpdate(userId, customerId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'customers'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.name?.trim()) return { ok: false, error: 'Customer name is required' };
+  await pool.query(
+    `update customers set name=$1, contact_person=$2, phone=$3, email=$4, address=$5, tin=$6, notes=$7 where id=$8`,
+    [p.name.trim(), p.contact_person?.trim() || null, p.phone?.trim() || null,
+     p.email?.trim() || null, p.address?.trim() || null, p.tin?.trim() || null,
+     p.notes?.trim() || null, customerId]
+  );
+  logAudit(user, `Updated customer #${customerId}: ${p.name.trim()}`, 'ti-edit', { customerId });
   return { ok: true };
 }
 
@@ -2751,7 +2980,7 @@ async function transportJobsList(userId) {
     `select id, name, phone from transport_companies where active=true order by name`
   );
   const { rows: salesOrders } = await pool.query(
-    `select id, order_number, customer_name, product_type, product_size, quantity
+    `select id, order_number, customer_name, product_type, product_size, quantity, price_tax_type
      from sales_orders
      where status in ('Confirmed','Pending')
      order by created_at desc limit 50`
@@ -3012,6 +3241,77 @@ async function valueAddedTimberDelete(userId, id, reason) {
 
 // ── Machine Fuel / Consumption Logs ──────────────────────────────────────────
 
+async function machineFuelSummary(userId, month) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'machine-fuel')) && !['admin','ceo','operations','logistics','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+
+  const monthFilter = month || null;
+  const params = monthFilter ? [monthFilter] : [];
+  const dateWhere = monthFilter ? `and to_char(log_date,'YYYY-MM') = $1` : '';
+
+  // Per-machine reconciliation: fuel issued (from fuel logs) vs fuel consumed (from daily logs)
+  const { rows: byMachine } = await pool.query(`
+    select
+      m.id,
+      m.machine_code,
+      m.name  as machine_name,
+      mc.name as category_name,
+      coalesce(fi.issued,   0)::numeric as fuel_issued,
+      coalesce(fc.consumed, 0)::numeric as fuel_consumed,
+      (coalesce(fi.issued, 0) - coalesce(fc.consumed, 0))::numeric as variance
+    from machines m
+    join machine_categories mc on mc.id = m.category_id
+    left join (
+      select machine_id, sum(quantity)::numeric as issued
+      from machine_fuel_logs
+      where deleted_at is null ${dateWhere}
+      group by machine_id
+    ) fi on fi.machine_id = m.id
+    left join (
+      select machine_id, sum(fuel_consumed)::numeric as consumed
+      from machine_daily_logs
+      where deleted_at is null ${dateWhere}
+      group by machine_id
+    ) fc on fc.machine_id = m.id
+    where m.active = true
+      and (fi.machine_id is not null or fc.machine_id is not null)
+    order by m.machine_code
+  `, params);
+
+  // Per-date reconciliation (last 30 entries across all machines)
+  const { rows: byDate } = await pool.query(`
+    select
+      to_char(d.log_date,'DD/MM/YYYY') as date_fmt,
+      d.log_date,
+      m.machine_code,
+      m.name as machine_name,
+      coalesce(fi.issued, 0)::numeric   as fuel_issued,
+      coalesce(mdl.fuel_consumed, 0)::numeric as fuel_consumed,
+      (coalesce(fi.issued, 0) - coalesce(mdl.fuel_consumed, 0))::numeric as variance
+    from (
+      select machine_id, log_date from machine_fuel_logs where deleted_at is null ${dateWhere}
+      union
+      select machine_id, log_date from machine_daily_logs  where deleted_at is null ${dateWhere}
+    ) d
+    join machines m on m.id = d.machine_id
+    left join (
+      select machine_id, log_date, sum(quantity)::numeric as issued
+      from machine_fuel_logs where deleted_at is null
+      group by machine_id, log_date
+    ) fi on fi.machine_id = d.machine_id and fi.log_date = d.log_date
+    left join (
+      select machine_id, log_date, sum(fuel_consumed)::numeric as fuel_consumed
+      from machine_daily_logs where deleted_at is null
+      group by machine_id, log_date
+    ) mdl on mdl.machine_id = d.machine_id and mdl.log_date = d.log_date
+    order by d.log_date desc, m.machine_code
+    limit 60
+  `, params);
+
+  return { ok: true, byMachine, byDate };
+}
+
 async function machineFuelLogsList(userId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'machine-fuel')) && !['admin','ceo','operations','logistics','supervisor'].includes(user.role))
@@ -3019,10 +3319,13 @@ async function machineFuelLogsList(userId) {
   const { rows } = await pool.query(
     `select mfl.id, mfl.log_date, mfl.operator, mfl.fuel_type, mfl.quantity, mfl.unit, mfl.notes,
             to_char(mfl.log_date,'DD/MM/YYYY') as date_fmt,
-            m.name as machine_name, m.plate_number,
+            coalesce(m.machine_code, v.registration) as machine_code,
+            coalesce(m.name, trim(coalesce(v.make,'') || case when v.model is not null then ' '||v.model else '' end)) as machine_name,
+            coalesce(m.plate_number, v.registration) as plate_number,
             u.name as logged_by_name, mfl.pending_deletion
      from machine_fuel_logs mfl
      left join machines m on m.id=mfl.machine_id
+     left join vehicles v on v.id=mfl.vehicle_id
      left join app_users u on u.id=mfl.logged_by
      where mfl.deleted_at is null
      order by mfl.log_date desc, mfl.id desc
@@ -3037,16 +3340,18 @@ async function machineFuelLogsCreate(userId, payload) {
     return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.log_date) return { ok: false, error: 'Date is required' };
-  if (!p.machine_id) return { ok: false, error: 'Machine is required' };
+  const machineId = p.machine_id ? Number(p.machine_id) : null;
+  const vehicleId = p.vehicle_id ? Number(p.vehicle_id) : null;
+  if (!machineId && !vehicleId) return { ok: false, error: 'Machine or vehicle is required' };
   if (!p.fuel_type) return { ok: false, error: 'Fuel type is required' };
   if (!p.quantity || Number(p.quantity) < 0) return { ok: false, error: 'Quantity is required' };
   await pool.query(
-    `insert into machine_fuel_logs(log_date, machine_id, operator, fuel_type, quantity, unit, notes, logged_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
-    [p.log_date, Number(p.machine_id), p.operator?.trim() || null,
+    `insert into machine_fuel_logs(log_date, machine_id, vehicle_id, operator, fuel_type, quantity, unit, notes, logged_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [p.log_date, machineId, vehicleId, p.operator?.trim() || null,
      p.fuel_type, Number(p.quantity), p.unit || 'liters', p.notes?.trim() || null, user.id]
   );
-  logAudit(user, `Machine fuel log: ${p.fuel_type} ${p.quantity}L — machine #${p.machine_id}`, 'ti-droplet', { ...p });
+  logAudit(user, `Machine fuel log: ${p.fuel_type} ${p.quantity}L — ${machineId ? 'machine #'+machineId : 'vehicle #'+vehicleId}`, 'ti-droplet', { ...p });
   return { ok: true };
 }
 
@@ -3072,7 +3377,7 @@ async function casualLabourRequestsList(userId) {
     return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query(
     `select clr.id, clr.start_date, clr.end_date, clr.task, clr.num_casuals,
-            clr.description, clr.comments, clr.status,
+            clr.labour_items, clr.description, clr.comments, clr.status,
             to_char(clr.start_date,'DD/MM/YYYY') as start_fmt,
             to_char(clr.end_date,'DD/MM/YYYY') as end_fmt,
             to_char(clr.created_at,'DD/MM/YYYY') as created_fmt,
@@ -3095,19 +3400,43 @@ async function casualLabourRequestsCreate(userId, payload) {
   if (!p.end_date) return { ok: false, error: 'End date is required' };
   if (!p.task?.trim()) return { ok: false, error: 'Task is required' };
   if (!p.num_casuals || Number(p.num_casuals) <= 0) return { ok: false, error: 'Number of casuals must be > 0' };
+  const items = Array.isArray(p.labour_items) && p.labour_items.length ? p.labour_items : null;
   await pool.query(
-    `insert into casual_labour_requests(start_date, end_date, task, num_casuals, description, comments, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7)`,
+    `insert into casual_labour_requests(start_date, end_date, task, num_casuals, labour_items, description, comments, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
     [p.start_date, p.end_date, p.task.trim(), Number(p.num_casuals),
+     items ? JSON.stringify(items) : null,
      p.description?.trim() || null, p.comments?.trim() || null, user.id]
   );
   logAudit(user, `Casual request: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
   return { ok: true };
 }
 
+async function casualLabourRequestsSubmit(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'casual-requests')) && !['admin','ceo','operations','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.start_date) return { ok: false, error: 'Start date is required' };
+  if (!p.end_date) return { ok: false, error: 'End date is required' };
+  if (!p.task?.trim()) return { ok: false, error: 'Task is required' };
+  if (!p.num_casuals || Number(p.num_casuals) <= 0) return { ok: false, error: 'Number of casuals must be > 0' };
+  const items = Array.isArray(p.labour_items) && p.labour_items.length ? p.labour_items : null;
+  await pool.query(
+    `insert into casual_labour_requests
+       (start_date, end_date, task, num_casuals, labour_items, description, comments, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    [p.start_date, p.end_date, p.task.trim(), Number(p.num_casuals),
+     items ? JSON.stringify(items) : null,
+     p.description?.trim() || null, p.comments?.trim() || null, user.id]
+  );
+  logAudit(user, `Casual request submitted: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
+  return { ok: true };
+}
+
 async function casualLabourRequestsReview(userId, requestId, status) {
   const user = await getUser(userId);
-  if (!['admin','ceo','operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  if (!['ceo','operations'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const valid = ['Approved', 'Rejected'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query(
@@ -3480,6 +3809,12 @@ module.exports = {
   salesList,
   salesCreate,
   salesUpdateStatus,
+  salesProductsForDropdown,
+  salesUpdatePayment,
+  customersForDropdown,
+  customersList,
+  customersCreate,
+  customersUpdate,
   productsList,
   productsCreate,
   productsToggle,
@@ -3515,6 +3850,9 @@ module.exports = {
   stockItemsList,
   stockItemsCreate,
   stockItemsUpdate,
+  stockCategoriesList,
+  stockCategoriesCreate,
+  stockCategoriesDelete,
   stockMovementsList,
   stockMovementsCreate,
   stockTransferApprove,
@@ -3522,6 +3860,7 @@ module.exports = {
   materialRequestsCreate,
   materialRequestsApprove,
   workshopOverview,
+  vehiclesForTransport,
   vehiclesList,
   vehiclesCreate,
   vehiclesUpdate,
@@ -3581,6 +3920,7 @@ module.exports = {
   machineLogsList,
   machineLogsUpdate,
   machineLogsDelete,
+  machineFuelIssuedLookup,
   machineKpiDefinitionsList,
   machineKpiDefinitionsCreate,
   machineKpiTargetsList,
@@ -3611,11 +3951,14 @@ module.exports = {
   valueAddedTimberList,
   valueAddedTimberCreate,
   valueAddedTimberDelete,
+  machineFuelDropdown,
+  machineFuelSummary,
   machineFuelLogsList,
   machineFuelLogsCreate,
   machineFuelLogsDelete,
   casualLabourRequestsList,
   casualLabourRequestsCreate,
+  casualLabourRequestsSubmit,
   casualLabourRequestsReview,
   casualLabourRequestsDelete,
   casualsList,
@@ -3667,7 +4010,7 @@ async function getCeoOverview(userId) {
              count(*) filter (where status='Under Maintenance')::int       as maintenance
       from machines where active=true`),
 
-    pool.query(`select count(*)::int as total from vehicles where active=true`),
+    pool.query(`select count(*)::int as total from vehicles where status='Active'`),
 
     pool.query(`select count(*)::int as total from casuals where active=true`),
 
@@ -3820,10 +4163,17 @@ async function machineLogsList(userId, machineId, month) {
   if (month) { params.push(month); whereClause += ` and to_char(mdl.log_date,'YYYY-MM') = $${params.length}`; }
 
   const { rows } = await pool.query(`
-    select mdl.*, m.name as machine_name, m.machine_code, mc.name as category_name
+    select mdl.*, m.name as machine_name, m.machine_code, mc.name as category_name,
+           coalesce(fi.fuel_issued, 0)::numeric as fuel_issued
     from machine_daily_logs mdl
     join machines m on m.id = mdl.machine_id
     join machine_categories mc on mc.id = m.category_id
+    left join (
+      select machine_id, log_date, sum(quantity)::numeric as fuel_issued
+      from machine_fuel_logs
+      where machine_id is not null
+      group by machine_id, log_date
+    ) fi on fi.machine_id = mdl.machine_id and fi.log_date = mdl.log_date
     where mdl.deleted_at is null ${whereClause}
     order by mdl.log_date desc, m.name
   `, params);
@@ -3893,6 +4243,19 @@ async function machineLogsDelete(userId, logId, reason) {
   );
   logAudit(user, `Moved machine log #${logId} to trash`, 'ti-trash', { logId, reason });
   return { ok: true };
+}
+
+async function machineFuelIssuedLookup(userId, machineId, logDate) {
+  const user = await getUser(userId);
+  if (!user) return { ok: false, error: 'Not authenticated' };
+  if (!machineId || !logDate) return { ok: true, issued: 0 };
+  const { rows } = await pool.query(
+    `select coalesce(sum(quantity), 0)::numeric as issued
+     from machine_fuel_logs
+     where machine_id = $1 and log_date = $2`,
+    [Number(machineId), logDate]
+  );
+  return { ok: true, issued: Number(rows[0]?.issued || 0) };
 }
 
 async function machineKpiDefinitionsList(userId) {

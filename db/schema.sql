@@ -555,6 +555,7 @@ create table if not exists machine_fuel_logs (
   id bigserial primary key,
   log_date date not null,
   machine_id bigint references machines(id),
+  vehicle_id bigint references vehicles(id),
   operator text,
   fuel_type text not null, -- diesel / petroleum / petrol / chain oil / engine oil
   quantity numeric(10,2) not null default 0,

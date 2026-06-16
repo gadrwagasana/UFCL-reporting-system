@@ -191,6 +191,46 @@ async function ensureSchema() {
   await pool.query(`alter table notifications add column if not exists for_user_id bigint references app_users(id) on delete cascade`);
   await pool.query(`create index if not exists idx_notif_for_user on notifications(for_user_id) where for_user_id is not null`);
   await pool.query(`alter table pending_edits add column if not exists old_snapshot jsonb`);
+  // Machine fuel logs — support company vehicles alongside machines
+  await pool.query(`alter table machine_fuel_logs add column if not exists vehicle_id bigint references vehicles(id)`);
+
+  // Labour request breakdown items
+  await pool.query(`alter table casual_labour_requests add column if not exists labour_items jsonb`);
+
+  // Sales order — currency, tax type, payment due date & payment status
+  await pool.query(`alter table sales_orders add column if not exists currency text not null default 'RWF'`);
+  await pool.query(`alter table sales_orders add column if not exists price_tax_type text not null default 'Exclusive'`);
+  await pool.query(`alter table sales_orders add column if not exists payment_due_date date`);
+  await pool.query(`alter table sales_orders add column if not exists payment_status text not null default 'Unpaid'`);
+
+  // Customer registry
+  await pool.query(`
+    create table if not exists customers (
+      id bigserial primary key,
+      name text not null,
+      contact_person text,
+      phone text,
+      email text,
+      address text,
+      tin text,
+      notes text,
+      active boolean not null default true,
+      created_by bigint references app_users(id),
+      created_at timestamptz not null default now()
+    )
+  `);
+  await pool.query(`create index if not exists idx_customers_active on customers(active)`);
+  await pool.query(`alter table sales_orders add column if not exists customer_id bigint references customers(id)`);
+
+  // Custom stock categories
+  await pool.query(`
+    create table if not exists stock_categories (
+      id bigserial primary key,
+      name text not null unique,
+      created_by bigint references app_users(id),
+      created_at timestamptz not null default now()
+    )
+  `);
 
   // ── Performance indexes ──────────────────────────────────────────────────────
   await pool.query(`create index if not exists idx_stock_mv_item     on stock_movements(item_id)`);
@@ -203,41 +243,45 @@ async function ensureSchema() {
   await pool.query(`create index if not exists idx_notif_read_user   on notifications_read(user_id)`);
 
   // ── Stock summary materialized view ──────────────────────────────────────────
+  // Drop and recreate so formula updates take effect (IF NOT EXISTS won't update an existing view).
+  await pool.query(`drop materialized view if exists mv_stock_summary cascade`);
   await pool.query(`
-    create materialized view if not exists mv_stock_summary as
+    create materialized view mv_stock_summary as
     with produced as (
-      select
-        coalesce(sum(timber_units),0)::int       as timber,
-        coalesce(sum(timber_kiln_dried),0)::int  as kiln_dried,
-        coalesce(sum(timber_cca_treated),0)::int as cca_treated,
-        coalesce(sum(timber_untreated),0)::int   as untreated,
-        coalesce(sum(poles_units),0)::int        as poles
-      from daily_logs
+      select coalesce(sum(timber_units),0)::int as timber,
+             coalesce(sum(poles_units),0)::int  as poles
+      from daily_logs where deleted_at is null
+    ),
+    value_added as (
+      select coalesce(sum(case when type_value_added='Kiln-dried timber'  then num_timber else 0 end),0)::int as kiln_dried,
+             coalesce(sum(case when type_value_added='CCA treated timber' then num_timber else 0 end),0)::int as cca_treated
+      from value_added_timber where deleted_at is null
     ),
     sold as (
       select
-        coalesce(sum(case when product_type='Timber' then quantity else 0 end),0)::int                                                            as timber,
+        coalesce(sum(case when product_type='Timber' then quantity else 0 end),0)::int as timber,
         coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Kiln-dried'  then quantity else 0 end),0)::int as kiln_dried,
         coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='CCA-treated' then quantity else 0 end),0)::int as cca_treated,
         coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Untreated'   then quantity else 0 end),0)::int as untreated,
-        coalesce(sum(case when product_type='Poles'  then quantity else 0 end),0)::int                                                            as poles
-      from sales_orders
+        coalesce(sum(case when product_type='Poles'  then quantity else 0 end),0)::int as poles
+      from sales_orders where deleted_at is null
     )
     select
-      p.timber as timber_produced, p.poles as poles_produced,
-      p.kiln_dried as kiln_dried_produced, p.cca_treated as cca_treated_produced, p.untreated as untreated_produced,
-      s.timber as timber_sold, s.poles as poles_sold,
+      p.timber                                                as timber_produced,
+      p.poles                                                 as poles_produced,
+      va.kiln_dried                                           as kiln_dried_produced,
+      va.cca_treated                                          as cca_treated_produced,
+      greatest(p.timber - va.kiln_dried - va.cca_treated, 0) as untreated_produced,
+      s.timber     as timber_sold,     s.poles     as poles_sold,
       s.kiln_dried as kiln_dried_sold, s.cca_treated as cca_treated_sold, s.untreated as untreated_sold,
-      (p.timber    - s.timber)    as timber_stock,
-      (p.poles     - s.poles)     as poles_stock,
-      (p.kiln_dried  - s.kiln_dried)  as kiln_dried_stock,
-      (p.cca_treated - s.cca_treated) as cca_treated_stock,
-      (p.untreated   - s.untreated)   as untreated_stock
-    from produced p, sold s
+      (p.timber    - s.timber)                                as timber_stock,
+      (p.poles     - s.poles)                                 as poles_stock,
+      (va.kiln_dried  - s.kiln_dried)                        as kiln_dried_stock,
+      (va.cca_treated - s.cca_treated)                       as cca_treated_stock,
+      (greatest(p.timber - va.kiln_dried - va.cca_treated, 0) - s.untreated) as untreated_stock
+    from produced p, value_added va, sold s
   `);
-  await pool.query(`
-    create unique index if not exists mv_stock_summary_unique on mv_stock_summary((1))
-  `);
+  await pool.query(`create unique index mv_stock_summary_unique on mv_stock_summary((1))`);
 }
 
 async function seedProductCatalog() {
