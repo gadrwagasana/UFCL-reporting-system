@@ -87,7 +87,10 @@ create table if not exists sales_orders (
   unit_price numeric(14,2) not null,
   notes text,
   reason text not null,
+  qty_dispatched_total int not null default 0,
   qty_accepted_total int not null default 0,
+  qty_rejected_total int not null default 0,
+  qty_returned_to_stock int not null default 0,
   qty_remaining int,
   created_by bigint references app_users(id),
   created_at timestamptz not null default now()

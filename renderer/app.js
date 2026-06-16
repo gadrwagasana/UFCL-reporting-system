@@ -81,6 +81,7 @@ const NAV = [
   { id: 'sales',              icon: 'ti-shopping-cart',      label: 'Sales Orders',         sec: 'Commercial'      },
   { id: 'customers',          icon: 'ti-users',              label: 'Customers',            sec: 'Commercial'      },
   { id: 'products',           icon: 'ti-tag',                label: 'Product Catalog',      sec: 'Commercial'      },
+  { id: 'logistics',          icon: 'ti-box',                label: 'Legacy Logistics',     sec: 'Commercial'      },
 
   // ── Reports & Analytics ───────────────────────────────────────────
   { id: 'weekly-cost',        icon: 'ti-cash',               label: 'Weekly Cost Report',   sec: 'Reports'         },
@@ -1973,18 +1974,28 @@ async function renderSales() {
                   const subBadge = r.product_sub_type === 'Kiln-dried' ? 'ba' : r.product_sub_type === 'CCA-treated' ? 'bg' : r.product_sub_type === 'Untreated' ? 'bt' : '';
                   const cur = r.currency || 'RWF';
                   const total = (Number(r.quantity)*Number(r.unit_price)).toLocaleString();
-                  const accepted = Number(r.qty_accepted_total || 0);
-                  const qty = Number(r.quantity || 0);
+                  const qty        = Number(r.quantity || 0);
+                  const dispatched = Number(r.qty_dispatched_total || 0);
+                  const accepted   = Number(r.qty_accepted_total || 0);
+                  const rejected   = Number(r.qty_rejected_total || 0);
+                  const remaining  = Number(r.qty_remaining ?? qty);
                   const pct = qty > 0 ? Math.min(100, Math.round(accepted / qty * 100)) : 0;
-                  const fulfilmentCell = accepted > 0
-                    ? `<div style="min-width:100px">
-                        <div style="font-size:11px;color:var(--t3);margin-bottom:3px">${accepted.toLocaleString()} / ${qty.toLocaleString()}</div>
+                  const hasActivity = dispatched > 0 || accepted > 0;
+                  const fulfilmentCell = hasActivity
+                    ? `<div style="min-width:130px">
+                        <div style="display:flex;gap:8px;font-size:11px;margin-bottom:4px;flex-wrap:wrap">
+                          <span style="color:var(--t3)">Ord: <strong>${qty.toLocaleString()}</strong></span>
+                          <span style="color:var(--blue)">Disp: <strong>${dispatched.toLocaleString()}</strong></span>
+                          <span style="color:var(--green)">Acc: <strong>${accepted.toLocaleString()}</strong></span>
+                          ${rejected > 0 ? `<span style="color:var(--red)">Rej: <strong>${rejected.toLocaleString()}</strong></span>` : ''}
+                        </div>
                         <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden">
                           <div style="height:100%;width:${pct}%;background:${pct>=100?'var(--green)':'var(--amber)'}"></div>
                         </div>
+                        <div style="font-size:11px;color:var(--t3);margin-top:2px">Remaining: <strong style="color:${remaining>0?'var(--amber)':'var(--green)'}">${remaining.toLocaleString()}</strong></div>
                       </div>`
                     : '<span style="color:var(--t3);font-size:12px">—</span>';
-                  const isPartial = ['Partially Delivered','In Progress'].includes(r.status);
+                  const isPartial = ['Partially Dispatched','Fully Dispatched','Partially Delivered'].includes(r.status);
                   return `<tr>
                     <td style="font-family:var(--fm);font-weight:500">${r.order_number}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                     <td>${r.customer_name}</td>
@@ -2005,7 +2016,7 @@ async function renderSales() {
                       ${(r.payment_status||'Unpaid')==='Unpaid' ? `<button class="bs1 so-pay-btn" data-so="${r.id}" style="color:var(--green)"><i class="ti ti-cash"></i>Pay</button>` : ''}
                       <button class="bs1 so-deliver-btn" data-so="${r.id}" title="Create delivery order"><i class="ti ti-truck-delivery"></i>Deliver</button>
                       <button class="bs1 so-transport-btn" data-so="${r.id}" title="Assign 3rd-party transport"><i class="ti ti-building"></i>Transport</button>
-                      ${isPartial ? `<button class="bs1 so-close-short-btn" data-so="${r.id}" data-accepted="${accepted}" data-qty="${qty}" title="Close short — accept partial delivery as final" style="color:var(--amber);white-space:nowrap"><i class="ti ti-x"></i>Close short</button>` : ''}
+                      ${isPartial ? `<button class="bs1 so-close-short-btn" data-so="${r.id}" data-accepted="${accepted}" data-qty="${qty}" data-remaining="${remaining}" title="Close short — accept partial delivery as final" style="color:var(--amber);white-space:nowrap"><i class="ti ti-x"></i>Close short</button>` : ''}
                       <button class="bs1 so-del-btn" data-so="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
                     </td>
                   </tr>`;
@@ -2543,20 +2554,23 @@ async function renderSales() {
   $('page-sales').querySelectorAll('.so-close-short-btn').forEach((btn) => {
     btn.onclick = () => {
       const soId     = btn.dataset.so;
-      const accepted = Number(btn.dataset.accepted || 0);
-      const qty      = Number(btn.dataset.qty || 0);
+      const accepted  = Number(btn.dataset.accepted  || 0);
+      const qty       = Number(btn.dataset.qty       || 0);
+      const remaining = Number(btn.dataset.remaining || 0);
       const order    = rows.find(r => String(r.id) === soId);
       if (!order) return;
       openOverlay('Close short', `${order.order_number} — ${order.customer_name}`, `
         <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px">
-          <strong>Original order qty:</strong> ${qty.toLocaleString()}<br>
-          <strong>Qty accepted so far:</strong> ${accepted.toLocaleString()}<br>
-          <strong>Remaining undelivered:</strong> ${(qty - accepted).toLocaleString()}<br><br>
-          Closing short will mark this order as <strong>Closed (Short)</strong> and release the undelivered units back to stock.
-          This action cannot be undone.
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+            <div><span style="color:var(--t3)">Original order</span><br><strong>${qty.toLocaleString()} units</strong></div>
+            <div><span style="color:var(--t3)">Accepted by customer</span><br><strong style="color:var(--green)">${accepted.toLocaleString()} units</strong></div>
+            <div><span style="color:var(--t3)">Remaining to deliver</span><br><strong style="color:var(--amber)">${remaining.toLocaleString()} units</strong></div>
+          </div>
+          Closing short will mark this order as <strong>Closed (Short)</strong> and return the <strong>${remaining.toLocaleString()} undelivered units</strong> back to stock.
+          The original order quantity is preserved for records. This action cannot be undone.
         </div>
         <div class="brow">
-          <button class="bp1" id="ovSave" style="background:var(--amber);border-color:var(--amber)"><i class="ti ti-x"></i>Close short (${accepted.toLocaleString()} accepted)</button>
+          <button class="bp1" id="ovSave" style="background:var(--amber);border-color:var(--amber)"><i class="ti ti-x"></i>Close short — return ${remaining.toLocaleString()} to stock</button>
           <button class="bs1" id="ovCancel">Cancel</button>
         </div>`,
         async () => {
@@ -5543,7 +5557,7 @@ async function renderDeliveries() {
             <td>${statBadge(r.status)}</td>
             <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
               ${canStatus ? `<select class="do-status-sel" data-id="${r.id}" style="font-size:12px;padding:3px 6px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:4px">
-                ${['Pending','Assigned','In Transit','Delivered','Failed'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+                ${['Pending','Assigned','In Transit','Failed'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
               </select>` : ''}
               ${canPOD ? `<button class="bs1 do-pod" data-id="${r.id}" title="Record POD" style="background:var(--green);color:#fff;border-color:var(--green)"><i class="ti ti-clipboard-check"></i></button>` : ''}
               <button class="bs1 do-edit" data-id="${r.id}"><i class="ti ti-edit"></i></button>
@@ -5557,7 +5571,12 @@ async function renderDeliveries() {
 
   $('doAdd').onclick = () => {
     const vOpts = vehicles.map(v=>`<option value="${v.id}">${v.registration}${v.make?' — '+v.make:''}</option>`).join('');
-    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s=>`<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}" data-qty="${s.quantity}" data-rem="${s.qty_remaining}">${s.order_number} — ${s.customer_name} (${s.qty_remaining} remaining)${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
+    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s => {
+      const rem = Number(s.qty_remaining ?? s.quantity);
+      const disp = Number(s.qty_dispatched_total || 0);
+      const label = `${s.order_number} — ${s.customer_name} | Ordered: ${Number(s.quantity).toLocaleString()}, Dispatched: ${disp.toLocaleString()}, Remaining: ${rem.toLocaleString()}${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}`;
+      return `<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}" data-qty="${s.quantity}" data-rem="${rem}">${label}</option>`;
+    }).join('');
     openOverlay('Create delivery order', null, `
       <div id="do-incl-banner" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
         <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — the client's unit price already covers this delivery.

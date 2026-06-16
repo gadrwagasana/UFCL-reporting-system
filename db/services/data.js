@@ -510,18 +510,21 @@ async function salesList(userId) {
               so.quantity, so.unit_price, so.currency, so.price_tax_type,
               so.payment_due_date, so.payment_status,
               so.notes, so.status, so.created_at, so.pending_deletion,
-              coalesce(so.qty_accepted_total,0) as qty_accepted_total,
+              coalesce(so.qty_dispatched_total,0)  as qty_dispatched_total,
+              coalesce(so.qty_accepted_total,0)    as qty_accepted_total,
+              coalesce(so.qty_rejected_total,0)    as qty_rejected_total,
               coalesce(so.qty_remaining, so.quantity) as qty_remaining,
               c.name as customer_registered_name,
+              del.delivery_count,
               del.delivery_number, del.delivery_status
        from sales_orders so
        left join customers c on c.id = so.customer_id
        left join lateral (
-         select order_number as delivery_number, status as delivery_status
+         select count(*)::int                        as delivery_count,
+                max(order_number)                    as delivery_number,
+                (array_agg(status order by created_at desc))[1] as delivery_status
          from delivery_orders
          where sales_order_id = so.id
-         order by created_at desc
-         limit 1
        ) del on true
        where so.deleted_at is null
        order by so.created_at desc, so.id desc
@@ -2114,10 +2117,11 @@ async function deliveryOrdersList(userId) {
   );
   const { rows: salesOrders } = await pool.query(
     `select id, order_number, customer_name, price_tax_type, quantity,
-            coalesce(qty_accepted_total,0) as qty_accepted_total,
+            coalesce(qty_dispatched_total,0)  as qty_dispatched_total,
+            coalesce(qty_accepted_total,0)    as qty_accepted_total,
             coalesce(qty_remaining, quantity) as qty_remaining
      from sales_orders
-     where status in ('Pending','Confirmed','In Progress','Partially Delivered') and deleted_at is null
+     where status not in ('Fully Delivered','Closed (Short)','Cancelled') and deleted_at is null
      order by created_at desc limit 200`
   );
   return { ok: true, rows, vehicles, salesOrders };
@@ -2137,6 +2141,20 @@ async function deliveryOrdersCreate(userId, payload) {
     [orderNum, p.sales_order_id || null, p.vehicle_id || null, p.driver_name,
      p.delivery_date || null, p.route || null, p.notes || null, qtyDispatched, user.id]
   );
+  // Update SO dispatched total and status
+  if (p.sales_order_id && qtyDispatched) {
+    await pool.query(
+      `update sales_orders set
+         qty_dispatched_total = coalesce(qty_dispatched_total,0) + $1,
+         status = case
+           when status in ('Partially Delivered','Fully Delivered','Closed (Short)','Cancelled') then status
+           when coalesce(qty_dispatched_total,0) + $1 >= quantity then 'Fully Dispatched'
+           else 'Partially Dispatched'
+         end
+       where id=$2 and deleted_at is null`,
+      [qtyDispatched, p.sales_order_id]
+    );
+  }
   logAudit(user, `Created delivery order ${orderNum}`, 'ti-truck-delivery', { id: rows[0].id });
   return { ok: true };
 }
@@ -2144,17 +2162,9 @@ async function deliveryOrdersCreate(userId, payload) {
 async function deliveryOrdersUpdateStatus(userId, orderId, status) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
-  const valid = ['Pending', 'Assigned', 'In Transit', 'Delivered', 'Failed'];
+  const valid = ['Pending', 'Assigned', 'In Transit', 'Failed'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query('update delivery_orders set status=$1 where id=$2', [status, orderId]);
-  if (status === 'In Transit') {
-    await pool.query(
-      `update sales_orders set status='Dispatched'
-       where id=(select sales_order_id from delivery_orders where id=$1) and sales_order_id is not null
-             and status not in ('Partially Delivered','In Progress','Fully Delivered','Closed (Short)')`,
-      [orderId]
-    );
-  }
   logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
   return { ok: true };
 }
@@ -2164,24 +2174,26 @@ async function deliveryOrdersRecordPOD(userId, orderId, payload) {
   if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   const qtyAccepted = Number(p.qty_accepted);
-  if (!qtyAccepted || qtyAccepted < 0) return { ok: false, error: 'Quantity accepted is required' };
+  if (isNaN(qtyAccepted) || qtyAccepted < 0) return { ok: false, error: 'Quantity accepted is required' };
 
-  // Get DO and linked SO
+  // Get DO and its linked SO totals
   const { rows: doRows } = await pool.query(
     `select do2.id, do2.qty_dispatched, do2.sales_order_id,
-            so.quantity as so_quantity,
-            coalesce(so.qty_accepted_total,0) as qty_accepted_total
+            so.quantity                              as so_quantity,
+            coalesce(so.qty_accepted_total,0)        as qty_accepted_total,
+            coalesce(so.qty_rejected_total,0)        as qty_rejected_total,
+            coalesce(so.qty_returned_to_stock,0)     as qty_returned_to_stock
      from delivery_orders do2
-     left join sales_orders so on so.id=do2.sales_order_id
+     left join sales_orders so on so.id = do2.sales_order_id
      where do2.id=$1`, [orderId]
   );
   if (!doRows.length) return { ok: false, error: 'Delivery order not found' };
   const doRow = doRows[0];
 
   const qtyDispatched = doRow.qty_dispatched || qtyAccepted;
-  const qtyRejected = Math.max(0, qtyDispatched - qtyAccepted);
+  const qtyRejected   = Math.max(0, qtyDispatched - qtyAccepted);
 
-  // Update the delivery order
+  // Record POD on the delivery order
   await pool.query(
     `update delivery_orders set
        qty_accepted=$1, qty_rejected=$2, rejection_reason=$3,
@@ -2190,22 +2202,28 @@ async function deliveryOrdersRecordPOD(userId, orderId, payload) {
     [qtyAccepted, qtyRejected, p.rejection_reason || null, user.id, orderId]
   );
 
-  // Update linked sales order if present
+  // Update the linked Sales Order
   if (doRow.sales_order_id) {
-    const newTotal = doRow.qty_accepted_total + qtyAccepted;
-    const newRemaining = Math.max(0, doRow.so_quantity - newTotal);
-    let newSoStatus = newRemaining <= 0 ? 'Fully Delivered' : 'Partially Delivered';
+    const newAcceptedTotal       = doRow.qty_accepted_total    + qtyAccepted;
+    const newRejectedTotal       = doRow.qty_rejected_total    + qtyRejected;
+    const newReturnedToStock     = doRow.qty_returned_to_stock + qtyRejected; // rejected = back to stock
+    const newRemaining           = Math.max(0, doRow.so_quantity - newAcceptedTotal);
+    const newSoStatus            = newRemaining <= 0 ? 'Fully Delivered' : 'Partially Delivered';
 
     await pool.query(
       `update sales_orders set
-         qty_accepted_total=$1, qty_remaining=$2, status=$3
-       where id=$4`,
-      [newTotal, newRemaining, newSoStatus, doRow.sales_order_id]
+         qty_accepted_total=$1, qty_rejected_total=$2,
+         qty_returned_to_stock=$3, qty_remaining=$4, status=$5
+       where id=$6`,
+      [newAcceptedTotal, newRejectedTotal, newReturnedToStock, newRemaining, newSoStatus, doRow.sales_order_id]
     );
     refreshStockView();
   }
 
-  logAudit(user, `Recorded POD for delivery #${orderId} — accepted: ${qtyAccepted}, rejected: ${qtyRejected}`, 'ti-clipboard-check', { orderId, qtyAccepted, qtyRejected });
+  logAudit(user,
+    `POD recorded for delivery #${orderId} — accepted: ${qtyAccepted}, rejected: ${qtyRejected}`,
+    'ti-clipboard-check', { orderId, qtyAccepted, qtyRejected }
+  );
   return { ok: true };
 }
 
@@ -2213,18 +2231,27 @@ async function salesCloseShort(userId, soId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query(
-    `select order_number, quantity, coalesce(qty_accepted_total,0) as qty_accepted_total
+    `select order_number, quantity,
+            coalesce(qty_accepted_total,0)    as qty_accepted_total,
+            coalesce(qty_remaining, quantity) as qty_remaining,
+            coalesce(qty_returned_to_stock,0) as qty_returned_to_stock
      from sales_orders where id=$1 and deleted_at is null`, [soId]
   );
   if (!rows.length) return { ok: false, error: 'Order not found' };
   const so = rows[0];
-  // Reduce SO quantity to what was actually accepted so stock formula corrects itself
+  // Return the undelivered remaining quantity back to stock without touching the original order quantity
+  const newReturnedToStock = so.qty_returned_to_stock + so.qty_remaining;
   await pool.query(
-    `update sales_orders set quantity=$1, qty_remaining=0, status='Closed (Short)' where id=$2`,
-    [so.qty_accepted_total, soId]
+    `update sales_orders set
+       qty_returned_to_stock=$1, qty_remaining=0, status='Closed (Short)'
+     where id=$2`,
+    [newReturnedToStock, soId]
   );
   refreshStockView();
-  logAudit(user, `Closed short SO ${so.order_number} — accepted ${so.qty_accepted_total} of original ${so.quantity}`, 'ti-x', { soId });
+  logAudit(user,
+    `Closed short SO ${so.order_number} — accepted ${so.qty_accepted_total} of ${so.quantity}, returned ${so.qty_remaining} to stock`,
+    'ti-x', { soId }
+  );
   return { ok: true };
 }
 

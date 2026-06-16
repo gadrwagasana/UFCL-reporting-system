@@ -242,6 +242,13 @@ async function ensureSchema() {
   await pool.query(`create index if not exists idx_mat_req_workshop  on material_requests(workshop_id, status)`);
   await pool.query(`create index if not exists idx_notif_read_user   on notifications_read(user_id)`);
 
+  // Sales orders — fulfilment tracking columns (must exist before mv_stock_summary)
+  await pool.query(`alter table sales_orders add column if not exists qty_accepted_total int not null default 0`);
+  await pool.query(`alter table sales_orders add column if not exists qty_remaining int`);
+  await pool.query(`alter table sales_orders add column if not exists qty_dispatched_total int not null default 0`);
+  await pool.query(`alter table sales_orders add column if not exists qty_rejected_total int not null default 0`);
+  await pool.query(`alter table sales_orders add column if not exists qty_returned_to_stock int not null default 0`);
+
   // ── Stock summary materialized view ──────────────────────────────────────────
   // Drop and recreate so formula updates take effect (IF NOT EXISTS won't update an existing view).
   await pool.query(`drop materialized view if exists mv_stock_summary cascade`);
@@ -258,13 +265,14 @@ async function ensureSchema() {
       from value_added_timber where deleted_at is null
     ),
     sold as (
+      -- net sold = quantity committed minus any units returned to stock (rejected or close-short)
       select
-        coalesce(sum(case when product_type='Timber' then quantity else 0 end),0)::int as timber,
-        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Kiln-dried'  then quantity else 0 end),0)::int as kiln_dried,
-        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='CCA-treated' then quantity else 0 end),0)::int as cca_treated,
-        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Untreated'   then quantity else 0 end),0)::int as untreated,
-        coalesce(sum(case when product_type='Poles'  then quantity else 0 end),0)::int as poles
-      from sales_orders where deleted_at is null
+        coalesce(sum(case when product_type='Timber' then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as timber,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Kiln-dried'  then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as kiln_dried,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='CCA-treated' then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as cca_treated,
+        coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Untreated'   then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as untreated,
+        coalesce(sum(case when product_type='Poles'  then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as poles
+      from sales_orders where deleted_at is null and status != 'Cancelled'
     )
     select
       p.timber                                                as timber_produced,
@@ -295,10 +303,6 @@ async function ensureSchema() {
   await pool.query(`alter table delivery_orders add column if not exists rejection_reason text`);
   await pool.query(`alter table delivery_orders add column if not exists pod_recorded_at timestamptz`);
   await pool.query(`alter table delivery_orders add column if not exists pod_recorded_by bigint references app_users(id)`);
-
-  // Sales orders — fulfilment tracking
-  await pool.query(`alter table sales_orders add column if not exists qty_accepted_total int not null default 0`);
-  await pool.query(`alter table sales_orders add column if not exists qty_remaining int`);
 }
 
 async function seedProductCatalog() {
