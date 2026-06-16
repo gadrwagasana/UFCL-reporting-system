@@ -510,6 +510,8 @@ async function salesList(userId) {
               so.quantity, so.unit_price, so.currency, so.price_tax_type,
               so.payment_due_date, so.payment_status,
               so.notes, so.status, so.created_at, so.pending_deletion,
+              coalesce(so.qty_accepted_total,0) as qty_accepted_total,
+              coalesce(so.qty_remaining, so.quantity) as qty_remaining,
               c.name as customer_registered_name,
               del.delivery_number, del.delivery_status
        from sales_orders so
@@ -1217,6 +1219,68 @@ async function getDashboardStats(userId) {
     pool.query('select * from mv_stock_summary')
   ]);
 
+  // ── Pending actions — role-specific ─────────────────────────────────────────
+  const pendingActions = [];
+
+  // Logistics: confirmed orders with no delivery order yet
+  if (['admin', 'ceo', 'logistics', 'operations'].includes(user.role)) {
+    const { rows: awaitingDelivery } = await pool.query(
+      `select so.id, so.order_number, so.customer_name, so.product_type, so.product_size,
+              so.quantity, so.unit_price,
+              to_char(so.created_at,'DD/MM/YYYY HH24:MI') as created_at,
+              u.name as created_by_name
+       from sales_orders so
+       left join app_users u on u.id = so.created_by
+       where so.status = 'Confirmed'
+         and so.deleted_at is null
+         and not exists (select 1 from delivery_orders do2 where do2.sales_order_id = so.id)
+       order by so.created_at desc limit 10`
+    );
+    for (const r of awaitingDelivery) {
+      pendingActions.push({
+        type: 'logistics',
+        icon: 'ti-truck-delivery',
+        color: '#D97706',
+        title: `Delivery not assigned — ${r.order_number}`,
+        body: `${r.customer_name} · ${r.quantity} ${r.product_type}${r.product_size ? ' ' + r.product_size : ''} · by ${r.created_by_name || '—'}`,
+        created_at: r.created_at,
+        page: 'deliveries',
+        so_id: r.id
+      });
+    }
+  }
+
+  // Operations + sales: orders still Pending (need confirmation)
+  if (['admin', 'ceo', 'operations', 'sales', 'supervisor'].includes(user.role)) {
+    const byWho = user.role === 'sales'
+      ? `and so.created_by = ${user.id}`
+      : '';
+    const { rows: awaitingConfirm } = await pool.query(
+      `select so.id, so.order_number, so.customer_name, so.product_type, so.product_size,
+              so.quantity, so.unit_price,
+              to_char(so.created_at,'DD/MM/YYYY HH24:MI') as created_at,
+              u.name as created_by_name
+       from sales_orders so
+       left join app_users u on u.id = so.created_by
+       where so.status = 'Pending'
+         and so.deleted_at is null
+         ${byWho}
+       order by so.created_at desc limit 10`
+    );
+    for (const r of awaitingConfirm) {
+      pendingActions.push({
+        type: 'operations',
+        icon: 'ti-clipboard-check',
+        color: '#2563EB',
+        title: `Awaiting confirmation — ${r.order_number}`,
+        body: `${r.customer_name} · ${r.quantity} ${r.product_type}${r.product_size ? ' ' + r.product_size : ''} · by ${r.created_by_name || '—'}`,
+        created_at: r.created_at,
+        page: 'sales',
+        so_id: r.id
+      });
+    }
+  }
+
   return {
     ok: true,
     month,
@@ -1238,7 +1302,8 @@ async function getDashboardStats(userId) {
       lowStock: Number(lowStock[0]?.n || 0),
       pendingChanges: Number(pendingChanges[0]?.n || 0)
     },
-    recentActivity
+    recentActivity,
+    pendingActions
   };
 }
 
@@ -2023,11 +2088,18 @@ async function deliveryOrdersList(userId) {
   const { rows } = await pool.query(
     `select do2.id, do2.order_number, do2.driver_name,
             do2.status, do2.route, do2.notes,
+            do2.qty_dispatched, do2.qty_accepted, do2.qty_rejected,
+            do2.rejection_reason,
+            to_char(do2.pod_recorded_at,'DD/MM/YYYY HH24:MI') as pod_recorded_at,
             to_char(do2.delivery_date,'DD/MM/YYYY') as delivery_date,
             to_char(do2.created_at,'DD/MM/YYYY') as created_at,
             v.registration as vehicle_registration,
+            so.id as so_id,
             so.order_number as sales_order_number,
             so.customer_name,
+            so.quantity as so_quantity,
+            so.qty_accepted_total,
+            so.qty_remaining,
             so.price_tax_type as so_price_tax_type,
             u.name as created_by
      from delivery_orders do2
@@ -2035,15 +2107,18 @@ async function deliveryOrdersList(userId) {
      left join sales_orders so on so.id=do2.sales_order_id
      left join app_users u on u.id=do2.created_by
      order by do2.created_at desc
-     limit 100`
+     limit 200`
   );
   const { rows: vehicles } = await pool.query(
     `select id, registration, make, model from vehicles where status='Active' order by registration`
   );
   const { rows: salesOrders } = await pool.query(
-    `select id, order_number, customer_name, price_tax_type from sales_orders
-     where status in ('Pending','Confirmed') and deleted_at is null
-     order by created_at desc limit 100`
+    `select id, order_number, customer_name, price_tax_type, quantity,
+            coalesce(qty_accepted_total,0) as qty_accepted_total,
+            coalesce(qty_remaining, quantity) as qty_remaining
+     from sales_orders
+     where status in ('Pending','Confirmed','In Progress','Partially Delivered') and deleted_at is null
+     order by created_at desc limit 200`
   );
   return { ok: true, rows, vehicles, salesOrders };
 }
@@ -2055,11 +2130,12 @@ async function deliveryOrdersCreate(userId, payload) {
   if (!p.driver_name) return { ok: false, error: 'Driver name is required' };
   const ts = Date.now().toString(36).toUpperCase();
   const orderNum = `DEL-${ts}`;
+  const qtyDispatched = p.qty_dispatched ? Number(p.qty_dispatched) : null;
   const { rows } = await pool.query(
-    `insert into delivery_orders(order_number, sales_order_id, vehicle_id, driver_name, delivery_date, status, route, notes, created_by)
-     values ($1,$2,$3,$4,$5,'Pending',$6,$7,$8) returning id`,
+    `insert into delivery_orders(order_number, sales_order_id, vehicle_id, driver_name, delivery_date, status, route, notes, qty_dispatched, created_by)
+     values ($1,$2,$3,$4,$5,'Pending',$6,$7,$8,$9) returning id`,
     [orderNum, p.sales_order_id || null, p.vehicle_id || null, p.driver_name,
-     p.delivery_date || null, p.route || null, p.notes || null, user.id]
+     p.delivery_date || null, p.route || null, p.notes || null, qtyDispatched, user.id]
   );
   logAudit(user, `Created delivery order ${orderNum}`, 'ti-truck-delivery', { id: rows[0].id });
   return { ok: true };
@@ -2071,16 +2147,84 @@ async function deliveryOrdersUpdateStatus(userId, orderId, status) {
   const valid = ['Pending', 'Assigned', 'In Transit', 'Delivered', 'Failed'];
   if (!valid.includes(status)) return { ok: false, error: 'Invalid status' };
   await pool.query('update delivery_orders set status=$1 where id=$2', [status, orderId]);
-  if (status === 'Delivered' || status === 'In Transit') {
-    const soStatus = status === 'Delivered' ? 'Delivered' : 'Dispatched';
+  if (status === 'In Transit') {
     await pool.query(
-      `update sales_orders set status=$1
-       where id=(select sales_order_id from delivery_orders where id=$2) and sales_order_id is not null`,
-      [soStatus, orderId]
+      `update sales_orders set status='Dispatched'
+       where id=(select sales_order_id from delivery_orders where id=$1) and sales_order_id is not null
+             and status not in ('Partially Delivered','In Progress','Fully Delivered','Closed (Short)')`,
+      [orderId]
+    );
+  }
+  logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
+  return { ok: true };
+}
+
+async function deliveryOrdersRecordPOD(userId, orderId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  const qtyAccepted = Number(p.qty_accepted);
+  if (!qtyAccepted || qtyAccepted < 0) return { ok: false, error: 'Quantity accepted is required' };
+
+  // Get DO and linked SO
+  const { rows: doRows } = await pool.query(
+    `select do2.id, do2.qty_dispatched, do2.sales_order_id,
+            so.quantity as so_quantity,
+            coalesce(so.qty_accepted_total,0) as qty_accepted_total
+     from delivery_orders do2
+     left join sales_orders so on so.id=do2.sales_order_id
+     where do2.id=$1`, [orderId]
+  );
+  if (!doRows.length) return { ok: false, error: 'Delivery order not found' };
+  const doRow = doRows[0];
+
+  const qtyDispatched = doRow.qty_dispatched || qtyAccepted;
+  const qtyRejected = Math.max(0, qtyDispatched - qtyAccepted);
+
+  // Update the delivery order
+  await pool.query(
+    `update delivery_orders set
+       qty_accepted=$1, qty_rejected=$2, rejection_reason=$3,
+       pod_recorded_at=now(), pod_recorded_by=$4, status='POD Recorded'
+     where id=$5`,
+    [qtyAccepted, qtyRejected, p.rejection_reason || null, user.id, orderId]
+  );
+
+  // Update linked sales order if present
+  if (doRow.sales_order_id) {
+    const newTotal = doRow.qty_accepted_total + qtyAccepted;
+    const newRemaining = Math.max(0, doRow.so_quantity - newTotal);
+    let newSoStatus = newRemaining <= 0 ? 'Fully Delivered' : 'Partially Delivered';
+
+    await pool.query(
+      `update sales_orders set
+         qty_accepted_total=$1, qty_remaining=$2, status=$3
+       where id=$4`,
+      [newTotal, newRemaining, newSoStatus, doRow.sales_order_id]
     );
     refreshStockView();
   }
-  logAudit(user, `Updated delivery #${orderId} to ${status}`, 'ti-truck-delivery', { orderId, status });
+
+  logAudit(user, `Recorded POD for delivery #${orderId} — accepted: ${qtyAccepted}, rejected: ${qtyRejected}`, 'ti-clipboard-check', { orderId, qtyAccepted, qtyRejected });
+  return { ok: true };
+}
+
+async function salesCloseShort(userId, soId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select order_number, quantity, coalesce(qty_accepted_total,0) as qty_accepted_total
+     from sales_orders where id=$1 and deleted_at is null`, [soId]
+  );
+  if (!rows.length) return { ok: false, error: 'Order not found' };
+  const so = rows[0];
+  // Reduce SO quantity to what was actually accepted so stock formula corrects itself
+  await pool.query(
+    `update sales_orders set quantity=$1, qty_remaining=0, status='Closed (Short)' where id=$2`,
+    [so.qty_accepted_total, soId]
+  );
+  refreshStockView();
+  logAudit(user, `Closed short SO ${so.order_number} — accepted ${so.qty_accepted_total} of original ${so.quantity}`, 'ti-x', { soId });
   return { ok: true };
 }
 
@@ -2737,9 +2881,10 @@ async function deliveryOrdersUpdate(userId, orderId, payload) {
   if (!(await mustRole(user, 'deliveries'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   await pool.query(
-    `update delivery_orders set vehicle_id=$1, driver_name=$2, delivery_date=$3, route=$4, notes=$5
-     where id=$6`,
-    [p.vehicle_id || null, p.driver_name, p.delivery_date || null, p.route || null, p.notes || null, orderId]
+    `update delivery_orders set vehicle_id=$1, driver_name=$2, delivery_date=$3, route=$4, notes=$5, qty_dispatched=$6
+     where id=$7`,
+    [p.vehicle_id || null, p.driver_name, p.delivery_date || null, p.route || null, p.notes || null,
+     p.qty_dispatched ? Number(p.qty_dispatched) : null, orderId]
   );
   logAudit(user, `Updated delivery order #${orderId}`, 'ti-edit', { orderId });
   return { ok: true };
@@ -2768,13 +2913,19 @@ async function transportJobsUpdate(userId, jobId, payload) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
+  const carrierType = p.carrier_type === 'Own Vehicle' ? 'Own Vehicle' : 'Third-party';
   await pool.query(
     `update transport_jobs
-     set transport_company_id=$1, sales_order_id=$2, job_type=$3,
-         origin=$4, destination=$5, job_date=$6, quantity=$7,
-         uom=$8, cost=$9, waybill_ref=$10, notes=$11
-     where id=$12`,
-    [p.transport_company_id, p.sales_order_id || null, p.job_type || 'Delivery',
+     set carrier_type=$1,
+         transport_company_id=$2, vehicle_id=$3,
+         sales_order_id=$4, job_type=$5,
+         origin=$6, destination=$7, job_date=$8, quantity=$9,
+         uom=$10, cost=$11, waybill_ref=$12, notes=$13
+     where id=$14`,
+    [carrierType,
+     carrierType === 'Third-party' ? p.transport_company_id : null,
+     carrierType === 'Own Vehicle'  ? p.vehicle_id : null,
+     p.sales_order_id || null, p.job_type || 'Delivery',
      p.origin || null, p.destination || null, p.job_date,
      p.quantity ? Number(p.quantity) : null, p.uom || null,
      p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, jobId]
@@ -2933,9 +3084,9 @@ async function transportCompaniesCreate(userId, payload) {
   if (!p.name) return { ok: false, error: 'Company name is required' };
   const { rows } = await pool.query(
     `insert into transport_companies(name, contact_person, phone, email, rate_per_km, notes, active)
-     values ($1,$2,$3,$4,$5,$6,true) returning id`,
+     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
     [p.name, p.contact_person || null, p.phone || null, p.email || null,
-     p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null]
+     p.rate_per_km ? Number(p.rate_per_km) : null, p.notes || null, p.active !== false]
   );
   logAudit(user, `Added transport company: ${p.name}`, 'ti-building', { id: rows[0].id });
   return { ok: true };
@@ -2960,16 +3111,18 @@ async function transportJobsList(userId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query(
-    `select tj.id, tj.job_number, tj.job_type, tj.origin, tj.destination,
+    `select tj.id, tj.job_number, tj.carrier_type, tj.job_type, tj.origin, tj.destination,
             tj.quantity, tj.uom, tj.cost, tj.waybill_ref, tj.status, tj.notes,
             to_char(tj.job_date,'DD/MM/YYYY') as job_date,
             to_char(tj.created_at,'DD/MM/YYYY') as created_at,
             tc.name as company_name, tc.phone as company_phone,
+            v.registration as vehicle_registration, v.make as vehicle_make, v.model as vehicle_model,
             so.order_number as sales_order_number, so.customer_name,
             do2.order_number as delivery_order_number,
             u.name as created_by
      from transport_jobs tj
-     join transport_companies tc on tc.id=tj.transport_company_id
+     left join transport_companies tc on tc.id=tj.transport_company_id
+     left join vehicles v on v.id=tj.vehicle_id
      left join sales_orders so on so.id=tj.sales_order_id
      left join delivery_orders do2 on do2.id=tj.delivery_order_id
      left join app_users u on u.id=tj.created_by
@@ -2977,7 +3130,10 @@ async function transportJobsList(userId) {
      limit 100`
   );
   const { rows: companies } = await pool.query(
-    `select id, name, phone from transport_companies where active=true order by name`
+    `select tc.id, tc.name, tc.contact_person, tc.phone, tc.email, tc.rate_per_km, tc.notes, tc.active,
+            (select count(*)::int from transport_jobs tj2 where tj2.transport_company_id=tc.id) as job_count,
+            (select coalesce(sum(tj2.cost),0)::numeric from transport_jobs tj2 where tj2.transport_company_id=tc.id) as total_cost
+     from transport_companies tc order by tc.name`
   );
   const { rows: salesOrders } = await pool.query(
     `select id, order_number, customer_name, product_type, product_size, quantity, price_tax_type
@@ -2985,28 +3141,39 @@ async function transportJobsList(userId) {
      where status in ('Confirmed','Pending')
      order by created_at desc limit 50`
   );
-  return { ok: true, rows, companies, salesOrders };
+  const { rows: vehicles } = await pool.query(
+    `select id, registration, make, model from vehicles where status='Active' order by registration`
+  );
+  return { ok: true, rows, companies, salesOrders, vehicles };
 }
 
 async function transportJobsCreate(userId, payload) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'transport'))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
-  if (!p.transport_company_id || !p.job_date)
-    return { ok: false, error: 'Transport company and job date are required' };
+  if (!p.job_date) return { ok: false, error: 'Job date is required' };
+  const carrierType = p.carrier_type === 'Own Vehicle' ? 'Own Vehicle' : 'Third-party';
+  if (carrierType === 'Third-party' && !p.transport_company_id)
+    return { ok: false, error: 'Transport company is required for third-party jobs' };
+  if (carrierType === 'Own Vehicle' && !p.vehicle_id)
+    return { ok: false, error: 'Vehicle is required for own-vehicle jobs' };
   const ts = Date.now().toString(36).toUpperCase();
   const jobNum = `TRN-${ts}`;
   await pool.query(
-    `insert into transport_jobs(job_number, transport_company_id, sales_order_id, delivery_order_id,
-      job_type, origin, destination, job_date, quantity, uom, cost, waybill_ref, status, notes, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'Scheduled',$13,$14)`,
-    [jobNum, p.transport_company_id, p.sales_order_id || null, p.delivery_order_id || null,
+    `insert into transport_jobs(job_number, carrier_type, transport_company_id, vehicle_id,
+      sales_order_id, delivery_order_id, job_type, origin, destination,
+      job_date, quantity, uom, cost, waybill_ref, status, notes, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'Scheduled',$15,$16)`,
+    [jobNum, carrierType,
+     carrierType === 'Third-party' ? p.transport_company_id : null,
+     carrierType === 'Own Vehicle'  ? p.vehicle_id : null,
+     p.sales_order_id || null, p.delivery_order_id || null,
      p.job_type || 'Delivery', p.origin || null, p.destination || null, p.job_date,
      p.quantity ? Number(p.quantity) : null, p.uom || null,
      p.cost ? Number(p.cost) : null, p.waybill_ref || null, p.notes || null, user.id]
   );
-  logAudit(user, `Created transport job ${jobNum}`, 'ti-truck', {
-    company_id: p.transport_company_id, sales_order_id: p.sales_order_id
+  logAudit(user, `Created transport job ${jobNum} (${carrierType})`, 'ti-truck', {
+    carrier_type: carrierType, transport_company_id: p.transport_company_id, vehicle_id: p.vehicle_id
   });
   return { ok: true, jobNum };
 }
@@ -3871,6 +4038,8 @@ module.exports = {
   deliveryOrdersList,
   deliveryOrdersCreate,
   deliveryOrdersUpdateStatus,
+  deliveryOrdersRecordPOD,
+  salesCloseShort,
   dispatchList,
   dispatchCreate,
   dispatchReview,

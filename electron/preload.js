@@ -157,6 +157,8 @@ contextBridge.exposeInMainWorld('UFCL', {
   harvestDelete: (userId, logId, reason) => ipcRenderer.invoke('harvest:delete', { userId, logId, reason }),
   deliveriesUpdate: (userId, orderId, payload) => ipcRenderer.invoke('deliveries:update', { userId, orderId, payload }),
   deliveriesDelete: (userId, orderId) => ipcRenderer.invoke('deliveries:delete', { userId, orderId }),
+  deliveriesRecordPOD: (userId, orderId, payload) => ipcRenderer.invoke('deliveries:recordPOD', { userId, orderId, payload }),
+  salesCloseShort: (userId, soId) => ipcRenderer.invoke('sales:closeShort', { userId, soId }),
   dispatchDelete: (userId, requestId) => ipcRenderer.invoke('dispatch:delete', { userId, requestId }),
   transportJobsUpdate: (userId, jobId, payload) => ipcRenderer.invoke('transport:jobs:update', { userId, jobId, payload }),
   transportJobsDelete: (userId, jobId) => ipcRenderer.invoke('transport:jobs:delete', { userId, jobId }),

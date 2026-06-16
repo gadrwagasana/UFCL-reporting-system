@@ -74,7 +74,8 @@ const NAV = [
   { id: 'logistics-dashboard',icon: 'ti-chart-pie-2',        label: 'Logistics Dashboard',  sec: 'Logistics'       },
   { id: 'deliveries',         icon: 'ti-truck-delivery',     label: 'Delivery Orders',      sec: 'Logistics'       },
   { id: 'dispatch',           icon: 'ti-send',               label: 'Dispatch',             sec: 'Logistics'       },
-  { id: 'transport',          icon: 'ti-building',           label: 'Third-Party Transport',sec: 'Logistics'       },
+  { id: 'transport',          icon: 'ti-building',           label: 'Transport Carriers',   sec: 'Logistics'       },
+  { id: 'transport-jobs',    icon: 'ti-truck-loading',      label: 'Transport Jobs',       sec: 'Logistics'       },
 
   // ── Commercial ────────────────────────────────────────────────────
   { id: 'sales',              icon: 'ti-shopping-cart',      label: 'Sales Orders',         sec: 'Commercial'      },
@@ -129,7 +130,12 @@ function setActivePage(id) {
 }
 
 function soStatusBadge(status) {
-  const map = { Pending: 'ba', Confirmed: 'bb', Dispatched: 'bp', Delivered: 'bg', Cancelled: 'br' };
+  const map = {
+    Pending: 'ba', Confirmed: 'bb', Dispatched: 'bp',
+    'In Progress': 'bp', 'Partially Delivered': 'ca',
+    'Fully Delivered': 'bg', Delivered: 'bg',
+    'Closed (Short)': 'bt', Cancelled: 'br'
+  };
   return `<span class="badge ${map[status] || 'ba'}">${status || 'Pending'}</span>`;
 }
 
@@ -192,7 +198,7 @@ function renderPermissionCheckboxes(selected = []) {
 
     grpHdr('Logistics'),
     chk('logistics-dashboard', 'Logistics Dashboard'), chk('deliveries', 'Delivery Orders'),
-    chk('dispatch'), chk('transport', 'Third-Party Transport'),
+    chk('dispatch'), chk('transport', 'Transport Carriers'), chk('transport-jobs', 'Transport Jobs'),
 
     grpHdr('Commercial'),
     chk('sales', 'Sales Orders'), chk('products', 'Product Catalog'), chk('logistics', 'Legacy Logistics'),
@@ -656,6 +662,8 @@ async function showPage(id) {
       return renderTimberInventory();
     case 'transport':
       return renderTransport();
+    case 'transport-jobs':
+      return renderTransportJobs();
     case 'machines':
       return renderMachines();
     case 'machine-logs':
@@ -704,7 +712,7 @@ async function renderDashboard() {
     return;
   }
 
-  const { production, sales, expenses, alerts, recentActivity, stock = {} } = res;
+  const { production, sales, expenses, alerts, recentActivity, stock = {}, pendingActions = [] } = res;
   const user = STORAGE.user;
 
   /* ── helpers ── */
@@ -797,6 +805,35 @@ async function renderDashboard() {
         <span class="db-pill db-pill-role">${roleLabel(user.role)}</span>
       </div>
     </div>
+
+    <!-- Pending Actions panel -->
+    ${pendingActions.length ? `
+    <div class="card" style="padding:0;margin-bottom:1.25rem;border-left:4px solid #D97706">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:.875rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <div style="display:flex;align-items:center;gap:.625rem">
+          <i class="ti ti-alert-circle" style="font-size:16px;color:#D97706"></i>
+          <span style="font-weight:700;font-size:14px;color:var(--t1)">Pending Actions</span>
+          <span style="background:#D97706;color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px">${pendingActions.length}</span>
+        </div>
+        <span style="font-size:12px;color:var(--t3)">These need your attention</span>
+      </div>
+      <div style="padding:.5rem 0">
+        ${pendingActions.map(a => `
+        <div class="db-action-row" data-page="${a.page}" style="display:flex;align-items:center;gap:.875rem;padding:.625rem 1.25rem;cursor:pointer;transition:background .12s" onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+          <div style="width:34px;height:34px;border-radius:8px;background:${a.color}18;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="ti ${a.icon}" style="font-size:15px;color:${a.color}"></i>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.title}</div>
+            <div style="font-size:12px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${a.body}</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;flex-shrink:0">
+            <span style="font-size:11px;color:var(--t3)">${a.created_at}</span>
+            <i class="ti ti-chevron-right" style="font-size:13px;color:var(--t3)"></i>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
 
     <!-- Stock balance row -->
     <div class="db-grid-4" style="margin-bottom:.625rem">
@@ -925,6 +962,10 @@ async function renderDashboard() {
   const gi = $('db-go-inventory');  if (gi) gi.onclick = () => showPage('inventory');
   const gc = $('db-go-changes');    if (gc) gc.onclick = () => showPage('changes');
   const gn = $('db-go-notif');      if (gn) gn.onclick = () => showPage('notifications');
+
+  document.querySelectorAll('.db-action-row').forEach(row => {
+    row.onclick = () => showPage(row.dataset.page);
+  });
 }
 
 // ── CEO Overview ──────────────────────────────────────────────────────────────
@@ -1924,14 +1965,26 @@ async function renderSales() {
       </div>
       <div class="tw">
         <table class="dt">
-          <thead><tr><th>Order #</th><th>Customer</th><th>Category</th><th>Type</th><th>Size / Spec</th><th>Qty</th><th>Unit price</th><th>Total</th><th>Transport</th><th>Delivery</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Order #</th><th>Customer</th><th>Category</th><th>Type</th><th>Size / Spec</th><th>Qty</th><th>Unit price</th><th>Total</th><th>Transport</th><th>Fulfilment</th><th>Delivery</th><th>Payment</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
           <tbody>
             ${rows.length === 0
-              ? '<tr><td colspan="14" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
+              ? '<tr><td colspan="15" style="text-align:center;color:var(--t3);padding:2rem">No orders yet.</td></tr>'
               : rows.map((r) => {
                   const subBadge = r.product_sub_type === 'Kiln-dried' ? 'ba' : r.product_sub_type === 'CCA-treated' ? 'bg' : r.product_sub_type === 'Untreated' ? 'bt' : '';
                   const cur = r.currency || 'RWF';
                   const total = (Number(r.quantity)*Number(r.unit_price)).toLocaleString();
+                  const accepted = Number(r.qty_accepted_total || 0);
+                  const qty = Number(r.quantity || 0);
+                  const pct = qty > 0 ? Math.min(100, Math.round(accepted / qty * 100)) : 0;
+                  const fulfilmentCell = accepted > 0
+                    ? `<div style="min-width:100px">
+                        <div style="font-size:11px;color:var(--t3);margin-bottom:3px">${accepted.toLocaleString()} / ${qty.toLocaleString()}</div>
+                        <div style="height:6px;border-radius:3px;background:var(--bg3);overflow:hidden">
+                          <div style="height:100%;width:${pct}%;background:${pct>=100?'var(--green)':'var(--amber)'}"></div>
+                        </div>
+                      </div>`
+                    : '<span style="color:var(--t3);font-size:12px">—</span>';
+                  const isPartial = ['Partially Delivered','In Progress'].includes(r.status);
                   return `<tr>
                     <td style="font-family:var(--fm);font-weight:500">${r.order_number}${r.pending_deletion ? ' <span class="badge br" style="font-size:10px;vertical-align:middle">Pending Deletion</span>' : ''}</td>
                     <td>${r.customer_name}</td>
@@ -1942,6 +1995,7 @@ async function renderSales() {
                     <td style="font-family:var(--fm)">${Number(r.unit_price).toLocaleString()} <small style="color:var(--t3)">${cur}</small></td>
                     <td style="font-family:var(--fm);font-weight:500">${total} <small style="color:var(--t3)">${cur}</small></td>
                     <td><span class="badge ${r.price_tax_type==='Inclusive'?'bg':'bt'}" style="font-size:10px">${r.price_tax_type==='Inclusive'?'+ Transport':'Ex-works'}</span></td>
+                    <td>${fulfilmentCell}</td>
                     <td>${soDeliveryBadge(r.delivery_number, r.delivery_status)}</td>
                     <td>${soPaymentBadge(r.payment_status||'Unpaid', r.payment_due_date)}</td>
                     <td><button class="so-status-btn" data-so="${r.id}" data-cur="${r.status||'Pending'}" style="all:unset;cursor:pointer">${soStatusBadge(r.status||'Pending')}</button></td>
@@ -1951,6 +2005,7 @@ async function renderSales() {
                       ${(r.payment_status||'Unpaid')==='Unpaid' ? `<button class="bs1 so-pay-btn" data-so="${r.id}" style="color:var(--green)"><i class="ti ti-cash"></i>Pay</button>` : ''}
                       <button class="bs1 so-deliver-btn" data-so="${r.id}" title="Create delivery order"><i class="ti ti-truck-delivery"></i>Deliver</button>
                       <button class="bs1 so-transport-btn" data-so="${r.id}" title="Assign 3rd-party transport"><i class="ti ti-building"></i>Transport</button>
+                      ${isPartial ? `<button class="bs1 so-close-short-btn" data-so="${r.id}" data-accepted="${accepted}" data-qty="${qty}" title="Close short — accept partial delivery as final" style="color:var(--amber);white-space:nowrap"><i class="ti ti-x"></i>Close short</button>` : ''}
                       <button class="bs1 so-del-btn" data-so="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
                     </td>
                   </tr>`;
@@ -2229,7 +2284,7 @@ async function renderSales() {
     }, 30);
   };
 
-  const STATUSES = ['Pending', 'Confirmed', 'Dispatched', 'Delivered', 'Cancelled'];
+  const STATUSES = ['Pending', 'Confirmed', 'Dispatched', 'In Progress', 'Partially Delivered', 'Fully Delivered', 'Closed (Short)', 'Cancelled'];
 
   $('page-sales').querySelectorAll('.so-edit-btn').forEach((btn) => {
     btn.onclick = () => {
@@ -2448,7 +2503,7 @@ async function renderSales() {
       const soId = Number(btn.dataset.so);
       const tcRes = await UFCL.transportJobsList(STORAGE.user.id);
       if (!tcRes.ok) { alert(tcRes.error); return; }
-      openTransportJobOverlay(tcRes.companies, tcRes.salesOrders, soId, () => renderSales());
+      openTransportJobOverlay(tcRes.companies, tcRes.salesOrders, soId, () => renderSales(), tcRes.vehicles || []);
     };
   });
 
@@ -2482,6 +2537,34 @@ async function renderSales() {
           await renderSales();
         }
       );
+    };
+  });
+
+  $('page-sales').querySelectorAll('.so-close-short-btn').forEach((btn) => {
+    btn.onclick = () => {
+      const soId     = btn.dataset.so;
+      const accepted = Number(btn.dataset.accepted || 0);
+      const qty      = Number(btn.dataset.qty || 0);
+      const order    = rows.find(r => String(r.id) === soId);
+      if (!order) return;
+      openOverlay('Close short', `${order.order_number} — ${order.customer_name}`, `
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:12px 16px;margin-bottom:12px;font-size:13px">
+          <strong>Original order qty:</strong> ${qty.toLocaleString()}<br>
+          <strong>Qty accepted so far:</strong> ${accepted.toLocaleString()}<br>
+          <strong>Remaining undelivered:</strong> ${(qty - accepted).toLocaleString()}<br><br>
+          Closing short will mark this order as <strong>Closed (Short)</strong> and release the undelivered units back to stock.
+          This action cannot be undone.
+        </div>
+        <div class="brow">
+          <button class="bp1" id="ovSave" style="background:var(--amber);border-color:var(--amber)"><i class="ti ti-x"></i>Close short (${accepted.toLocaleString()} accepted)</button>
+          <button class="bs1" id="ovCancel">Cancel</button>
+        </div>`,
+        async () => {
+          const res2 = await UFCL.salesCloseShort(STORAGE.user.id, soId);
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Order closed short. Undelivered units returned to stock.');
+          await renderSales();
+        });
     };
   });
 
@@ -5403,15 +5486,25 @@ async function renderDeliveries() {
   const salesOrders = res.salesOrders || [];
 
   const statBadge = (s) => {
-    const map = { Pending:'ba', Assigned:'bb', 'In Transit':'bp', Delivered:'bg', Failed:'br' };
+    const map = {
+      Pending:'ba', Assigned:'bb', 'In Transit':'bp',
+      Delivered:'bg', Failed:'br', 'POD Recorded':'bg'
+    };
     return `<span class="badge ${map[s]||'ba'}">${s}</span>`;
+  };
+
+  const podStatus = (r) => {
+    if (r.status !== 'POD Recorded') return '';
+    return `<div style="font-size:11px;color:var(--t3);margin-top:2px">
+      ✓ ${r.qty_accepted??'—'} accepted${r.qty_rejected ? ` / ${r.qty_rejected} returned` : ''}
+    </div>`;
   };
 
   $('page-deliveries').innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
         <div class="ptitle">Delivery Orders</div>
-        <div class="psub">Create delivery orders, assign drivers and vehicles, and track every shipment from pickup to delivery confirmation.</div>
+        <div class="psub">Create delivery orders, assign drivers and vehicles, and record proof of delivery (POD) per trip. Partial deliveries and multi-trip fulfillment are supported.</div>
       </div>
       <button class="bp1" id="doAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>New delivery order</button>
     </div>
@@ -5419,7 +5512,7 @@ async function renderDeliveries() {
       <div class="mc"><div class="mclbl">Total orders</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-truck-delivery"></i>all time</div></div>
       <div class="mc"><div class="mclbl">Pending</div><div class="mcval">${rows.filter(r=>r.status==='Pending').length}</div><div class="mcsub ca"><i class="ti ti-clock"></i>awaiting dispatch</div></div>
       <div class="mc"><div class="mclbl">In transit</div><div class="mcval">${rows.filter(r=>r.status==='In Transit').length}</div><div class="mcsub bp"><i class="ti ti-truck"></i>on the road</div></div>
-      <div class="mc"><div class="mclbl">Delivered</div><div class="mcval">${rows.filter(r=>r.status==='Delivered').length}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>completed</div></div>
+      <div class="mc"><div class="mclbl">POD recorded</div><div class="mcval">${rows.filter(r=>r.status==='POD Recorded').length}</div><div class="mcsub cg"><i class="ti ti-clipboard-check"></i>confirmed</div></div>
     </div>
     <div class="card" style="padding:0">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
@@ -5427,37 +5520,50 @@ async function renderDeliveries() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} order${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Order #</th><th>Sales order</th><th>Customer</th><th>Driver</th><th>Vehicle</th><th>Delivery date</th><th>Route</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>${rows.length ? rows.map(r=>`<tr>
-          <td style="font-family:var(--fm);font-weight:700">${r.order_number}</td>
-          <td style="font-family:var(--fm);color:var(--t3)">
-            ${r.sales_order_number||'—'}
-            ${r.so_price_tax_type==='Inclusive' ? '<span class="badge bg" style="font-size:10px;margin-left:4px"><i class="ti ti-truck-delivery"></i> Transport incl.</span>' : ''}
-          </td>
-          <td style="font-weight:500">${r.customer_name||'—'}</td>
-          <td>${r.driver_name||'—'}</td>
-          <td style="font-family:var(--fm)">${r.vehicle_registration||'—'}</td>
-          <td>${r.delivery_date||'—'}</td>
-          <td>${r.route||'—'}</td>
-          <td>${statBadge(r.status)}</td>
-          <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
-            <select class="do-status-sel" data-id="${r.id}" style="font-size:12px;padding:3px 6px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:4px">
-              ${['Pending','Assigned','In Transit','Delivered','Failed'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
-            </select>
-            <button class="bs1 do-edit" data-id="${r.id}"><i class="ti ti-edit"></i></button>
-            <button class="bs1 do-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
-          </td>
-        </tr>`).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck-delivery" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No delivery orders yet. Click <strong>New delivery order</strong> to get started.</td></tr>'}
+        <thead><tr><th>Order #</th><th>Sales order</th><th>Customer</th><th>Driver</th><th>Vehicle</th><th>Date</th><th>Qty dispatched</th><th>POD result</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r => {
+          const canPOD = r.status === 'In Transit' || r.status === 'Assigned';
+          const canStatus = r.status !== 'POD Recorded';
+          return `<tr>
+            <td style="font-family:var(--fm);font-weight:700">${r.order_number}</td>
+            <td style="font-family:var(--fm);color:var(--t3)">
+              ${r.sales_order_number||'—'}
+              ${r.so_price_tax_type==='Inclusive' ? '<span class="badge bg" style="font-size:10px;margin-left:4px"><i class="ti ti-truck-delivery"></i>incl.</span>' : ''}
+            </td>
+            <td style="font-weight:500">${r.customer_name||'—'}</td>
+            <td>${r.driver_name||'—'}</td>
+            <td style="font-family:var(--fm)">${r.vehicle_registration||'—'}</td>
+            <td>${r.delivery_date||'—'}</td>
+            <td style="text-align:center;font-family:var(--fm)">${r.qty_dispatched!=null ? r.qty_dispatched : '—'}</td>
+            <td>
+              ${r.status==='POD Recorded'
+                ? `<span style="color:var(--green);font-weight:600">✓ ${r.qty_accepted??0}</span>${r.qty_rejected ? `<span style="color:var(--red);margin-left:4px">↩ ${r.qty_rejected}</span>` : ''}`
+                : '<span style="color:var(--t3);font-size:12px">—</span>'}
+            </td>
+            <td>${statBadge(r.status)}</td>
+            <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
+              ${canStatus ? `<select class="do-status-sel" data-id="${r.id}" style="font-size:12px;padding:3px 6px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:4px">
+                ${['Pending','Assigned','In Transit','Delivered','Failed'].map(s=>`<option value="${s}" ${r.status===s?'selected':''}>${s}</option>`).join('')}
+              </select>` : ''}
+              ${canPOD ? `<button class="bs1 do-pod" data-id="${r.id}" title="Record POD" style="background:var(--green);color:#fff;border-color:var(--green)"><i class="ti ti-clipboard-check"></i></button>` : ''}
+              <button class="bs1 do-edit" data-id="${r.id}"><i class="ti ti-edit"></i></button>
+              <button class="bs1 do-del" data-id="${r.id}" style="color:var(--red)"><i class="ti ti-trash"></i></button>
+            </td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck-delivery" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No delivery orders yet. Click <strong>New delivery order</strong> to get started.</td></tr>'}
         </tbody>
       </table></div>
     </div>`;
 
   $('doAdd').onclick = () => {
     const vOpts = vehicles.map(v=>`<option value="${v.id}">${v.registration}${v.make?' — '+v.make:''}</option>`).join('');
-    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s=>`<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}">${s.order_number} — ${s.customer_name}${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
+    const soOpts = `<option value="">— None —</option>` + salesOrders.map(s=>`<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}" data-qty="${s.quantity}" data-rem="${s.qty_remaining}">${s.order_number} — ${s.customer_name} (${s.qty_remaining} remaining)${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
     openOverlay('Create delivery order', null, `
       <div id="do-incl-banner" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
         <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — the client's unit price already covers this delivery.
+      </div>
+      <div id="do-partial-banner" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#92400e">
+        <i class="ti ti-alert-triangle"></i> This sales order is partially fulfilled. Enter how many units you are dispatching in this trip.
       </div>
       <div class="frow">
         <div class="fg"><label>Driver name *</label><input id="do-driver" type="text" placeholder="Full name"></div>
@@ -5465,12 +5571,13 @@ async function renderDeliveries() {
       </div>
       <div class="frow">
         <div class="fg"><label>Sales order</label><select id="do-so">${soOpts}</select></div>
-        <div class="fg"><label>Delivery date</label><input id="do-date" type="date"></div>
+        <div class="fg"><label>Qty dispatched (this trip)</label><input id="do-qty" type="number" min="1" placeholder="e.g. 1750"></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Delivery date</label><input id="do-date" type="date"></div>
         <div class="fg"><label>Route</label><input id="do-route" type="text" placeholder="Origin → Destination"></div>
-        <div class="fg"><label>Notes</label><input id="do-notes" type="text"></div>
       </div>
+      <div class="fg"><label>Notes</label><input id="do-notes" type="text"></div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Create</button><button class="bs1" id="ovCancel">Cancel</button></div>`, async () => {
       const res2 = await UFCL.deliveriesCreate(STORAGE.user.id, {
         driver_name: $('do-driver').value.trim(),
@@ -5478,19 +5585,24 @@ async function renderDeliveries() {
         sales_order_id: $('do-so').value || null,
         delivery_date: $('do-date').value || null,
         route: $('do-route').value.trim(),
-        notes: $('do-notes').value.trim()
+        notes: $('do-notes').value.trim(),
+        qty_dispatched: $('do-qty').value || null
       });
       if (!res2.ok) { showOverlayError(res2.error); return; }
       showOverlaySuccess('Delivery order created.');
       await renderDeliveries();
     });
     setTimeout(() => {
-      const doSo     = $('do-so');
-      const doBanner = $('do-incl-banner');
-      if (doSo && doBanner) {
+      const doSo       = $('do-so');
+      const doBanner   = $('do-incl-banner');
+      const doPartial  = $('do-partial-banner');
+      if (doSo) {
         const check = () => {
           const sel = doSo.options[doSo.selectedIndex];
-          doBanner.style.display = sel?.dataset?.incl === '1' ? '' : 'none';
+          if (doBanner) doBanner.style.display = sel?.dataset?.incl === '1' ? '' : 'none';
+          const rem = Number(sel?.dataset?.rem || 0);
+          const qty = Number(sel?.dataset?.qty || 0);
+          if (doPartial) doPartial.style.display = (qty > 0 && rem < qty) ? '' : 'none';
         };
         doSo.addEventListener('change', check);
         check();
@@ -5501,14 +5613,55 @@ async function renderDeliveries() {
   document.querySelectorAll('.do-status-sel').forEach(sel => {
     sel.onchange = async () => {
       const res2 = await UFCL.deliveriesUpdateStatus(STORAGE.user.id, Number(sel.dataset.id), sel.value);
-      if (!res2.ok) { alert(res2.error); sel.value = rows.find(r=>r.id===Number(sel.dataset.id))?.status||'Pending'; }
+      if (!res2.ok) { alert(res2.error); sel.value = rows.find(r=>String(r.id)===sel.dataset.id)?.status||'Pending'; }
       else await renderDeliveries();
+    };
+  });
+
+  document.querySelectorAll('.do-pod').forEach(btn => {
+    btn.onclick = () => {
+      const r = rows.find(x => String(x.id) === btn.dataset.id);
+      if (!r) return;
+      openOverlay('Record Proof of Delivery', r.order_number, `
+        <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+          <strong>Sales order:</strong> ${r.sales_order_number||'—'} &nbsp;|&nbsp;
+          <strong>Customer:</strong> ${r.customer_name||'—'}<br>
+          <strong>Qty dispatched this trip:</strong> ${r.qty_dispatched!=null ? r.qty_dispatched : '—'}
+          ${r.so_quantity ? ` &nbsp;|&nbsp; <strong>SO total:</strong> ${r.so_quantity} &nbsp;|&nbsp; <strong>SO remaining:</strong> ${r.qty_remaining??r.so_quantity}` : ''}
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Qty accepted by customer *</label><input id="pod-accepted" type="number" min="0" placeholder="Units accepted"></div>
+          <div class="fg"><label>Qty rejected (auto-calculated)</label><input id="pod-rejected" type="number" readonly placeholder="0" style="background:var(--bg2);color:var(--t3)"></div>
+        </div>
+        <div class="fg"><label>Rejection reason (if any)</label><input id="pod-reason" type="text" placeholder="e.g. Size mismatch, quality issue..."></div>
+        <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-clipboard-check"></i>Record POD</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
+        async () => {
+          const accepted = Number($('pod-accepted').value);
+          const res2 = await UFCL.deliveriesRecordPOD(STORAGE.user.id, r.id, {
+            qty_accepted: accepted,
+            rejection_reason: $('pod-reason').value.trim() || null
+          });
+          if (!res2.ok) { showOverlayError(res2.error); return; }
+          showOverlaySuccess('Proof of delivery recorded.');
+          await renderDeliveries();
+        });
+      setTimeout(() => {
+        const acc = $('pod-accepted');
+        const rej = $('pod-rejected');
+        if (acc && rej) {
+          const dispatched = r.qty_dispatched || 0;
+          acc.addEventListener('input', () => {
+            const v = Number(acc.value) || 0;
+            rej.value = Math.max(0, dispatched - v);
+          });
+        }
+      }, 30);
     };
   });
 
   document.querySelectorAll('.do-edit').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === btn.dataset.id);
+      const r = rows.find(x => String(x.id) === btn.dataset.id);
       if (!r) return;
       const vOpts = vehicles.map(v=>`<option value="${v.id}" ${r.vehicle_registration===v.registration?'selected':''}>${v.registration}</option>`).join('');
       openOverlay('Edit delivery order', r.order_number, `
@@ -5517,10 +5670,13 @@ async function renderDeliveries() {
           <div class="fg"><label>Vehicle</label><select id="doe-vehicle"><option value="">— None —</option>${vOpts}</select></div>
         </div>
         <div class="frow">
+          <div class="fg"><label>Qty dispatched</label><input id="doe-qty" type="number" min="1" value="${r.qty_dispatched||''}"></div>
           <div class="fg"><label>Delivery date</label><input id="doe-date" type="date" value="${r.delivery_date ? r.delivery_date.split('/').reverse().join('-') : ''}"></div>
-          <div class="fg"><label>Route</label><input id="doe-route" type="text" value="${r.route||''}"></div>
         </div>
-        <div class="fg"><label>Notes</label><input id="doe-notes" type="text" value="${r.notes||''}"></div>
+        <div class="frow">
+          <div class="fg"><label>Route</label><input id="doe-route" type="text" value="${r.route||''}"></div>
+          <div class="fg"><label>Notes</label><input id="doe-notes" type="text" value="${r.notes||''}"></div>
+        </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
           const res2 = await UFCL.deliveriesUpdate(STORAGE.user.id, r.id, {
@@ -5528,7 +5684,8 @@ async function renderDeliveries() {
             vehicle_id: $('doe-vehicle').value || null,
             delivery_date: $('doe-date').value || null,
             route: $('doe-route').value.trim(),
-            notes: $('doe-notes').value.trim()
+            notes: $('doe-notes').value.trim(),
+            qty_dispatched: $('doe-qty').value || null
           });
           if (!res2.ok) { showOverlayError(res2.error); return; }
           showOverlaySuccess('Delivery order updated.'); await renderDeliveries();
@@ -5538,7 +5695,7 @@ async function renderDeliveries() {
 
   document.querySelectorAll('.do-del').forEach(btn => {
     btn.onclick = () => {
-      const r = rows.find(x => x.id === btn.dataset.id);
+      const r = rows.find(x => String(x.id) === btn.dataset.id);
       if (!r) return;
       confirmDelete(`Delete delivery order <strong>${r.order_number}</strong>? This will also remove any linked dispatch requests.`, async () => {
         const res2 = await UFCL.deliveriesDelete(STORAGE.user.id, r.id);
@@ -5804,18 +5961,15 @@ async function renderTransport() {
   $('page-transport').innerHTML = `
     <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
       <div>
-        <div class="ptitle">Third-Party Transport</div>
-        <div class="psub">Manage external carriers, log transport jobs, and link shipments to sales orders for full traceability.</div>
+        <div class="ptitle">Transport Carriers</div>
+        <div class="psub">Register and manage external transport companies used for deliveries and log movements.</div>
       </div>
-      <div style="display:flex;gap:.5rem;flex-shrink:0">
-        <button class="bp1" id="tcAdd"><i class="ti ti-building"></i>Add carrier</button>
-        <button class="bp1" id="tjAdd" style="background:var(--bg2);color:var(--t1);border:1px solid var(--bdr)"><i class="ti ti-plus"></i>Log job</button>
-      </div>
+      <button class="bp1" id="tcAdd" style="flex-shrink:0"><i class="ti ti-building"></i>Add carrier</button>
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
       <div class="mc"><div class="mclbl">Carriers</div><div class="mcval">${activeCompanies}</div><div class="mcsub cg"><i class="ti ti-building"></i>registered</div></div>
-      <div class="mc"><div class="mclbl">Total jobs</div><div class="mcval">${jobs.length}</div><div class="mcsub cg"><i class="ti ti-truck-loading"></i>last 100</div></div>
-      <div class="mc"><div class="mclbl">In transit</div><div class="mcval">${jobs.filter(j=>j.status==='In Transit').length}</div><div class="mcsub bp"><i class="ti ti-truck"></i>active</div></div>
+      <div class="mc"><div class="mclbl">Active</div><div class="mcval">${companies.filter(c=>c.active).length}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>active</div></div>
+      <div class="mc"><div class="mclbl">Inactive</div><div class="mcval">${companies.filter(c=>!c.active).length}</div><div class="mcsub cr"><i class="ti ti-x"></i>inactive</div></div>
       <div class="mc"><div class="mclbl">Total spend (RWF)</div><div class="mcval">${Math.round(totalCost).toLocaleString()}</div><div class="mcsub ca"><i class="ti ti-coin"></i>all jobs</div></div>
     </div>
 
@@ -5844,36 +5998,7 @@ async function renderTransport() {
       </table></div>
     </div>
 
-    <div class="card" style="padding:0">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
-        <h3 style="margin:0"><i class="ti ti-truck-loading"></i>Transport jobs</h3>
-        <span style="font-size:12px;color:var(--t3)">${jobs.length} job${jobs.length!==1?'s':''}</span>
-      </div>
-      <div class="tw"><table class="dt">
-        <thead><tr><th>Job #</th><th>Date</th><th>Carrier</th><th>Type</th><th>Sales order</th><th>Origin → Destination</th><th>Qty</th><th>Waybill</th><th>Cost (RWF)</th><th>Status</th><th>Actions</th></tr></thead>
-        <tbody>
-          ${jobs.length ? jobs.map(j => `<tr>
-            <td style="font-family:var(--fm);font-weight:700">${j.job_number}</td>
-            <td style="white-space:nowrap;color:var(--t3);font-size:12px">${j.job_date}</td>
-            <td style="font-weight:500">${j.company_name}</td>
-            <td><span class="badge bt">${j.job_type}</span></td>
-            <td style="font-family:var(--fm)">${j.sales_order_number||'—'}${j.customer_name?`<div style="font-size:11px;color:var(--t3)">${j.customer_name}</div>`:''}</td>
-            <td>${j.origin||'—'}${j.destination?` → ${j.destination}`:''}</td>
-            <td style="font-family:var(--fm)">${j.quantity?Number(j.quantity).toLocaleString()+(j.uom?' '+j.uom:''):'—'}</td>
-            <td style="font-family:var(--fm);color:var(--t3)">${j.waybill_ref||'—'}</td>
-            <td style="font-family:var(--fm)">${j.cost?Number(j.cost).toLocaleString():'—'}</td>
-            <td>${jBadge(j.status)}</td>
-            <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
-              <select class="tj-status-sel" data-id="${j.id}" style="font-size:12px;padding:3px 6px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:4px">
-                ${['Scheduled','In Transit','Completed','Cancelled'].map(s=>`<option value="${s}" ${j.status===s?'selected':''}>${s}</option>`).join('')}
-              </select>
-              <button class="bs1 tj-edit" data-id="${j.id}" style="padding:3px 8px"><i class="ti ti-edit"></i></button>
-              <button class="bs1 tj-del" data-id="${j.id}" style="padding:3px 8px;color:var(--red)"><i class="ti ti-trash"></i></button>
-            </td>
-          </tr>`).join('') : '<tr><td colspan="11" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck-loading" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No jobs logged yet. Click <strong>Log job</strong> to record your first transport.</td></tr>'}
-        </tbody>
-      </table></div>
-    </div>`;
+    `;
 
   // ── Add company ────────────────────────────────────────────────────────────
   function companyForm(c) {
@@ -5888,7 +6013,13 @@ async function renderTransport() {
       </div>
       <div class="frow">
         <div class="fg"><label>Rate per km (RWF)</label><input id="tc-rate" type="number" min="0" value="${c ? c.rate_per_km || '' : ''}" placeholder="0"></div>
-        <div class="fg"><label>Notes</label><input id="tc-notes" type="text" value="${c ? c.notes || '' : ''}"></div>
+        <div class="fg"><label>Status</label><select id="tc-active">
+          <option value="true"  ${!c || c.active !== false ? 'selected' : ''}>Active</option>
+          <option value="false" ${c && c.active === false ? 'selected' : ''}>Inactive</option>
+        </select></div>
+      </div>
+      <div class="frow">
+        <div class="fg" style="flex:2"><label>Notes</label><input id="tc-notes" type="text" value="${c ? c.notes || '' : ''}"></div>
       </div>
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`;
   }
@@ -5900,7 +6031,8 @@ async function renderTransport() {
       phone: $('tc-phone').value.trim(),
       email: $('tc-email').value.trim(),
       rate_per_km: $('tc-rate').value,
-      notes: $('tc-notes').value.trim()
+      notes: $('tc-notes').value.trim(),
+      active: $('tc-active').value === 'true'
     });
     if (!r.ok) { showOverlayError(r.error); return; }
     showOverlaySuccess('Company added.');
@@ -5919,7 +6051,7 @@ async function renderTransport() {
           email: $('tc-email').value.trim(),
           rate_per_km: $('tc-rate').value,
           notes: $('tc-notes').value.trim(),
-          active: c.active
+          active: $('tc-active').value === 'true'
         });
         if (!r.ok) { showOverlayError(r.error); return; }
         showOverlaySuccess('Company updated.');
@@ -5940,14 +6072,105 @@ async function renderTransport() {
     };
   });
 
-  // ── Log transport job ──────────────────────────────────────────────────────
-  $('tjAdd').onclick = () => openTransportJobOverlay(companies, salesOrders, null, async () => renderTransport());
+}
 
-  // ── Update job status ──────────────────────────────────────────────────────
+// ── Transport Jobs (standalone page) ─────────────────────────────────────────
+
+async function renderTransportJobs() {
+  $('page-transport-jobs').innerHTML = `<div style="padding:2rem;color:var(--t3);font-size:13px"><i class="ti ti-loader-2" style="font-size:18px;animation:spin 1s linear infinite"></i> Loading…</div>`;
+  const res = await UFCL.transportJobsList(STORAGE.user.id);
+  if (!res.ok) return renderDenied('transport-jobs', res.error);
+
+  const jobs = res.rows || [];
+  const companies = res.companies || [];
+  const salesOrders = res.salesOrders || [];
+  const vehicles = res.vehicles || [];
+
+  const jBadge = s => {
+    const m = { Scheduled: 'ba', 'In Transit': 'bp', Completed: 'bg', Cancelled: 'br' };
+    return `<span class="badge ${m[s] || 'ba'}">${s}</span>`;
+  };
+
+  const totalCost = jobs.reduce((s, j) => s + Number(j.cost || 0), 0);
+
+  $('page-transport-jobs').innerHTML = `
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div class="ptitle">Transport Jobs</div>
+        <div class="psub">Log and track all third-party transport movements — deliveries, pickups, transfers, and returns.</div>
+      </div>
+      <button class="bp1" id="tjAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>Log job</button>
+    </div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc"><div class="mclbl">Total jobs</div><div class="mcval">${jobs.length}</div><div class="mcsub cg"><i class="ti ti-truck-loading"></i>last 100</div></div>
+      <div class="mc"><div class="mclbl">Scheduled</div><div class="mcval">${jobs.filter(j=>j.status==='Scheduled').length}</div><div class="mcsub ca"><i class="ti ti-clock"></i>pending</div></div>
+      <div class="mc"><div class="mclbl">In transit</div><div class="mcval">${jobs.filter(j=>j.status==='In Transit').length}</div><div class="mcsub bp"><i class="ti ti-truck"></i>active</div></div>
+      <div class="mc"><div class="mclbl">Total spend (RWF)</div><div class="mcval">${Math.round(totalCost).toLocaleString()}</div><div class="mcsub ca"><i class="ti ti-coin"></i>all jobs</div></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-truck-loading"></i>Job records</h3>
+        <div style="display:flex;align-items:center;gap:.75rem">
+          <label style="font-size:12px;color:var(--t3);white-space:nowrap">Filter by carrier:</label>
+          <select id="tj-co-filter" style="font-size:12px;padding:4px 8px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:6px">
+            <option value="">All</option>
+            <option value="Own Vehicle">Own vehicle</option>
+            ${[...new Set(jobs.filter(j=>j.carrier_type!=='Own Vehicle').map(j=>j.company_name).filter(Boolean))].sort().map(n=>`<option value="${n}">${n}</option>`).join('')}
+          </select>
+          <span id="tj-count-label" style="font-size:12px;color:var(--t3);white-space:nowrap">${jobs.length} job${jobs.length!==1?'s':''}</span>
+        </div>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Job #</th><th>Date</th><th>Carrier type</th><th>Carrier / Vehicle</th><th>Job type</th><th>Sales order</th><th>Origin → Destination</th><th>Qty</th><th>Waybill</th><th>Cost (RWF)</th><th>Status</th><th>Actions</th></tr></thead>
+        <tbody id="tj-tbody">
+          ${jobs.length ? jobs.map(j => {
+            const carrierLabel = j.carrier_type === 'Own Vehicle'
+              ? (j.vehicle_registration || '—') + (j.vehicle_make ? ` <span style="color:var(--t3);font-size:11px">${j.vehicle_make}${j.vehicle_model?' '+j.vehicle_model:''}</span>` : '')
+              : (j.company_name || '—');
+            return `<tr data-company="${j.carrier_type==='Own Vehicle'?'Own Vehicle':(j.company_name||'')}">
+            <td style="font-family:var(--fm);font-weight:700">${j.job_number}</td>
+            <td style="white-space:nowrap;color:var(--t3);font-size:12px">${j.job_date}</td>
+            <td><span class="badge ${j.carrier_type==='Own Vehicle'?'bb':'bt'}">${j.carrier_type==='Own Vehicle'?'Own vehicle':'Third-party'}</span></td>
+            <td style="font-weight:500">${carrierLabel}</td>
+            <td><span class="badge bt">${j.job_type}</span></td>
+            <td style="font-family:var(--fm)">${j.sales_order_number||'—'}${j.customer_name?`<div style="font-size:11px;color:var(--t3)">${j.customer_name}</div>`:''}</td>
+            <td>${j.origin||'—'}${j.destination?` → ${j.destination}`:''}</td>
+            <td style="font-family:var(--fm)">${j.quantity?Number(j.quantity).toLocaleString()+(j.uom?' '+j.uom:''):'—'}</td>
+            <td style="font-family:var(--fm);color:var(--t3)">${j.waybill_ref||'—'}</td>
+            <td style="font-family:var(--fm)">${j.cost?Number(j.cost).toLocaleString():'—'}</td>
+            <td>${jBadge(j.status)}</td>
+            <td style="white-space:nowrap;display:flex;gap:4px;align-items:center">
+              <select class="tj-status-sel" data-id="${j.id}" style="font-size:12px;padding:3px 6px;background:var(--bg2);border:1px solid var(--bdr);color:var(--t1);border-radius:4px">
+                ${['Scheduled','In Transit','Completed','Cancelled'].map(s=>`<option value="${s}" ${j.status===s?'selected':''}>${s}</option>`).join('')}
+              </select>
+              <button class="bs1 tj-edit" data-id="${j.id}" style="padding:3px 8px"><i class="ti ti-edit"></i></button>
+              <button class="bs1 tj-del" data-id="${j.id}" style="padding:3px 8px;color:var(--red)"><i class="ti ti-trash"></i></button>
+            </td>
+          </tr>`; }).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-truck-loading" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No jobs logged yet. Click <strong>Log job</strong> to record your first transport.</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  $('tjAdd').onclick = () => openTransportJobOverlay(companies, salesOrders, null, () => renderTransportJobs(), vehicles);
+
+  $('tj-co-filter')?.addEventListener('change', () => {
+    const filter = $('tj-co-filter').value;
+    const rows = document.querySelectorAll('#tj-tbody tr[data-company]');
+    let visible = 0;
+    rows.forEach(row => {
+      const match = !filter || row.dataset.company === filter;
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    const lbl = $('tj-count-label');
+    if (lbl) lbl.textContent = `${visible} job${visible!==1?'s':''}${filter?' for '+filter:''}`;
+  });
+
   document.querySelectorAll('.tj-status-sel').forEach(sel => {
     sel.onchange = async () => {
       const r = await UFCL.transportJobsUpdateStatus(STORAGE.user.id, Number(sel.dataset.id), sel.value);
-      if (!r.ok) { alert(r.error); await renderTransport(); }
+      if (!r.ok) { alert(r.error); await renderTransportJobs(); }
     };
   });
 
@@ -5955,14 +6178,35 @@ async function renderTransport() {
     btn.onclick = () => {
       const j = jobs.find(x => x.id === btn.dataset.id);
       if (!j) return;
+      const isOwn = j.carrier_type === 'Own Vehicle';
       const coOpts = companies.map(c => `<option value="${c.id}" ${j.company_name===c.name?'selected':''}>${c.name}</option>`).join('');
+      const vhOpts = vehicles.map(v => `<option value="${v.id}" ${j.vehicle_registration===v.registration?'selected':''}>${v.registration}${v.make?' — '+v.make+(v.model?' '+v.model:''):''}</option>`).join('');
       const soOpts = `<option value="">— None —</option>` +
         salesOrders.map(s => `<option value="${s.id}" ${j.sales_order_number===s.order_number?'selected':''}>${s.order_number} — ${s.customer_name}</option>`).join('');
       openOverlay('Edit transport job', j.job_number, `
+        <div style="display:flex;gap:0;margin-bottom:1.25rem;border:1px solid var(--bdr);border-radius:7px;overflow:hidden">
+          <button id="tje-type-third" style="flex:1;padding:.5rem 1rem;font-size:13px;font-weight:600;border:none;cursor:pointer;background:${!isOwn?'var(--primary)':'var(--bg2)'};color:${!isOwn?'#fff':'var(--t2)'}">
+            <i class="ti ti-building"></i> Third-party carrier
+          </button>
+          <button id="tje-type-own" style="flex:1;padding:.5rem 1rem;font-size:13px;font-weight:600;border:none;border-left:1px solid var(--bdr);cursor:pointer;background:${isOwn?'var(--primary)':'var(--bg2)'};color:${isOwn?'#fff':'var(--t2)'}">
+            <i class="ti ti-truck"></i> Own vehicle
+          </button>
+        </div>
+        <input type="hidden" id="tje-carrier-type" value="${j.carrier_type||'Third-party'}">
+        <div id="tje-third-panel" style="${isOwn?'display:none':''}">
+          <div class="fg" style="margin-bottom:.875rem"><label>Transport company *</label><select id="tje-co">${coOpts}</select></div>
+        </div>
+        <div id="tje-own-panel" style="${!isOwn?'display:none':''}">
+          <div class="fg" style="margin-bottom:.875rem"><label>Vehicle *</label><select id="tje-vehicle">${vhOpts}</select></div>
+        </div>
         <div class="frow">
-          <div class="fg"><label>Company *</label><select id="tje-co">${coOpts}</select></div>
           <div class="fg"><label>Date *</label><input id="tje-date" type="date" value="${j.job_date.split('/').reverse().join('-')}"></div>
-          <div class="fg"><label>Type</label><select id="tje-type"><option ${j.job_type==='Delivery'?'selected':''}>Delivery</option><option ${j.job_type==='Pickup'?'selected':''}>Pickup</option><option ${j.job_type==='Return'?'selected':''}>Return</option><option ${j.job_type==='Transfer'?'selected':''}>Transfer</option></select></div>
+          <div class="fg"><label>Job type</label><select id="tje-type">
+            <option ${j.job_type==='Delivery'?'selected':''}>Delivery</option>
+            <option ${j.job_type==='Pickup'?'selected':''}>Pickup</option>
+            <option ${j.job_type==='Return'?'selected':''}>Return</option>
+            <option ${j.job_type==='Transfer'?'selected':''}>Transfer</option>
+          </select></div>
         </div>
         <div class="fg"><label>Linked sales order</label><select id="tje-so">${soOpts}</select></div>
         <div class="frow">
@@ -5980,8 +6224,11 @@ async function renderTransport() {
         </div>
         <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
         async () => {
+          const ct = $('tje-carrier-type').value;
           const res2 = await UFCL.transportJobsUpdate(STORAGE.user.id, j.id, {
-            transport_company_id: $('tje-co').value,
+            carrier_type: ct,
+            transport_company_id: ct === 'Third-party' ? $('tje-co').value : null,
+            vehicle_id: ct === 'Own Vehicle' ? $('tje-vehicle').value : null,
             job_date: $('tje-date').value, job_type: $('tje-type').value,
             sales_order_id: $('tje-so').value || null,
             origin: $('tje-origin').value.trim(), destination: $('tje-dest').value.trim(),
@@ -5990,8 +6237,22 @@ async function renderTransport() {
             notes: $('tje-notes').value.trim()
           });
           if (!res2.ok) { showOverlayError(res2.error); return; }
-          showOverlaySuccess('Transport job updated.'); await renderTransport();
+          showOverlaySuccess('Transport job updated.'); await renderTransportJobs();
         });
+      setTimeout(() => {
+        $('tje-type-third')?.addEventListener('click', () => {
+          $('tje-carrier-type').value = 'Third-party';
+          $('tje-third-panel').style.display = ''; $('tje-own-panel').style.display = 'none';
+          $('tje-type-third').style.background = 'var(--primary)'; $('tje-type-third').style.color = '#fff';
+          $('tje-type-own').style.background = 'var(--bg2)'; $('tje-type-own').style.color = 'var(--t2)';
+        });
+        $('tje-type-own')?.addEventListener('click', () => {
+          $('tje-carrier-type').value = 'Own Vehicle';
+          $('tje-third-panel').style.display = 'none'; $('tje-own-panel').style.display = '';
+          $('tje-type-own').style.background = 'var(--primary)'; $('tje-type-own').style.color = '#fff';
+          $('tje-type-third').style.background = 'var(--bg2)'; $('tje-type-third').style.color = 'var(--t2)';
+        });
+      }, 30);
     };
   });
 
@@ -6002,25 +6263,44 @@ async function renderTransport() {
       confirmDelete(`Delete transport job <strong>${j.job_number}</strong> (${j.company_name})?`, async () => {
         const res2 = await UFCL.transportJobsDelete(STORAGE.user.id, j.id);
         if (!res2.ok) { showOverlayError(res2.error); return; }
-        showOverlaySuccess('Transport job deleted.'); await renderTransport();
+        showOverlaySuccess('Transport job deleted.'); await renderTransportJobs();
       });
     };
   });
 }
 
-function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, onDone) {
+function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, onDone, vehicles = [], prefillCarrierType = 'Third-party') {
   const coOpts = companies.map(c => `<option value="${c.id}">${c.name}${c.phone ? ' — ' + c.phone : ''}</option>`).join('');
+  const vhOpts = vehicles.map(v => `<option value="${v.id}">${v.registration}${v.make ? ' — ' + v.make + (v.model ? ' ' + v.model : '') : ''}</option>`).join('');
   const soOpts = `<option value="">— None (standalone job) —</option>` +
     salesOrders.map(s => `<option value="${s.id}" data-incl="${s.price_tax_type==='Inclusive'?'1':''}" ${prefillSalesOrderId && Number(prefillSalesOrderId) === s.id ? 'selected' : ''}>${s.order_number} — ${s.customer_name} (${s.product_type} ${s.product_size}, qty ${s.quantity})${s.price_tax_type==='Inclusive'?' ✓ Transport incl.':''}</option>`).join('');
 
-  openOverlay('Log transport job', 'Assign a third-party company to move goods', `
+  const isOwn = prefillCarrierType === 'Own Vehicle';
+
+  openOverlay('Log transport job', 'Record a transport movement using your own vehicle or a third-party carrier.', `
+    <div style="display:flex;gap:0;margin-bottom:1.25rem;border:1px solid var(--bdr);border-radius:7px;overflow:hidden">
+      <button id="tj-type-third" class="tj-carrier-tab${!isOwn?' active':''}" style="flex:1;padding:.6rem 1rem;font-size:13px;font-weight:600;border:none;cursor:pointer;background:${!isOwn?'var(--primary)':'var(--bg2)'};color:${!isOwn?'#fff':'var(--t2)'};transition:all .15s">
+        <i class="ti ti-building"></i> Third-party carrier
+      </button>
+      <button id="tj-type-own" class="tj-carrier-tab${isOwn?' active':''}" style="flex:1;padding:.6rem 1rem;font-size:13px;font-weight:600;border:none;border-left:1px solid var(--bdr);cursor:pointer;background:${isOwn?'var(--primary)':'var(--bg2)'};color:${isOwn?'#fff':'var(--t2)'};transition:all .15s">
+        <i class="ti ti-truck"></i> Own vehicle
+      </button>
+    </div>
+    <input type="hidden" id="tj-carrier-type" value="${prefillCarrierType}">
+    <div id="tj-third-panel" style="${isOwn?'display:none':''}">
+      <div class="fg" style="margin-bottom:.875rem"><label>Transport company *</label>
+        <select id="tj-co">${coOpts || '<option value="">No companies registered — add one in Transport Carriers</option>'}</select>
+      </div>
+    </div>
+    <div id="tj-own-panel" style="${!isOwn?'display:none':''}">
+      <div class="fg" style="margin-bottom:.875rem"><label>Vehicle *</label>
+        <select id="tj-vehicle">${vhOpts || '<option value="">No active vehicles — add one in Vehicle Fleet</option>'}</select>
+      </div>
+    </div>
     <div id="tj-so-banner" style="display:none;background:#ecfdf5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:13px;color:#065f46">
-      <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — this client's unit price already covers delivery. The transport cost for this job is pre-set to <strong>0</strong> (already covered in SO). Update if you need to track a separate charge.
+      <i class="ti ti-truck-delivery"></i> <strong>Transport included in sales price</strong> — transport cost pre-set to 0. Update if you need to track a separate charge.
     </div>
     <div class="frow">
-      <div class="fg"><label>Transport company *</label>
-        <select id="tj-co">${coOpts || '<option>No companies registered</option>'}</select>
-      </div>
       <div class="fg"><label>Job date *</label><input id="tj-date" type="date" value="${new Date().toISOString().slice(0, 10)}"></div>
       <div class="fg"><label>Job type</label>
         <select id="tj-type">
@@ -6047,8 +6327,11 @@ function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, on
     </div>
     <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save job</button><button class="bs1" id="ovCancel">Cancel</button></div>`,
     async () => {
+      const ct = $('tj-carrier-type').value;
       const r = await UFCL.transportJobsCreate(STORAGE.user.id, {
-        transport_company_id: $('tj-co').value,
+        carrier_type: ct,
+        transport_company_id: ct === 'Third-party' ? $('tj-co').value : null,
+        vehicle_id: ct === 'Own Vehicle' ? $('tj-vehicle').value : null,
         job_date: $('tj-date').value,
         job_type: $('tj-type').value,
         sales_order_id: $('tj-so').value || null,
@@ -6066,16 +6349,29 @@ function openTransportJobOverlay(companies, salesOrders, prefillSalesOrderId, on
     }
   );
   setTimeout(() => {
-    const tjSo     = $('tj-so');
-    const tjBanner = $('tj-so-banner');
-    const tjCost   = $('tj-cost');
-    const tjNotes  = $('tj-notes');
+    // Carrier type toggle
+    $('tj-type-third')?.addEventListener('click', () => {
+      $('tj-carrier-type').value = 'Third-party';
+      $('tj-third-panel').style.display = '';
+      $('tj-own-panel').style.display = 'none';
+      $('tj-type-third').style.background = 'var(--primary)'; $('tj-type-third').style.color = '#fff';
+      $('tj-type-own').style.background = 'var(--bg2)'; $('tj-type-own').style.color = 'var(--t2)';
+    });
+    $('tj-type-own')?.addEventListener('click', () => {
+      $('tj-carrier-type').value = 'Own Vehicle';
+      $('tj-third-panel').style.display = 'none';
+      $('tj-own-panel').style.display = '';
+      $('tj-type-own').style.background = 'var(--primary)'; $('tj-type-own').style.color = '#fff';
+      $('tj-type-third').style.background = 'var(--bg2)'; $('tj-type-third').style.color = 'var(--t2)';
+    });
+    // Sales order banner
+    const tjSo = $('tj-so'), tjBanner = $('tj-so-banner'), tjCost = $('tj-cost'), tjNotes = $('tj-notes');
     const applyBanner = () => {
       const sel = tjSo?.options[tjSo.selectedIndex];
       const incl = sel?.dataset?.incl === '1';
       if (tjBanner) tjBanner.style.display = incl ? '' : 'none';
-      if (incl && tjCost && !tjCost.value) { tjCost.value = '0'; }
-      if (incl && tjNotes && !tjNotes.value) { tjNotes.value = 'Transport cost included in sales order price'; }
+      if (incl && tjCost && !tjCost.value) tjCost.value = '0';
+      if (incl && tjNotes && !tjNotes.value) tjNotes.value = 'Transport cost included in sales order price';
     };
     if (tjSo) { tjSo.addEventListener('change', applyBanner); applyBanner(); }
   }, 30);
@@ -6182,7 +6478,11 @@ async function renderMachines() {
         <div class="ptitle">Machine Registry</div>
         <div class="psub">Manage machine profiles, specifications, operational status, and maintenance schedules.</div>
       </div>
-      ${canManage ? `<button class="bp1" id="mchAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>Register machine</button>` : ''}
+      ${canManage ? `
+        <div style="display:flex;gap:.5rem;flex-shrink:0">
+          <button class="bs1" id="mchManageCats" style="white-space:nowrap"><i class="ti ti-tag"></i>Manage categories</button>
+          <button class="bp1" id="mchAdd" style="white-space:nowrap"><i class="ti ti-plus"></i>Register machine</button>
+        </div>` : ''}
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
       <div class="mc"><div class="mclbl">Total Machines</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-settings-2"></i>registered</div></div>
@@ -6220,7 +6520,8 @@ async function renderMachines() {
     </div>`;
 
   function machineForm(r) {
-    const catSel = categories.map(c => `<option value="${c.id}" ${r&&Number(r.category_id)===c.id?'selected':''}>${c.name}</option>`).join('');
+    const catSel = `<option value="">— Select category —</option>` +
+      categories.map(c => `<option value="${c.id}" ${r&&Number(r.category_id)===c.id?'selected':''}>${c.name}</option>`).join('');
     const statusOpts = ['Available','Running','Maintenance','Breakdown'].map(s => `<option value="${s}" ${r&&r.status===s?'selected':''}>${s}</option>`).join('');
     const wshOpts = workshops.map(w => `<option value="${w.id}" ${r&&Number(r.workshop_id)===w.id?'selected':''}>${w.name}${w.workshop_type?' ('+w.workshop_type+')':''}</option>`).join('');
     return `
@@ -6282,6 +6583,107 @@ async function renderMachines() {
       if (!r2.ok) { showOverlayError(r2.error); return; }
       showOverlaySuccess('Machine registered.');
       await renderMachines();
+    });
+
+    $('mchManageCats')?.addEventListener('click', async () => {
+      async function loadCats() {
+        const res = await UFCL.machineCategoriesList(STORAGE.user.id);
+        return res.ok ? (res.rows || []) : [];
+      }
+
+      function catRows(cats) {
+        return cats.length
+          ? cats.map(c => `<tr data-id="${c.id}">
+              <td style="font-weight:500">${c.name}</td>
+              <td style="color:var(--t3);font-size:12px">${c.description || '—'}</td>
+              <td style="white-space:nowrap">
+                <button class="bs1 mcat-edit" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-desc="${(c.description||'').replace(/"/g,'&quot;')}" style="margin-right:4px;padding:4px 8px;font-size:12px"><i class="ti ti-edit"></i></button>
+                <button class="bs1 mcat-del" data-id="${c.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-trash"></i></button>
+              </td>
+            </tr>`).join('')
+          : `<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:1rem">No categories yet.</td></tr>`;
+      }
+
+      const cats = await loadCats();
+      openOverlay('Manage machine categories', 'Add, rename, or remove categories used when registering machines.', `
+        <div class="tw" style="margin-bottom:1.25rem"><table class="dt" style="min-width:0">
+          <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+          <tbody id="mcat-tbody">${catRows(cats)}</tbody>
+        </table></div>
+        <div id="mcat-edit-area"></div>
+        <div style="border-top:1px solid var(--bdr);padding-top:1rem">
+          <div style="font-weight:600;font-size:13px;margin-bottom:.625rem">Add new category</div>
+          <div class="frow" style="gap:.625rem">
+            <div class="fg" style="flex:2"><label>Category name *</label><input id="mcat-new-name" type="text" placeholder="e.g. Excavator, Bulldozer"></div>
+            <div class="fg" style="flex:3"><label>Description</label><input id="mcat-new-desc" type="text" placeholder="Optional description"></div>
+            <button class="bp1" id="mcat-add-btn" style="flex-shrink:0;align-self:flex-end;margin-bottom:0"><i class="ti ti-plus"></i>Add</button>
+          </div>
+        </div>
+        <div class="brow"><button class="bs1" id="ovCancel">Close</button></div>`,
+        async () => {}
+      );
+
+      async function rebindCatTable() {
+        const updated = await loadCats();
+        const tbody = $('mcat-tbody');
+        if (tbody) tbody.innerHTML = catRows(updated);
+        bindCatActions();
+        renderMachines();
+      }
+
+      function bindCatActions() {
+        document.querySelectorAll('.mcat-del').forEach(btn => {
+          btn.onclick = async () => {
+            if (!confirm('Delete this category? This will fail if machines are using it.')) return;
+            const r2 = await UFCL.machineCategoriesDelete(STORAGE.user.id, Number(btn.dataset.id));
+            if (!r2.ok) { showOverlayError(r2.error); return; }
+            await rebindCatTable();
+          };
+        });
+
+        document.querySelectorAll('.mcat-edit').forEach(btn => {
+          btn.onclick = () => {
+            const editArea = $('mcat-edit-area');
+            if (!editArea) return;
+            editArea.innerHTML = `
+              <div style="background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;padding:1rem;margin-bottom:1rem">
+                <div style="font-weight:600;font-size:13px;margin-bottom:.625rem">Edit category</div>
+                <div class="frow" style="gap:.625rem">
+                  <div class="fg" style="flex:2"><label>Name *</label><input id="mcat-edit-name" type="text" value="${btn.dataset.name}"></div>
+                  <div class="fg" style="flex:3"><label>Description</label><input id="mcat-edit-desc" type="text" value="${btn.dataset.desc}"></div>
+                  <button class="bp1" id="mcat-save-btn" data-id="${btn.dataset.id}" style="flex-shrink:0;align-self:flex-end;margin-bottom:0"><i class="ti ti-check"></i>Save</button>
+                  <button class="bs1" id="mcat-cancel-edit" style="flex-shrink:0;align-self:flex-end;margin-bottom:0">Cancel</button>
+                </div>
+              </div>`;
+            $('mcat-cancel-edit')?.addEventListener('click', () => { editArea.innerHTML = ''; });
+            $('mcat-save-btn')?.addEventListener('click', async () => {
+              const catId = Number($('mcat-save-btn').dataset.id);
+              const r2 = await UFCL.machineCategoriesUpdate(STORAGE.user.id, catId, {
+                name: $('mcat-edit-name').value.trim(),
+                description: $('mcat-edit-desc').value.trim()
+              });
+              if (!r2.ok) { showOverlayError(r2.error); return; }
+              editArea.innerHTML = '';
+              await rebindCatTable();
+            });
+          };
+        });
+      }
+
+      $('mcat-add-btn')?.addEventListener('click', async () => {
+        const name = $('mcat-new-name')?.value?.trim();
+        if (!name) { showOverlayError('Category name is required'); return; }
+        const r2 = await UFCL.machineCategoriesCreate(STORAGE.user.id, {
+          name,
+          description: $('mcat-new-desc')?.value?.trim() || null
+        });
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        if ($('mcat-new-name')) $('mcat-new-name').value = '';
+        if ($('mcat-new-desc')) $('mcat-new-desc').value = '';
+        await rebindCatTable();
+      });
+
+      bindCatActions();
     });
 
     document.querySelectorAll('.mch-edit').forEach(btn => {

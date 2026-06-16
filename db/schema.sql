@@ -87,6 +87,8 @@ create table if not exists sales_orders (
   unit_price numeric(14,2) not null,
   notes text,
   reason text not null,
+  qty_accepted_total int not null default 0,
+  qty_remaining int,
   created_by bigint references app_users(id),
   created_at timestamptz not null default now()
 );
@@ -303,6 +305,12 @@ create table if not exists delivery_orders (
   status text not null default 'Pending',
   route text,
   notes text,
+  qty_dispatched int,
+  qty_accepted int,
+  qty_rejected int,
+  rejection_reason text,
+  pod_recorded_at timestamptz,
+  pod_recorded_by bigint references app_users(id),
   created_by bigint references app_users(id),
   created_at timestamptz not null default now()
 );
@@ -350,7 +358,9 @@ create table if not exists transport_companies (
 create table if not exists transport_jobs (
   id bigserial primary key,
   job_number text not null unique,
-  transport_company_id bigint not null references transport_companies(id),
+  carrier_type text not null default 'Third-party',
+  transport_company_id bigint references transport_companies(id),
+  vehicle_id bigint references vehicles(id),
   sales_order_id bigint references sales_orders(id),
   delivery_order_id bigint references delivery_orders(id),
   job_type text not null default 'Delivery',

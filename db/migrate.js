@@ -282,6 +282,23 @@ async function ensureSchema() {
     from produced p, value_added va, sold s
   `);
   await pool.query(`create unique index mv_stock_summary_unique on mv_stock_summary((1))`);
+
+  // Transport jobs — support own-vehicle jobs alongside third-party carriers
+  await pool.query(`alter table transport_jobs alter column transport_company_id drop not null`);
+  await pool.query(`alter table transport_jobs add column if not exists carrier_type text not null default 'Third-party'`);
+  await pool.query(`alter table transport_jobs add column if not exists vehicle_id bigint references vehicles(id)`);
+
+  // Delivery orders — partial delivery / POD tracking
+  await pool.query(`alter table delivery_orders add column if not exists qty_dispatched int`);
+  await pool.query(`alter table delivery_orders add column if not exists qty_accepted int`);
+  await pool.query(`alter table delivery_orders add column if not exists qty_rejected int`);
+  await pool.query(`alter table delivery_orders add column if not exists rejection_reason text`);
+  await pool.query(`alter table delivery_orders add column if not exists pod_recorded_at timestamptz`);
+  await pool.query(`alter table delivery_orders add column if not exists pod_recorded_by bigint references app_users(id)`);
+
+  // Sales orders — fulfilment tracking
+  await pool.query(`alter table sales_orders add column if not exists qty_accepted_total int not null default 0`);
+  await pool.query(`alter table sales_orders add column if not exists qty_remaining int`);
 }
 
 async function seedProductCatalog() {
