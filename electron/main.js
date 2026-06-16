@@ -1,8 +1,53 @@
 const path = require('path');
 const fs = require('fs');
+const https = require('https');
 const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 
 const { migrate } = require('../db/migrate');
+
+const LOCAL_VERSION = require('../package.json').version;
+const RELEASE_NOTES_URL = 'https://raw.githubusercontent.com/gadrwagasana/UFCL-reporting-system/master/release-notes.json';
+
+function fetchJSON(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, { timeout: 8000 }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => {
+        try { resolve(JSON.parse(data)); }
+        catch { reject(new Error('Invalid JSON')); }
+      });
+    }).on('error', reject).on('timeout', () => reject(new Error('Timeout')));
+  });
+}
+
+function semverGt(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return true;
+    if ((pa[i] || 0) < (pb[i] || 0)) return false;
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  try {
+    const remote = await fetchJSON(RELEASE_NOTES_URL);
+    if (remote && remote.version && semverGt(remote.version, LOCAL_VERSION)) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('update:available', {
+          current: LOCAL_VERSION,
+          latest: remote.version,
+          date: remote.date || '',
+          notes: remote.notes || []
+        });
+      }
+    }
+  } catch {
+    // No internet or unreachable — silently skip
+  }
+}
 const auth = require('../db/services/auth');
 const data = require('../db/services/data');
 
@@ -84,6 +129,9 @@ app.whenReady().then(async () => {
 
   createWindow();
 
+  // Check for updates 4 seconds after startup so it doesn't block the UI
+  setTimeout(checkForUpdate, 4000);
+
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -92,6 +140,9 @@ app.whenReady().then(async () => {
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
+
+ipcMain.handle('app:getVersion', () => ({ version: LOCAL_VERSION }));
+ipcMain.handle('app:checkUpdate', async () => { await checkForUpdate(); return { ok: true }; });
 
 ipcMain.handle('auth:login', async (_evt, { username, password }) => {
   return auth.login(username, password);

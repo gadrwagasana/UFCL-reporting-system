@@ -1,0 +1,13 @@
+{
+  "version": "1.2.0",
+  "date": "2026-06-16",
+  "notes": [
+    "Partial deliveries and multi-trip fulfillment support",
+    "Proof of Delivery (POD) recording per delivery trip",
+    "Fulfillment progress bar on Sales Orders",
+    "Close short option for partially-delivered orders",
+    "Transport Jobs page with own-vehicle and third-party support",
+    "Dashboard Pending Actions panel",
+    "Machine category management"
+  ]
+}

@@ -34,6 +34,10 @@ contextBridge.exposeInMainWorld('UFCL', {
   login: (username, password) => ipcRenderer.invoke('auth:login', { username, password }),
   logout: () => ipcRenderer.invoke('auth:logout'),
 
+  getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
+  checkForUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
+  onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_evt, data) => cb(data)),
+
   getBootstrap: (userId) => ipcRenderer.invoke('app:getBootstrap', { userId }),
 
   dailyList: (userId) => ipcRenderer.invoke('daily:list', { userId }),

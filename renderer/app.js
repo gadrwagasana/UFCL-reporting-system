@@ -8843,6 +8843,64 @@ function wireLogin() {
   });
 }
 
+function wireUpdateBanner() {
+  if (!window.UFCL || typeof UFCL.onUpdateAvailable !== 'function') return;
+
+  UFCL.onUpdateAvailable((data) => {
+    if (!data || !data.latest) return;
+
+    // Don't show if banner already present
+    if ($('update-banner')) return;
+
+    const notes = (data.notes || []).map(n => `<li>${n}</li>`).join('');
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
+        <i class="ti ti-arrow-up-circle" style="font-size:20px;flex-shrink:0;margin-top:1px"></i>
+        <div>
+          <strong>New version available — v${data.latest}</strong>
+          ${data.date ? `<span style="opacity:.7;margin-left:8px;font-size:12px">${data.date}</span>` : ''}
+          ${notes ? `<ul style="margin:6px 0 0 16px;padding:0;font-size:13px;opacity:.9">${notes}</ul>` : ''}
+          <div style="margin-top:8px;font-size:13px;opacity:.85">
+            Please ask your administrator to update the system. You are currently on v${data.current}.
+          </div>
+        </div>
+      </div>
+      <button id="update-banner-dismiss" style="flex-shrink:0;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;white-space:nowrap">
+        Dismiss
+      </button>`;
+    banner.style.cssText = `
+      position:fixed;top:0;left:0;right:0;z-index:9999;
+      background:linear-gradient(135deg,#1a6b3c,#145c33);
+      color:#fff;padding:14px 20px;
+      display:flex;align-items:flex-start;gap:16px;
+      box-shadow:0 2px 12px rgba(0,0,0,.35);
+      font-family:var(--ff,system-ui);font-size:14px;line-height:1.4;
+      animation:slideDown .3s ease;
+    `;
+
+    // Inject animation keyframe once
+    if (!document.getElementById('update-banner-style')) {
+      const style = document.createElement('style');
+      style.id = 'update-banner-style';
+      style.textContent = `@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}`;
+      document.head.appendChild(style);
+    }
+
+    document.body.prepend(banner);
+
+    // Push content down so banner doesn't overlap the topbar
+    const shell = $('shell');
+    if (shell) shell.style.marginTop = banner.offsetHeight + 'px';
+
+    banner.querySelector('#update-banner-dismiss').onclick = () => {
+      banner.remove();
+      if (shell) shell.style.marginTop = '';
+    };
+  });
+}
+
 function wireTopbar() {
   $('logoutBtn').onclick = async () => {
     await UFCL.logout();
@@ -8894,6 +8952,7 @@ window.addEventListener('DOMContentLoaded', () => {
     }
     wireLogin();
     wireTopbar();
+    wireUpdateBanner();
   } catch (e) {
     const msg = e?.message || String(e);
     document.body.innerHTML = `<div style="font-family:Arial;padding:24px">
