@@ -9061,58 +9061,144 @@ function wireLogin() {
 function wireUpdateBanner() {
   if (!window.UFCL || typeof UFCL.onUpdateAvailable !== 'function') return;
 
-  UFCL.onUpdateAvailable((data) => {
-    if (!data || !data.latest) return;
+  const BANNER_STYLE = `
+    position:fixed;top:0;left:0;right:0;z-index:9999;
+    background:linear-gradient(135deg,#1a6b3c,#145c33);
+    color:#fff;padding:14px 20px;
+    display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    box-shadow:0 2px 12px rgba(0,0,0,.35);
+    font-family:var(--ff,system-ui);font-size:14px;line-height:1.4;
+    animation:slideDown .3s ease;
+  `;
+  const BTN = `background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;white-space:nowrap`;
+  const BTN_PRIMARY = `background:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.95);color:#145c33;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;font-weight:600;white-space:nowrap`;
 
-    // Don't show if banner already present
-    if ($('update-banner')) return;
+  function injectStyle() {
+    if (document.getElementById('update-banner-style')) return;
+    const s = document.createElement('style');
+    s.id = 'update-banner-style';
+    s.textContent = `@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}`;
+    document.head.appendChild(s);
+  }
 
-    const notes = (data.notes || []).map(n => `<li>${n}</li>`).join('');
-    const banner = document.createElement('div');
-    banner.id = 'update-banner';
-    banner.innerHTML = `
-      <div style="display:flex;align-items:flex-start;gap:12px;flex:1;min-width:0">
-        <i class="ti ti-arrow-up-circle" style="font-size:20px;flex-shrink:0;margin-top:1px"></i>
-        <div>
-          <strong>New version available — v${data.latest}</strong>
-          ${data.date ? `<span style="opacity:.7;margin-left:8px;font-size:12px">${data.date}</span>` : ''}
-          ${notes ? `<ul style="margin:6px 0 0 16px;padding:0;font-size:13px;opacity:.9">${notes}</ul>` : ''}
-          <div style="margin-top:8px;font-size:13px;opacity:.85">
-            Please ask your administrator to update the system. You are currently on v${data.current}.
-          </div>
-        </div>
-      </div>
-      <button id="update-banner-dismiss" style="flex-shrink:0;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:13px;white-space:nowrap">
-        Dismiss
-      </button>`;
-    banner.style.cssText = `
-      position:fixed;top:0;left:0;right:0;z-index:9999;
-      background:linear-gradient(135deg,#1a6b3c,#145c33);
-      color:#fff;padding:14px 20px;
-      display:flex;align-items:flex-start;gap:16px;
-      box-shadow:0 2px 12px rgba(0,0,0,.35);
-      font-family:var(--ff,system-ui);font-size:14px;line-height:1.4;
-      animation:slideDown .3s ease;
-    `;
-
-    // Inject animation keyframe once
-    if (!document.getElementById('update-banner-style')) {
-      const style = document.createElement('style');
-      style.id = 'update-banner-style';
-      style.textContent = `@keyframes slideDown{from{transform:translateY(-100%);opacity:0}to{transform:translateY(0);opacity:1}}`;
-      document.head.appendChild(style);
+  function showBanner(html) {
+    let banner = $('update-banner');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'update-banner';
+      banner.style.cssText = BANNER_STYLE;
+      injectStyle();
+      document.body.prepend(banner);
     }
-
-    document.body.prepend(banner);
-
-    // Push content down so banner doesn't overlap the topbar
+    banner.innerHTML = html;
     const shell = $('shell');
     if (shell) shell.style.marginTop = banner.offsetHeight + 'px';
+    return banner;
+  }
 
-    banner.querySelector('#update-banner-dismiss').onclick = () => {
-      banner.remove();
-      if (shell) shell.style.marginTop = '';
+  function removeBanner() {
+    const b = $('update-banner');
+    if (b) b.remove();
+    const shell = $('shell');
+    if (shell) shell.style.marginTop = '';
+  }
+
+  function fmtBytes(n) {
+    if (n > 1048576) return (n / 1048576).toFixed(1) + ' MB';
+    return (n / 1024).toFixed(0) + ' KB';
+  }
+
+  UFCL.onUpdateAvailable((data) => {
+    if (!data || !data.latest) return;
+    // Check snooze
+    try {
+      const snooze = localStorage.getItem('update-snooze');
+      if (snooze && Date.now() < Number(snooze)) return;
+      const skip = localStorage.getItem('update-skip');
+      if (skip === data.latest) return;
+    } catch {}
+
+    const notes = (data.notes || []).map(n => `<li style="margin-top:3px">${n}</li>`).join('');
+    showBanner(`
+      <i class="ti ti-arrow-up-circle" style="font-size:22px;flex-shrink:0"></i>
+      <div style="flex:1;min-width:0">
+        <strong>Version ${data.latest} is available</strong>
+        <span style="opacity:.65;margin-left:8px;font-size:12px">you have v${data.current}</span>
+        ${notes ? `<ul style="margin:5px 0 0 16px;padding:0;font-size:12px;opacity:.9">${notes}</ul>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
+        <button id="upd-now" style="${BTN_PRIMARY}"><i class="ti ti-download"></i> Update Now</button>
+        <button id="upd-later" style="${BTN}">Remind Me Later</button>
+        <button id="upd-skip" style="${BTN}">Skip This Version</button>
+      </div>`);
+
+    $('upd-now').onclick = async () => {
+      showBanner(`
+        <i class="ti ti-download" style="font-size:22px;flex-shrink:0"></i>
+        <div style="flex:1;min-width:200px">
+          <strong>Downloading version ${data.latest}…</strong>
+          <div id="upd-bar-wrap" style="background:rgba(255,255,255,.25);border-radius:4px;height:6px;margin-top:8px;overflow:hidden">
+            <div id="upd-bar" style="background:#fff;height:100%;width:0%;transition:width .3s ease"></div>
+          </div>
+          <div id="upd-bar-label" style="font-size:12px;opacity:.8;margin-top:4px">Starting…</div>
+        </div>`);
+
+      const res = await UFCL.startUpdateDownload();
+      if (!res || !res.ok) {
+        showBanner(`
+          <i class="ti ti-alert-circle" style="font-size:22px;flex-shrink:0"></i>
+          <div style="flex:1">
+            <strong>Download failed</strong>
+            <div style="font-size:12px;opacity:.85;margin-top:3px">${res?.error || 'Unknown error'} — the current version is still running normally.</div>
+          </div>
+          <button id="upd-dismiss-err" style="${BTN}">Dismiss</button>`);
+        const d = $('upd-dismiss-err'); if (d) d.onclick = removeBanner;
+      }
     };
+
+    $('upd-later').onclick = () => {
+      try { localStorage.setItem('update-snooze', String(Date.now() + 86400000)); } catch {}
+      removeBanner();
+    };
+
+    $('upd-skip').onclick = () => {
+      try { localStorage.setItem('update-skip', data.latest); } catch {}
+      removeBanner();
+    };
+  });
+
+  UFCL.onUpdateProgress((p) => {
+    const bar = $('upd-bar');
+    const label = $('upd-bar-label');
+    if (bar) bar.style.width = p.percent + '%';
+    if (label) label.textContent = `${p.percent}%  —  ${fmtBytes(p.transferred)} / ${fmtBytes(p.total)}`;
+  });
+
+  UFCL.onUpdateDownloaded((d) => {
+    showBanner(`
+      <i class="ti ti-circle-check" style="font-size:22px;flex-shrink:0"></i>
+      <div style="flex:1">
+        <strong>Version ${d.version} is ready to install</strong>
+        <div style="font-size:12px;opacity:.85;margin-top:3px">Your data will not be affected. The app will restart automatically.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
+        <button id="upd-install" style="${BTN_PRIMARY}"><i class="ti ti-refresh"></i> Restart &amp; Install</button>
+        <button id="upd-later2" style="${BTN}">Install on Next Launch</button>
+      </div>`);
+    $('upd-install').onclick = () => UFCL.installUpdate();
+    $('upd-later2').onclick = removeBanner;
+  });
+
+  UFCL.onUpdateError((e) => {
+    if (!$('update-banner')) return;
+    showBanner(`
+      <i class="ti ti-alert-circle" style="font-size:22px;flex-shrink:0"></i>
+      <div style="flex:1">
+        <strong>Update error</strong>
+        <div style="font-size:12px;opacity:.85;margin-top:3px">${e.message || 'Unknown error'} — running current version normally.</div>
+      </div>
+      <button id="upd-dismiss-err2" style="${BTN}">Dismiss</button>`);
+    const d = $('upd-dismiss-err2'); if (d) d.onclick = removeBanner;
   });
 }
 

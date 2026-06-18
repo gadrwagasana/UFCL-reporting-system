@@ -1,52 +1,51 @@
 const path = require('path');
 const fs = require('fs');
-const https = require('https');
 const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
+const { autoUpdater } = require('electron-updater');
 
 const { migrate } = require('../db/migrate');
 
 const LOCAL_VERSION = require('../package.json').version;
-const RELEASE_NOTES_URL = 'https://raw.githubusercontent.com/gadrwagasana/UFCL-reporting-system/master/release-notes.json';
 
-function fetchJSON(url) {
-  return new Promise((resolve, reject) => {
-    https.get(url, { timeout: 8000 }, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch { reject(new Error('Invalid JSON')); }
+function setupAutoUpdater() {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:available', {
+        current: LOCAL_VERSION,
+        latest: info.version,
+        date: info.releaseDate || '',
+        notes: Array.isArray(info.releaseNotes)
+          ? info.releaseNotes.map(n => (typeof n === 'string' ? n : n.note || '')).filter(Boolean)
+          : info.releaseNotes ? [String(info.releaseNotes)] : []
       });
-    }).on('error', reject).on('timeout', () => reject(new Error('Timeout')));
-  });
-}
-
-function semverGt(a, b) {
-  const pa = a.split('.').map(Number);
-  const pb = b.split('.').map(Number);
-  for (let i = 0; i < 3; i++) {
-    if ((pa[i] || 0) > (pb[i] || 0)) return true;
-    if ((pa[i] || 0) < (pb[i] || 0)) return false;
-  }
-  return false;
-}
-
-async function checkForUpdate() {
-  try {
-    const remote = await fetchJSON(RELEASE_NOTES_URL);
-    if (remote && remote.version && semverGt(remote.version, LOCAL_VERSION)) {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.send('update:available', {
-          current: LOCAL_VERSION,
-          latest: remote.version,
-          date: remote.date || '',
-          notes: remote.notes || []
-        });
-      }
     }
-  } catch {
-    // No internet or unreachable — silently skip
-  }
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:progress', {
+        percent: Math.round(progress.percent),
+        transferred: progress.transferred,
+        total: progress.total,
+        bytesPerSecond: progress.bytesPerSecond
+      });
+    }
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:downloaded', { version: info.version });
+    }
+  });
+
+  autoUpdater.on('error', (err) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('update:error', { message: err?.message || String(err) });
+    }
+  });
 }
 const auth = require('../db/services/auth');
 const data = require('../db/services/data');
@@ -129,8 +128,11 @@ app.whenReady().then(async () => {
 
   createWindow();
 
-  // Check for updates 4 seconds after startup so it doesn't block the UI
-  setTimeout(checkForUpdate, 4000);
+  // Check for updates 4 seconds after startup (only in packaged app)
+  if (app.isPackaged) {
+    setupAutoUpdater();
+    setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 4000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -142,7 +144,13 @@ app.on('window-all-closed', () => {
 });
 
 ipcMain.handle('app:getVersion', () => ({ version: LOCAL_VERSION }));
-ipcMain.handle('app:checkUpdate', async () => { await checkForUpdate(); return { ok: true }; });
+ipcMain.handle('update:download', async () => {
+  try { await autoUpdater.downloadUpdate(); return { ok: true }; }
+  catch (e) { return { ok: false, error: e?.message || String(e) }; }
+});
+ipcMain.handle('update:install', () => {
+  autoUpdater.quitAndInstall(false, true);
+});
 
 ipcMain.handle('auth:login', async (_evt, { username, password }) => {
   return auth.login(username, password);

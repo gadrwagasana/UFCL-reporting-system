@@ -10,11 +10,13 @@
     "setup": "node tools/setup.js",
     "migrate": "node db/migrate.js",
     "lint": "node -e \"console.log('No lint configured yet')\"",
-    "dist": "electron-builder"
+    "dist": "electron-builder --publish never",
+    "publish": "electron-builder --publish always"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.2",
+    "electron-updater": "^6.8.9",
     "pg": "^8.16.3"
   },
   "devDependencies": {
@@ -32,7 +34,9 @@
       "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
     ],
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "publisherName": "UFCL"
     },
     "nsis": {
@@ -40,7 +44,12 @@
       "perMachine": false,
       "allowElevation": true,
       "allowToChangeInstallationDirectory": true
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "gadrwagasana",
+      "repo": "UFCL-reporting-system",
+      "releaseType": "release"
     }
   }
 }
-

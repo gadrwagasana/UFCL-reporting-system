@@ -35,8 +35,14 @@ contextBridge.exposeInMainWorld('UFCL', {
   logout: () => ipcRenderer.invoke('auth:logout'),
 
   getAppVersion: () => ipcRenderer.invoke('app:getVersion'),
-  checkForUpdate: () => ipcRenderer.invoke('app:checkUpdate'),
-  onUpdateAvailable: (cb) => ipcRenderer.on('update:available', (_evt, data) => cb(data)),
+
+  // Auto-update bridge
+  onUpdateAvailable:  (cb) => ipcRenderer.on('update:available',  (_e, d) => cb(d)),
+  onUpdateProgress:   (cb) => ipcRenderer.on('update:progress',   (_e, d) => cb(d)),
+  onUpdateDownloaded: (cb) => ipcRenderer.on('update:downloaded', (_e, d) => cb(d)),
+  onUpdateError:      (cb) => ipcRenderer.on('update:error',      (_e, d) => cb(d)),
+  startUpdateDownload: () => ipcRenderer.invoke('update:download'),
+  installUpdate:       () => ipcRenderer.invoke('update:install'),
 
   getBootstrap: (userId) => ipcRenderer.invoke('app:getBootstrap', { userId }),
 
