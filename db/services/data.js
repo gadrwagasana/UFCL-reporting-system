@@ -1559,7 +1559,9 @@ async function stockMovementsList(userId, workshopId) {
     ? await pool.query(
         `select sm.id, sc.name as item_name, sc.category, sc.uom,
                 w.name as warehouse_name, tw.name as to_warehouse_name,
-                sm.movement_type, sm.quantity, sm.reference, sm.notes,
+                sm.movement_type, sm.quantity, sm.unit_cost,
+                (sm.quantity * coalesce(sm.unit_cost, 0))::numeric(14,2) as total_value,
+                sm.reference, sm.notes,
                 sm.approval_status, sm.rejection_reason,
                 to_char(sm.created_at,'DD/MM/YYYY HH24:MI') as created_at,
                 u.name as created_by
@@ -1573,7 +1575,9 @@ async function stockMovementsList(userId, workshopId) {
     : await pool.query(
         `select sm.id, sc.name as item_name, sc.category, sc.uom,
                 w.name as warehouse_name, tw.name as to_warehouse_name,
-                sm.movement_type, sm.quantity, sm.reference, sm.notes,
+                sm.movement_type, sm.quantity, sm.unit_cost,
+                (sm.quantity * coalesce(sm.unit_cost, 0))::numeric(14,2) as total_value,
+                sm.reference, sm.notes,
                 sm.approval_status, sm.rejection_reason, sm.pending_deletion,
                 to_char(sm.created_at,'DD/MM/YYYY HH24:MI') as created_at,
                 u.name as created_by
@@ -1586,13 +1590,13 @@ async function stockMovementsList(userId, workshopId) {
          order by sm.created_at desc limit 100`);
   const { rows: items } = filterWh
     ? await pool.query(
-        `select sc.id, sc.name, sc.category, sc.uom,
+        `select sc.id, sc.name, sc.category, sc.uom, sc.unit_cost as default_unit_cost,
                 coalesce(sum(sl.quantity),0)::int as total_stock
          from stock_catalog sc
          left join stock_levels sl on sl.item_id=sc.id and sl.warehouse_id=$1
          where sc.active=true group by sc.id order by sc.category, sc.name`, [filterWh])
     : await pool.query(
-        `select sc.id, sc.name, sc.category, sc.uom,
+        `select sc.id, sc.name, sc.category, sc.uom, sc.unit_cost as default_unit_cost,
                 coalesce(sum(sl.quantity),0)::int as total_stock
          from stock_catalog sc
          left join stock_levels sl on sl.item_id=sc.id
@@ -1620,11 +1624,13 @@ async function stockMovementsCreate(userId, payload) {
   const isTransfer = p.movement_type === 'transfer';
   const approvalStatus = isTransfer ? 'pending' : null;
 
+  const unitCost = p.unit_cost != null && p.unit_cost !== '' ? Number(p.unit_cost) : null;
+
   const { rows: mvRows } = await pool.query(
-    `insert into stock_movements(item_id, warehouse_id, to_warehouse_id, movement_type, quantity, reference, notes, approval_status, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning id`,
+    `insert into stock_movements(item_id, warehouse_id, to_warehouse_id, movement_type, quantity, unit_cost, reference, notes, approval_status, created_by)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) returning id`,
     [p.item_id, p.warehouse_id || null, p.to_warehouse_id || null,
-     p.movement_type, qty, p.reference || null, p.notes || null, approvalStatus, user.id]
+     p.movement_type, qty, unitCost, p.reference || null, p.notes || null, approvalStatus, user.id]
   );
 
   if (!isTransfer && p.warehouse_id) {
@@ -1703,6 +1709,200 @@ async function stockTransferApprove(userId, movementId, action, rejectionReason)
 
     await client.query('commit');
     return { ok: true };
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+// ── Stock Transfers (multi-stage) ─────────────────────────────────────────────
+
+async function stockTransfersList(userId, workshopId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-transfers'))) return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const filterWh = restricted ? user.workshop_id : (workshopId || null);
+  const base = `
+    select st.id, sc.name as item_name, sc.category, sc.uom,
+           fw.name as from_warehouse_name, tw.name as to_warehouse_name,
+           st.from_warehouse_id, st.to_warehouse_id,
+           st.requested_qty, st.dispatched_qty, st.received_qty, st.status,
+           st.reference, st.notes, st.rejection_reason,
+           u1.name as requested_by, u2.name as approved_by,
+           to_char(st.requested_at,'DD/MM/YYYY HH24:MI') as requested_at,
+           to_char(st.approved_at,'DD/MM/YYYY HH24:MI') as approved_at
+    from stock_transfers st
+    join stock_catalog sc on sc.id=st.item_id
+    join warehouses fw on fw.id=st.from_warehouse_id
+    join warehouses tw on tw.id=st.to_warehouse_id
+    left join app_users u1 on u1.id=st.requested_by
+    left join app_users u2 on u2.id=st.approved_by
+    where st.deleted_at is null`;
+  const { rows } = filterWh
+    ? await pool.query(base + ` and (st.from_warehouse_id=$1 or st.to_warehouse_id=$1) order by st.requested_at desc limit 100`, [filterWh])
+    : await pool.query(base + ` order by st.requested_at desc limit 100`);
+  const { rows: items } = filterWh
+    ? await pool.query(
+        `select sc.id, sc.name, sc.category, sc.uom, coalesce(sum(sl.quantity),0)::int as total_stock
+         from stock_catalog sc left join stock_levels sl on sl.item_id=sc.id and sl.warehouse_id=$1
+         where sc.active=true group by sc.id order by sc.category, sc.name`, [filterWh])
+    : await pool.query(
+        `select sc.id, sc.name, sc.category, sc.uom, coalesce(sum(sl.quantity),0)::int as total_stock
+         from stock_catalog sc left join stock_levels sl on sl.item_id=sc.id
+         where sc.active=true group by sc.id order by sc.category, sc.name`);
+  const { rows: wh } = await pool.query(`select id, name from warehouses where active=true order by name`);
+  return { ok: true, rows, items, warehouses: wh, user_workshop_id: user.workshop_id };
+}
+
+async function stockTransfersCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-transfers'))) return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.item_id || !p.from_warehouse_id || !p.to_warehouse_id || !p.requested_qty)
+    return { ok: false, error: 'Item, source warehouse, destination warehouse, and quantity are required' };
+  const qty = Number(p.requested_qty);
+  if (qty <= 0) return { ok: false, error: 'Quantity must be greater than zero' };
+  if (Number(p.from_warehouse_id) === Number(p.to_warehouse_id))
+    return { ok: false, error: 'Source and destination warehouses must be different' };
+  if (isWorkshopRestricted(user) && Number(p.from_warehouse_id) !== Number(user.workshop_id))
+    return { ok: false, error: 'You can only request transfers from your assigned workshop' };
+  await pool.query(
+    `insert into stock_transfers(item_id, from_warehouse_id, to_warehouse_id, requested_qty, reference, notes, requested_by)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [p.item_id, p.from_warehouse_id, p.to_warehouse_id, qty, p.reference || null, p.notes || null, user.id]
+  );
+  logAudit(user, `Transfer request: ${qty} × item #${p.item_id} from wh #${p.from_warehouse_id} → #${p.to_warehouse_id}`, 'ti-arrows-right-left', { ...p });
+  return { ok: true };
+}
+
+async function stockTransfersApproveReject(userId, transferId, action, rejectionReason) {
+  const user = await getUser(userId);
+  if (!['admin', 'ceo', 'operations', 'logistics'].includes(user.role))
+    return { ok: false, error: 'Access denied — manager approval required' };
+  const { rows } = await pool.query(
+    `select id from stock_transfers where id=$1 and status='pending' and deleted_at is null`,
+    [transferId]
+  );
+  if (!rows.length) return { ok: false, error: 'Transfer not found or already reviewed' };
+  if (action === 'approve') {
+    await pool.query(
+      `update stock_transfers set status='approved', approved_by=$1, approved_at=now() where id=$2`,
+      [user.id, transferId]
+    );
+    logAudit(user, `Transfer #${transferId} approved`, 'ti-circle-check', { transferId });
+  } else {
+    await pool.query(
+      `update stock_transfers set status='rejected', approved_by=$1, approved_at=now(), rejection_reason=$2 where id=$3`,
+      [user.id, rejectionReason || null, transferId]
+    );
+    logAudit(user, `Transfer #${transferId} rejected`, 'ti-circle-x', { transferId, rejectionReason });
+  }
+  return { ok: true };
+}
+
+async function stockTransfersDispatch(userId, transferId, qty, reference, notes) {
+  const user = await getUser(userId);
+  if (!['admin', 'ceo', 'operations', 'logistics', 'supervisor', 'storekeeper'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const qty_n = Number(qty);
+  if (!qty_n || qty_n <= 0) return { ok: false, error: 'Quantity must be greater than zero' };
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const { rows } = await client.query(
+      `select * from stock_transfers where id=$1 and deleted_at is null for update skip locked`,
+      [transferId]
+    );
+    if (!rows.length) { await client.query('rollback'); return { ok: false, error: 'Transfer not found' }; }
+    const tr = rows[0];
+    if (!['approved', 'in_transit'].includes(tr.status)) {
+      await client.query('rollback');
+      return { ok: false, error: `Cannot dispatch: transfer status is "${tr.status}"` };
+    }
+    const remaining = tr.requested_qty - tr.dispatched_qty;
+    if (qty_n > remaining) {
+      await client.query('rollback');
+      return { ok: false, error: `Cannot dispatch ${qty_n} — only ${remaining} remaining to dispatch` };
+    }
+    const { rows: sl } = await client.query(
+      `select quantity from stock_levels where item_id=$1 and warehouse_id=$2`,
+      [tr.item_id, tr.from_warehouse_id]
+    );
+    const available = sl.length ? Number(sl[0].quantity) : 0;
+    if (available < qty_n) {
+      await client.query('rollback');
+      return { ok: false, error: `Insufficient stock at source: ${available} available, ${qty_n} requested` };
+    }
+    await client.query(
+      `insert into stock_movements(item_id, warehouse_id, movement_type, quantity, reference, notes, transfer_id, created_by)
+       values ($1,$2,'transfer_out',$3,$4,$5,$6,$7)`,
+      [tr.item_id, tr.from_warehouse_id, qty_n, reference || null, notes || null, transferId, user.id]
+    );
+    await client.query(
+      `update stock_levels set quantity=greatest(0, quantity-$1), updated_at=now()
+       where item_id=$2 and warehouse_id=$3`,
+      [qty_n, tr.item_id, tr.from_warehouse_id]
+    );
+    await client.query(
+      `update stock_transfers set dispatched_qty=dispatched_qty+$1, status='in_transit' where id=$2`,
+      [qty_n, transferId]
+    );
+    await client.query('commit');
+    logAudit(user, `Transfer #${transferId} dispatch: ${qty_n} units`, 'ti-truck', { transferId, qty_n });
+    return { ok: true };
+  } catch (e) {
+    await client.query('rollback');
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+async function stockTransfersReceive(userId, transferId, qty, notes) {
+  const user = await getUser(userId);
+  if (!['admin', 'ceo', 'operations', 'logistics', 'supervisor', 'storekeeper'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const qty_n = Number(qty);
+  if (!qty_n || qty_n <= 0) return { ok: false, error: 'Quantity must be greater than zero' };
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const { rows } = await client.query(
+      `select * from stock_transfers where id=$1 and deleted_at is null for update skip locked`,
+      [transferId]
+    );
+    if (!rows.length) { await client.query('rollback'); return { ok: false, error: 'Transfer not found' }; }
+    const tr = rows[0];
+    if (!['in_transit', 'partially_received'].includes(tr.status)) {
+      await client.query('rollback');
+      return { ok: false, error: `Cannot receive: transfer status is "${tr.status}"` };
+    }
+    const in_transit = tr.dispatched_qty - tr.received_qty;
+    if (qty_n > in_transit) {
+      await client.query('rollback');
+      return { ok: false, error: `Cannot receive ${qty_n} — only ${in_transit} currently in transit` };
+    }
+    await client.query(
+      `insert into stock_movements(item_id, warehouse_id, movement_type, quantity, notes, transfer_id, created_by)
+       values ($1,$2,'transfer_in',$3,$4,$5,$6)`,
+      [tr.item_id, tr.to_warehouse_id, qty_n, notes || null, transferId, user.id]
+    );
+    await client.query(
+      `insert into stock_levels(item_id, warehouse_id, quantity, updated_at) values ($1,$2,$3,now())
+       on conflict(item_id, warehouse_id) do update set quantity=stock_levels.quantity+$3, updated_at=now()`,
+      [tr.item_id, tr.to_warehouse_id, qty_n]
+    );
+    const new_received = tr.received_qty + qty_n;
+    const new_status = new_received >= tr.requested_qty ? 'completed' : 'partially_received';
+    await client.query(
+      `update stock_transfers set received_qty=received_qty+$1, status=$2 where id=$3`,
+      [qty_n, new_status, transferId]
+    );
+    await client.query('commit');
+    logAudit(user, `Transfer #${transferId} receipt: ${qty_n} units — ${new_status}`, 'ti-package-import', { transferId, qty_n, new_status });
+    return { ok: true, completed: new_status === 'completed' };
   } catch (e) {
     await client.query('rollback');
     throw e;
@@ -4050,6 +4250,11 @@ module.exports = {
   stockMovementsList,
   stockMovementsCreate,
   stockTransferApprove,
+  stockTransfersList,
+  stockTransfersCreate,
+  stockTransfersApproveReject,
+  stockTransfersDispatch,
+  stockTransfersReceive,
   materialRequestsList,
   materialRequestsCreate,
   materialRequestsApprove,
@@ -4241,7 +4446,7 @@ async function machineCategoriesList(userId) {
 
 async function machineCategoriesCreate(userId, payload) {
   const user = await getUser(userId);
-  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  if (!['admin', 'ceo', 'operations', 'logistics'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { name, description, icon } = payload;
   if (!name?.trim()) return { ok: false, error: 'Name is required' };
   await pool.query(
@@ -4273,7 +4478,7 @@ async function machinesList(userId) {
 
 async function machinesCreate(userId, payload) {
   const user = await getUser(userId);
-  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  if (!['admin', 'ceo', 'logistics'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { machine_code, name, category_id, status, production_capacity, capacity_unit,
           fuel_consumption_rate, fuel_type, manufacturer, model_number,
           serial_number, year_manufactured, date_acquired, notes, plate_number, workshop_id } = payload;
@@ -4298,7 +4503,7 @@ async function machinesCreate(userId, payload) {
 
 async function machinesUpdate(userId, machineId, payload) {
   const user = await getUser(userId);
-  if (!(await mustRole(user, 'machines'))) return { ok: false, error: 'Access denied' };
+  if (!['admin', 'ceo', 'logistics'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { name, category_id, status, production_capacity, capacity_unit,
           fuel_consumption_rate, fuel_type, manufacturer, model_number,
           serial_number, year_manufactured, date_acquired, notes, plate_number, workshop_id } = payload;
@@ -4677,7 +4882,7 @@ async function machinesDelete(userId, machineId) {
 
 async function machineCategoriesUpdate(userId, categoryId, payload) {
   const user = await getUser(userId);
-  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  if (!['admin', 'ceo', 'operations', 'logistics'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { name, description, icon } = payload || {};
   if (!name?.trim()) return { ok: false, error: 'Name is required' };
   await pool.query(
@@ -4690,10 +4895,13 @@ async function machineCategoriesUpdate(userId, categoryId, payload) {
 
 async function machineCategoriesDelete(userId, categoryId) {
   const user = await getUser(userId);
-  if (!['admin', 'operations', 'ceo'].includes(user.role)) return { ok: false, error: 'Access denied' };
+  if (!['admin', 'ceo', 'operations', 'logistics'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const { rows } = await pool.query('select count(*) as cnt from machines where category_id=$1 and active=true', [categoryId]);
-  if (Number(rows[0].cnt) > 0) return { ok: false, error: 'Cannot delete: active machines use this category' };
-  await pool.query('delete from machine_categories where id=$1', [categoryId]);
+  if (Number(rows[0].cnt) > 0) return { ok: false, error: 'Cannot delete: active machines are using this category' };
+  // Remove KPI targets and definitions linked to this category before deleting
+  await pool.query(`delete from machine_kpi_targets where kpi_id in (select id from machine_kpi_definitions where category_id=$1)`, [categoryId]);
+  await pool.query(`delete from machine_kpi_definitions where category_id=$1`, [categoryId]);
+  await pool.query(`delete from machine_categories where id=$1`, [categoryId]);
   logAudit(user, `Deleted machine category #${categoryId}`, 'ti-trash', { categoryId });
   return { ok: true };
 }

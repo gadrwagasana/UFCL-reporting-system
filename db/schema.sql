@@ -230,6 +230,7 @@ create table if not exists stock_movements (
   to_warehouse_id bigint references warehouses(id),
   movement_type text not null,
   quantity int not null,
+  unit_cost numeric(14,2),
   reference text,
   notes text,
   approval_status text,
@@ -238,6 +239,27 @@ create table if not exists stock_movements (
   rejection_reason text,
   created_by bigint references app_users(id),
   created_at timestamptz not null default now()
+);
+
+create table if not exists stock_transfers (
+  id bigserial primary key,
+  item_id bigint not null references stock_catalog(id),
+  from_warehouse_id bigint not null references warehouses(id),
+  to_warehouse_id bigint not null references warehouses(id),
+  requested_qty int not null,
+  dispatched_qty int not null default 0,
+  received_qty int not null default 0,
+  status text not null default 'pending',
+  reference text,
+  notes text,
+  requested_by bigint references app_users(id),
+  requested_at timestamptz not null default now(),
+  approved_by bigint references app_users(id),
+  approved_at timestamptz,
+  rejection_reason text,
+  deleted_at timestamptz,
+  deleted_by bigint references app_users(id),
+  deletion_reason text
 );
 
 create table if not exists material_requests (

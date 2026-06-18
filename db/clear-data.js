@@ -22,7 +22,7 @@ async function clearData() {
       await client.query(`ALTER TABLE app_users DROP CONSTRAINT "${rows[0].conname}"`);
     }
 
-    // Truncate all tables except app_users
+    // Truncate all tables except app_users (CASCADE handles FK order automatically)
     await client.query(`
       TRUNCATE
         wk_transfer_items,
@@ -65,13 +65,17 @@ async function clearData() {
         change_requests,
         logistics_items,
         sales_orders,
+        customers,
         daily_logs,
         products,
+        material_requests,
+        deletion_requests,
+        stock_categories,
         notifications_read,
         notifications,
         audit_log,
         role_definitions
-      RESTART IDENTITY
+      RESTART IDENTITY CASCADE
     `);
 
     // Restore the FK constraint (workshop_id is now NULL for all users so it will validate)

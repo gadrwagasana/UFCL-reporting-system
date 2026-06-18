@@ -303,6 +303,34 @@ async function ensureSchema() {
   await pool.query(`alter table delivery_orders add column if not exists rejection_reason text`);
   await pool.query(`alter table delivery_orders add column if not exists pod_recorded_at timestamptz`);
   await pool.query(`alter table delivery_orders add column if not exists pod_recorded_by bigint references app_users(id)`);
+
+  // Stock Transfers — multi-stage transfer workflow
+  await pool.query(`
+    create table if not exists stock_transfers (
+      id bigserial primary key,
+      item_id bigint not null references stock_catalog(id),
+      from_warehouse_id bigint not null references warehouses(id),
+      to_warehouse_id bigint not null references warehouses(id),
+      requested_qty int not null,
+      dispatched_qty int not null default 0,
+      received_qty int not null default 0,
+      status text not null default 'pending',
+      reference text,
+      notes text,
+      requested_by bigint references app_users(id),
+      requested_at timestamptz not null default now(),
+      approved_by bigint references app_users(id),
+      approved_at timestamptz,
+      rejection_reason text,
+      deleted_at timestamptz,
+      deleted_by bigint references app_users(id),
+      deletion_reason text
+    )
+  `);
+  await pool.query(`alter table stock_movements add column if not exists unit_cost numeric(14,2)`);
+  await pool.query(`alter table stock_movements add column if not exists transfer_id bigint references stock_transfers(id)`);
+  await pool.query(`create index if not exists idx_stock_transfers_status on stock_transfers(status) where deleted_at is null`);
+  await pool.query(`create index if not exists idx_stock_mv_transfer on stock_movements(transfer_id) where transfer_id is not null`);
 }
 
 async function seedProductCatalog() {
@@ -483,7 +511,7 @@ async function updateRolePermissions() {
     admin: ['dashboard', 'ceo', 'users', 'audit', 'export', 'notifications', 'changes',
             'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'sales', 'products',
             'inventory', 'logistics', 'logistics-dashboard',
-            'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch',
+            'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'vehicles', 'deliveries', 'dispatch',
             'harvest', 'timber-inventory', 'transport',
             'machines', 'machine-logs', 'machine-kpi',
             'compartments', 'log-transport', 'value-added-timber',
@@ -492,25 +520,25 @@ async function updateRolePermissions() {
     ceo: ['dashboard', 'ceo', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
           'daily-harvest', 'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
           'logistics-dashboard', 'machines', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber',
-          'casual-requests', 'casuals'],
+          'casual-requests', 'casuals', 'stock-transfers'],
     operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
                  'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
-                 'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'transport',
+                 'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'stock-transfers', 'transport',
                  'machines', 'machine-logs', 'machine-kpi',
                  'compartments', 'log-transport', 'value-added-timber',
                  'machine-fuel', 'casual-requests', 'casuals'],
     sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
     finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
     logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
-                'warehouses', 'stock-items', 'stock-movements', 'vehicles', 'deliveries', 'dispatch', 'transport',
+                'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'vehicles', 'deliveries', 'dispatch', 'transport',
                 'machines', 'log-transport', 'machine-fuel'],
     supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
                  'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
                  'machine-logs', 'compartments', 'log-transport', 'value-added-timber',
                  'machine-fuel', 'casual-requests', 'casuals',
-                 'workshop-overview', 'material-requests'],
+                 'workshop-overview', 'material-requests', 'stock-transfers'],
     storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
-                  'warehouses', 'stock-items', 'stock-movements']
+                  'warehouses', 'stock-items', 'stock-movements', 'stock-transfers']
   };
 
   for (const [role, perms] of Object.entries(permissionsByRole)) {

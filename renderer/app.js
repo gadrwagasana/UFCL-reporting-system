@@ -10,6 +10,8 @@ const STORAGE = {
 // Workshop & Stock filter — null = all workshops, number = specific warehouse id
 let WORKSHOP_FILTER = null;
 
+let CURRENT_PAGE = 'dashboard';
+
 function workshopBannerHtml(allWarehouses, userWorkshopId) {
   const wh = allWarehouses || [];
   if (userWorkshopId) {
@@ -63,6 +65,7 @@ const NAV = [
   { id: 'stock-items',        icon: 'ti-package',            label: 'Stock Catalog',        sec: 'Workshop & Stock' },
   { id: 'inventory',          icon: 'ti-stack',              label: 'Inventory',            sec: 'Workshop & Stock' },
   { id: 'stock-movements',    icon: 'ti-arrows-exchange',    label: 'Stock Movements',      sec: 'Workshop & Stock' },
+  { id: 'stock-transfers',    icon: 'ti-arrows-right-left',  label: 'Stock Transfers',       sec: 'Workshop & Stock' },
   { id: 'material-requests',  icon: 'ti-clipboard-list',     label: 'Material Requests',    sec: 'Workshop & Stock' },
 
   // ── Fleet & Machines ──────────────────────────────────────────────
@@ -121,6 +124,7 @@ function show(el, on) {
 }
 
 function setActivePage(id) {
+  CURRENT_PAGE = id;
   document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
   const el = $(`page-${id}`);
   if (el) el.classList.add('active');
@@ -191,7 +195,7 @@ function renderPermissionCheckboxes(selected = []) {
     grpHdr('Workshop & Stock'),
     chk('workshop-overview', 'Workshop Overview'), chk('warehouses', 'Workshops'),
     chk('stock-items', 'Stock Catalog'), chk('inventory', 'Inventory'),
-    chk('stock-movements', 'Stock Movements'), chk('material-requests', 'Material Requests'),
+    chk('stock-movements', 'Stock Movements'), chk('stock-transfers', 'Stock Transfers'), chk('material-requests', 'Material Requests'),
 
     grpHdr('Fleet & Machines'),
     chk('machines', 'Machine Registry'), chk('machine-fuel', 'Fuel Logs (Machines)'),
@@ -651,6 +655,8 @@ async function showPage(id) {
       return renderStockItems();
     case 'stock-movements':
       return renderStockMovements();
+    case 'stock-transfers':
+      return renderStockTransfers();
     case 'material-requests':
       return renderMaterialRequests();
     case 'vehicles':
@@ -4833,13 +4839,15 @@ async function renderStockMovements() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} entr${rows.length!==1?'ies':'y'}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Type</th><th>Qty</th><th>From warehouse</th><th>To warehouse</th><th>Reference</th><th>Recorded by</th><th></th></tr></thead>
+        <thead><tr><th>Date</th><th>Item</th><th>Category</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total Value</th><th>From warehouse</th><th>To warehouse</th><th>Reference</th><th>Recorded by</th><th></th></tr></thead>
         <tbody>${rows.length ? rows.map(r=>`<tr>
           <td style="white-space:nowrap;color:var(--t3);font-size:12px">${r.created_at}</td>
           <td style="font-weight:500">${r.item_name}</td>
           <td><span class="badge bt">${r.category}</span></td>
           <td>${typeBadge(r.movement_type, r.approval_status)}</td>
           <td style="font-family:var(--fm);font-weight:600">${r.quantity} <span style="color:var(--t3);font-weight:400">${r.uom}</span></td>
+          <td style="font-family:var(--fm);color:var(--t3)">${r.unit_cost != null ? Number(r.unit_cost).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
+          <td style="font-family:var(--fm);font-weight:500">${r.unit_cost != null ? Number(r.total_value).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}) : '—'}</td>
           <td>${r.warehouse_name||'—'}</td>
           <td>${r.to_warehouse_name||'—'}</td>
           <td style="font-family:var(--fm);color:var(--t3)">${r.reference||'—'}</td>
@@ -4850,7 +4858,7 @@ async function renderStockMovements() {
                  <button class="bs1 sm-trej" data-id="${r.id}" style="color:var(--red);padding:3px 7px;font-size:11px"><i class="ti ti-x"></i></button>`
               : `<button class="bs1 sm-del" data-id="${r.id}" style="color:var(--red);padding:3px 8px" title="Delete &amp; reverse"><i class="ti ti-trash"></i></button>`}
           </td>
-        </tr>`).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-arrows-exchange" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No movements recorded yet.</td></tr>'}
+        </tr>`).join('') : '<tr><td colspan="12" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-arrows-exchange" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No movements recorded yet.</td></tr>'}
         </tbody>
       </table></div>
     </div>`;
@@ -4896,7 +4904,7 @@ async function renderStockMovements() {
   });
 
   $('smAdd').onclick = () => {
-    const itemOpts = items.map(i=>`<option value="${i.id}">${i.name} (${i.category}) — stock: ${i.total_stock} ${i.uom}</option>`).join('');
+    const itemOpts = items.map(i=>`<option value="${i.id}" data-cost="${i.default_unit_cost||0}">${i.name} (${i.category}) — stock: ${i.total_stock} ${i.uom}</option>`).join('');
     const whOpts = warehouses.map(w=>`<option value="${w.id}">${w.name}</option>`).join('');
     openOverlay('Record stock movement', null, `
       <div class="frow">
@@ -4913,10 +4921,11 @@ async function renderStockMovements() {
       </div>
       <div class="frow">
         <div class="fg"><label>Quantity *</label><input id="sm-qty" type="number" min="1" placeholder="0"></div>
-        <div class="fg"><label>Warehouse</label><select id="sm-wh">${whOpts||'<option value="">No warehouses</option>'}</select></div>
+        <div class="fg"><label>Unit Price</label><input id="sm-cost" type="number" min="0" step="0.01" placeholder="Price per unit"></div>
         <div class="fg sm-towh-row"><label>To warehouse (transfer)</label><select id="sm-towh">${whOpts||'<option value="">No warehouses</option>'}</select></div>
       </div>
       <div class="frow">
+        <div class="fg"><label>Warehouse</label><select id="sm-wh">${whOpts||'<option value="">No warehouses</option>'}</select></div>
         <div class="fg"><label>Reference</label><input id="sm-ref" type="text" placeholder="PO#, invoice, etc."></div>
         <div class="fg"><label>Notes</label><input id="sm-notes" type="text"></div>
       </div>
@@ -4925,6 +4934,7 @@ async function renderStockMovements() {
         item_id: $('sm-item').value,
         movement_type: $('sm-type').value,
         quantity: $('sm-qty').value,
+        unit_cost: $('sm-cost').value || null,
         warehouse_id: $('sm-wh').value || null,
         to_warehouse_id: $('sm-towh').value || null,
         reference: $('sm-ref').value.trim(),
@@ -4934,9 +4944,194 @@ async function renderStockMovements() {
       showOverlaySuccess('Movement recorded.');
       await renderStockMovements();
     });
+    // Auto-fill unit price from catalog when item changes
+    const smItem = $('sm-item');
+    const smCost = $('sm-cost');
+    if (smItem && smCost) {
+      const fillCost = () => {
+        const opt = smItem.options[smItem.selectedIndex];
+        if (opt) smCost.value = opt.dataset.cost || '';
+      };
+      fillCost();
+      smItem.onchange = fillCost;
+    }
   };
   bindWorkshopBanner(renderStockMovements);
   await insertDeletionPanel($('page-stock-movements'), ['stock_movement'], renderStockMovements);
+}
+
+// ── Stock Transfers ───────────────────────────────────────────────────────────
+
+async function renderStockTransfers() {
+  const res = await UFCL.stockTransfersList(STORAGE.user.id, WORKSHOP_FILTER);
+  if (!res.ok) return renderDenied('stock-transfers', res.error);
+  const rows = res.rows || [];
+  const items = res.items || [];
+  const warehouses = res.warehouses || [];
+
+  const canApprove = ['admin', 'ceo', 'operations', 'logistics'].includes(STORAGE.user?.role);
+  const canAct = ['admin', 'ceo', 'operations', 'logistics', 'supervisor', 'storekeeper'].includes(STORAGE.user?.role);
+
+  const statusBadge = (s) => {
+    const map = { pending: 'ba', approved: 'bg', in_transit: 'bp', partially_received: 'ba', completed: 'bg', rejected: 'br', cancelled: 'br' };
+    const labels = { pending: 'Pending', approved: 'Approved', in_transit: 'In Transit', partially_received: 'Partial', completed: 'Completed', rejected: 'Rejected', cancelled: 'Cancelled' };
+    return `<span class="badge ${map[s] || 'bt'}">${labels[s] || s}</span>`;
+  };
+
+  const progressBar = (dispatched, received, requested) => {
+    const dispPct = Math.min(100, Math.round((dispatched / requested) * 100));
+    const recvPct = Math.min(100, Math.round((received / requested) * 100));
+    return `
+      <div style="font-size:11px;color:var(--t3);margin-bottom:2px">
+        <span style="color:var(--t2)">Dispatched:</span> ${dispatched}/${requested}
+        &nbsp;|&nbsp;
+        <span style="color:var(--t2)">Received:</span> ${received}/${requested}
+      </div>
+      <div style="background:var(--bdr);border-radius:3px;height:5px;position:relative;overflow:hidden;width:100%;min-width:80px">
+        <div style="background:var(--g-soft);opacity:.45;position:absolute;left:0;top:0;height:100%;width:${dispPct}%"></div>
+        <div style="background:var(--g-dark);position:absolute;left:0;top:0;height:100%;width:${recvPct}%"></div>
+      </div>`;
+  };
+
+  $('page-stock-transfers').innerHTML = `
+    ${workshopBannerHtml(res.warehouses, res.user_workshop_id)}
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:1.5rem">
+      <div>
+        <div class="ptitle">Stock Transfers</div>
+        <div class="psub">Move stock between workshops. Each transfer goes through Request → Approval → Dispatch → Receipt before completion.</div>
+      </div>
+      ${canAct ? `<button class="bp1" id="stAdd" style="flex-shrink:0;white-space:nowrap"><i class="ti ti-plus"></i>New transfer request</button>` : ''}
+    </div>
+    <div class="cards" style="margin-bottom:1.25rem">
+      <div class="mc"><div class="mclbl">Total</div><div class="mcval">${rows.length}</div><div class="mcsub cg"><i class="ti ti-arrows-right-left"></i>all time</div></div>
+      <div class="mc"><div class="mclbl">Pending Approval</div><div class="mcval">${rows.filter(r=>r.status==='pending').length}</div><div class="mcsub ca"><i class="ti ti-clock"></i>awaiting review</div></div>
+      <div class="mc"><div class="mclbl">In Transit</div><div class="mcval">${rows.filter(r=>['approved','in_transit','partially_received'].includes(r.status)).length}</div><div class="mcsub cp"><i class="ti ti-truck"></i>active</div></div>
+      <div class="mc"><div class="mclbl">Completed</div><div class="mcval">${rows.filter(r=>r.status==='completed').length}</div><div class="mcsub cg"><i class="ti ti-circle-check"></i>fulfilled</div></div>
+    </div>
+    <div class="card" style="padding:0">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--bdr)">
+        <h3 style="margin:0"><i class="ti ti-arrows-right-left"></i>Transfer log</h3>
+        <span style="font-size:12px;color:var(--t3)">${rows.length} entr${rows.length!==1?'ies':'y'}</span>
+      </div>
+      <div class="tw"><table class="dt">
+        <thead><tr><th>Ref / Date</th><th>Item</th><th>From</th><th>To</th><th>Qty</th><th>Progress</th><th>Status</th><th>Requested by</th><th></th></tr></thead>
+        <tbody>${rows.length ? rows.map(r => `<tr>
+          <td style="white-space:nowrap">
+            <div style="font-family:var(--fm);font-size:12px;color:var(--t3)">${r.reference || '—'}</div>
+            <div style="font-size:11px;color:var(--t3)">${r.requested_at}</div>
+          </td>
+          <td style="font-weight:500">${r.item_name}<div style="font-size:11px;color:var(--t3)">${r.category}</div></td>
+          <td>${r.from_warehouse_name}</td>
+          <td>${r.to_warehouse_name}</td>
+          <td style="font-family:var(--fm);font-weight:600">${r.requested_qty} <span style="color:var(--t3);font-weight:400">${r.uom}</span></td>
+          <td style="min-width:130px">${progressBar(r.dispatched_qty, r.received_qty, r.requested_qty)}</td>
+          <td>${statusBadge(r.status)}${r.status==='rejected'&&r.rejection_reason?`<div style="font-size:11px;color:var(--red);margin-top:2px">${r.rejection_reason}</div>`:''}</td>
+          <td style="font-size:12px;color:var(--t3)">${r.requested_by||'—'}</td>
+          <td style="white-space:nowrap">
+            ${canApprove && r.status==='pending' ? `
+              <button class="bs1 st-approve" data-id="${r.id}" style="color:var(--green);padding:3px 7px;font-size:11px" title="Approve"><i class="ti ti-check"></i></button>
+              <button class="bs1 st-reject" data-id="${r.id}" style="color:var(--red);padding:3px 7px;font-size:11px" title="Reject"><i class="ti ti-x"></i></button>
+            ` : ''}
+            ${canAct && ['approved','in_transit'].includes(r.status) && r.dispatched_qty < r.requested_qty ? `
+              <button class="bs1 st-dispatch" data-id="${r.id}" data-remaining="${r.requested_qty - r.dispatched_qty}" data-item="${r.item_name}" data-uom="${r.uom}" style="color:var(--purple);padding:3px 7px;font-size:11px" title="Record Dispatch"><i class="ti ti-truck"></i></button>
+            ` : ''}
+            ${canAct && ['in_transit','partially_received'].includes(r.status) && r.received_qty < r.dispatched_qty ? `
+              <button class="bs1 st-receive" data-id="${r.id}" data-intransit="${r.dispatched_qty - r.received_qty}" data-item="${r.item_name}" data-uom="${r.uom}" style="color:var(--green);padding:3px 7px;font-size:11px" title="Record Receipt"><i class="ti ti-package-import"></i></button>
+            ` : ''}
+          </td>
+        </tr>`).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-arrows-right-left" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No transfers recorded yet.</td></tr>'}
+        </tbody>
+      </table></div>
+    </div>`;
+
+  if ($('stAdd')) {
+    $('stAdd').onclick = () => {
+      const itemOpts = items.map(i => `<option value="${i.id}">${i.name} (${i.category}) — stock: ${i.total_stock} ${i.uom}</option>`).join('');
+      const whOpts = warehouses.map(w => `<option value="${w.id}">${w.name}</option>`).join('');
+      openOverlay('New Transfer Request', 'Request will be sent for approval before dispatch', `
+        <div class="fg"><label>Item *</label><select id="st-item">${itemOpts || '<option>No items</option>'}</select></div>
+        <div class="frow">
+          <div class="fg"><label>From warehouse *</label><select id="st-from">${whOpts || '<option value="">No warehouses</option>'}</select></div>
+          <div class="fg"><label>To warehouse *</label><select id="st-to">${whOpts || '<option value="">No warehouses</option>'}</select></div>
+        </div>
+        <div class="frow">
+          <div class="fg"><label>Quantity *</label><input id="st-qty" type="number" min="1" placeholder="0"></div>
+          <div class="fg"><label>Reference</label><input id="st-ref" type="text" placeholder="PO#, transfer ref…"></div>
+        </div>
+        <div class="fg"><label>Notes</label><input id="st-notes" type="text"></div>
+        <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Submit request</button><button class="bs1" id="ovCancel">Cancel</button></div>
+      `, async () => {
+        if (Number($('st-from').value) === Number($('st-to').value)) { showOverlayError('Source and destination warehouses must be different'); return; }
+        const r2 = await UFCL.stockTransfersCreate(STORAGE.user.id, {
+          item_id: $('st-item').value,
+          from_warehouse_id: $('st-from').value,
+          to_warehouse_id: $('st-to').value,
+          requested_qty: $('st-qty').value,
+          reference: $('st-ref').value.trim(),
+          notes: $('st-notes').value.trim()
+        });
+        if (!r2.ok) { showOverlayError(r2.error); return; }
+        showOverlaySuccess('Transfer request submitted.');
+        await renderStockTransfers();
+      });
+    };
+  }
+
+  document.querySelectorAll('.st-approve').forEach(btn => {
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const r2 = await UFCL.stockTransfersApprove(STORAGE.user.id, Number(btn.dataset.id), 'approve', null);
+      if (!r2.ok) { showOverlayError(r2.error); btn.disabled = false; return; }
+      showOverlaySuccess('Transfer approved.');
+      await renderStockTransfers();
+    };
+  });
+
+  document.querySelectorAll('.st-reject').forEach(btn => {
+    btn.onclick = () => openOverlay('Reject Transfer', null, `
+      <div class="fg"><label>Reason for rejection</label><input id="st-rej-reason" type="text" placeholder="Optional reason"></div>
+      <div class="brow"><button class="bp1" id="ovSave" style="background:var(--red)"><i class="ti ti-x"></i>Reject</button><button class="bs1" id="ovCancel">Cancel</button></div>
+    `, async () => {
+      const r2 = await UFCL.stockTransfersApprove(STORAGE.user.id, Number(btn.dataset.id), 'reject', $('st-rej-reason').value.trim());
+      if (!r2.ok) { showOverlayError(r2.error); return; }
+      showOverlaySuccess('Transfer rejected.');
+      await renderStockTransfers();
+    });
+  });
+
+  document.querySelectorAll('.st-dispatch').forEach(btn => {
+    btn.onclick = () => openOverlay('Record Dispatch', `Dispatching: ${btn.dataset.item}`, `
+      <div class="frow">
+        <div class="fg"><label>Quantity to dispatch *</label><input id="st-dqty" type="number" min="1" max="${btn.dataset.remaining}" placeholder="Max: ${btn.dataset.remaining} ${btn.dataset.uom}"></div>
+        <div class="fg"><label>Reference</label><input id="st-dref" type="text" placeholder="Waybill, note…"></div>
+      </div>
+      <div class="fg"><label>Notes</label><input id="st-dnotes" type="text"></div>
+      <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-truck"></i>Confirm dispatch</button><button class="bs1" id="ovCancel">Cancel</button></div>
+    `, async () => {
+      const r2 = await UFCL.stockTransfersDispatch(STORAGE.user.id, Number(btn.dataset.id), $('st-dqty').value, $('st-dref').value.trim(), $('st-dnotes').value.trim());
+      if (!r2.ok) { showOverlayError(r2.error); return; }
+      showOverlaySuccess('Dispatch recorded — stock deducted from source.');
+      await renderStockTransfers();
+    });
+  });
+
+  document.querySelectorAll('.st-receive').forEach(btn => {
+    btn.onclick = () => openOverlay('Record Receipt', `Receiving: ${btn.dataset.item}`, `
+      <div class="frow">
+        <div class="fg"><label>Quantity received *</label><input id="st-rqty" type="number" min="1" max="${btn.dataset.intransit}" placeholder="Max: ${btn.dataset.intransit} ${btn.dataset.uom}"></div>
+        <div class="fg"><label>In transit</label><input type="text" value="${btn.dataset.intransit} ${btn.dataset.uom}" disabled style="background:var(--bg2);color:var(--t3)"></div>
+      </div>
+      <div class="fg"><label>Notes</label><input id="st-rnotes" type="text"></div>
+      <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-package-import"></i>Confirm receipt</button><button class="bs1" id="ovCancel">Cancel</button></div>
+    `, async () => {
+      const r2 = await UFCL.stockTransfersReceive(STORAGE.user.id, Number(btn.dataset.id), $('st-rqty').value, $('st-rnotes').value.trim());
+      if (!r2.ok) { showOverlayError(r2.error); return; }
+      showOverlaySuccess(r2.completed ? 'Transfer completed — all items received.' : 'Receipt recorded — stock added to destination.');
+      await renderStockTransfers();
+    });
+  });
+
+  bindWorkshopBanner(renderStockTransfers);
 }
 
 // ── Material Requests ─────────────────────────────────────────────────────────
@@ -6483,7 +6678,8 @@ async function renderMachines() {
   const rows = res.rows || [];
   const categories = res.categories || [];
   const workshops = res.workshops || [];
-  const canManage = ['admin', 'operations', 'ceo', 'logistics'].includes(STORAGE.user?.role);
+  const canManageCats = ['admin', 'ceo', 'operations', 'logistics'].includes(STORAGE.user?.role);
+  const canRegister   = ['admin', 'ceo', 'logistics'].includes(STORAGE.user?.role);
 
   const statusCls = s => ({ Available:'bg', Running:'bb', Maintenance:'ba', Breakdown:'br' }[s] || 'bt');
   const byStatus = s => rows.filter(r => r.status === s).length;
@@ -6497,10 +6693,10 @@ async function renderMachines() {
         <div class="ptitle">Machine Registry</div>
         <div class="psub">Manage machine profiles, specifications, operational status, and maintenance schedules.</div>
       </div>
-      ${canManage ? `
+      ${(canManageCats || canRegister) ? `
         <div style="display:flex;gap:.5rem;flex-shrink:0">
-          <button class="bs1" id="mchManageCats" style="white-space:nowrap"><i class="ti ti-tag"></i>Manage categories</button>
-          <button class="bp1" id="mchAdd" style="white-space:nowrap"><i class="ti ti-plus"></i>Register machine</button>
+          ${canManageCats ? `<button class="bs1" id="mchManageCats" style="white-space:nowrap"><i class="ti ti-tag"></i>Manage categories</button>` : ''}
+          ${canRegister ? `<button class="bp1" id="mchAdd" style="white-space:nowrap"><i class="ti ti-plus"></i>Register machine</button>` : ''}
         </div>` : ''}
     </div>
     <div class="cards" style="margin-bottom:1.25rem">
@@ -6515,7 +6711,7 @@ async function renderMachines() {
         <span style="font-size:12px;color:var(--t3)">${rows.length} machine${rows.length!==1?'s':''}</span>
       </div>
       <div class="tw"><table class="dt">
-        <thead><tr><th>Code</th><th>Name</th><th>Plate/Fleet No.</th><th>Category</th><th>Workshop</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canManage?'<th>Actions</th>':''}</tr></thead>
+        <thead><tr><th>Code</th><th>Name</th><th>Plate/Fleet No.</th><th>Category</th><th>Workshop</th><th>Status</th><th>Capacity</th><th>Fuel Rate</th><th>Next Maintenance</th>${canRegister?'<th>Actions</th>':''}</tr></thead>
         <tbody>${rows.length ? rows.map(r => `<tr>
           <td style="font-family:var(--fm);font-weight:600">${r.machine_code}</td>
           <td style="font-weight:500">${r.name}</td>
@@ -6528,12 +6724,12 @@ async function renderMachines() {
           <td style="${r.next_maintenance && new Date(r.next_maintenance) <= new Date() ? 'color:var(--red);font-weight:600' : 'color:var(--t3)'}">
             ${r.next_maintenance ? new Date(r.next_maintenance).toLocaleDateString('en-GB') : '—'}
           </td>
-          ${canManage ? `<td style="white-space:nowrap">
+          ${canRegister ? `<td style="white-space:nowrap">
             <button class="bs1 mch-edit" data-id="${r.id}" style="margin-right:4px"><i class="ti ti-edit"></i>Edit</button>
             <button class="bs1 mch-maint" data-id="${r.id}" title="Maintenance schedules"><i class="ti ti-calendar"></i></button>
           </td>` : ''}
         </tr>`).join('')
-        : `<tr><td colspan="${canManage?10:9}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
+        : `<tr><td colspan="${canRegister?10:9}" style="text-align:center;color:var(--t3);padding:3rem"><i class="ti ti-settings-2" style="font-size:2rem;display:block;margin-bottom:.5rem;opacity:.35"></i>No machines registered yet.</td></tr>`}
         </tbody>
       </table></div>
     </div>`;
@@ -6562,7 +6758,7 @@ async function renderMachines() {
       </div>
       <div class="frow">
         <div class="fg"><label>Fuel Consumption (L/hr)</label><input id="mch-fuel" type="number" min="0" step="0.1" value="${r?r.fuel_consumption_rate:0}"></div>
-        <div class="fg"><label>Fuel Type</label><input id="mch-fueltype" type="text" value="${r?r.fuel_type||'':''}" placeholder="Diesel / Petrol"></div>
+        <div class="fg"><label>Fuel Type</label><select id="mch-fueltype"><option value="">— Select fuel type —</option>${['Diesel','Petroleum/Essence','DAT','Petrol','Chain Oil','Engine Oil'].map(f=>`<option value="${f}" ${r&&r.fuel_type===f?'selected':''}>${f}</option>`).join('')}</select></div>
       </div>
       <div class="frow">
         <div class="fg"><label>Manufacturer</label><input id="mch-mfg" type="text" value="${r?r.manufacturer||'':''}"></div>
@@ -6579,8 +6775,8 @@ async function renderMachines() {
       <div class="brow"><button class="bp1" id="ovSave"><i class="ti ti-check"></i>Save</button><button class="bs1" id="ovCancel">Cancel</button></div>`;
   }
 
-  if (canManage) {
-    $('mchAdd').onclick = () => openOverlay('Register machine', null, machineForm(null), async () => {
+  if (canRegister || canManageCats) {
+    if ($('mchAdd')) $('mchAdd').onclick = () => openOverlay('Register machine', null, machineForm(null), async () => {
       const r2 = await UFCL.machinesCreate(STORAGE.user.id, {
         machine_code: $('mch-code').value.trim(),
         name: $('mch-name').value.trim(),
@@ -6604,7 +6800,7 @@ async function renderMachines() {
       await renderMachines();
     });
 
-    $('mchManageCats')?.addEventListener('click', async () => {
+    if ($('mchManageCats')) $('mchManageCats').onclick = async () => {
       async function loadCats() {
         const res = await UFCL.machineCategoriesList(STORAGE.user.id);
         return res.ok ? (res.rows || []) : [];
@@ -6612,51 +6808,29 @@ async function renderMachines() {
 
       function catRows(cats) {
         return cats.length
-          ? cats.map(c => `<tr data-id="${c.id}">
+          ? cats.map(c => `<tr>
               <td style="font-weight:500">${c.name}</td>
               <td style="color:var(--t3);font-size:12px">${c.description || '—'}</td>
               <td style="white-space:nowrap">
-                <button class="bs1 mcat-edit" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-desc="${(c.description||'').replace(/"/g,'&quot;')}" style="margin-right:4px;padding:4px 8px;font-size:12px"><i class="ti ti-edit"></i></button>
-                <button class="bs1 mcat-del" data-id="${c.id}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-trash"></i></button>
+                <button class="bs1 mcat-edit" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" data-desc="${(c.description||'').replace(/"/g,'&quot;')}" style="margin-right:4px;padding:4px 8px;font-size:12px"><i class="ti ti-edit"></i>Edit</button>
+                <button class="bs1 mcat-del" data-id="${c.id}" data-name="${c.name.replace(/"/g,'&quot;')}" style="color:var(--red);padding:4px 8px;font-size:12px"><i class="ti ti-trash"></i>Delete</button>
               </td>
             </tr>`).join('')
-          : `<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:1rem">No categories yet.</td></tr>`;
-      }
-
-      const cats = await loadCats();
-      openOverlay('Manage machine categories', 'Add, rename, or remove categories used when registering machines.', `
-        <div class="tw" style="margin-bottom:1.25rem"><table class="dt" style="min-width:0">
-          <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
-          <tbody id="mcat-tbody">${catRows(cats)}</tbody>
-        </table></div>
-        <div id="mcat-edit-area"></div>
-        <div style="border-top:1px solid var(--bdr);padding-top:1rem">
-          <div style="font-weight:600;font-size:13px;margin-bottom:.625rem">Add new category</div>
-          <div class="frow" style="gap:.625rem">
-            <div class="fg" style="flex:2"><label>Category name *</label><input id="mcat-new-name" type="text" placeholder="e.g. Excavator, Bulldozer"></div>
-            <div class="fg" style="flex:3"><label>Description</label><input id="mcat-new-desc" type="text" placeholder="Optional description"></div>
-            <button class="bp1" id="mcat-add-btn" style="flex-shrink:0;align-self:flex-end;margin-bottom:0"><i class="ti ti-plus"></i>Add</button>
-          </div>
-        </div>
-        <div class="brow"><button class="bs1" id="ovCancel">Close</button></div>`,
-        async () => {}
-      );
-
-      async function rebindCatTable() {
-        const updated = await loadCats();
-        const tbody = $('mcat-tbody');
-        if (tbody) tbody.innerHTML = catRows(updated);
-        bindCatActions();
-        renderMachines();
+          : `<tr><td colspan="3" style="text-align:center;color:var(--t3);padding:1rem">No categories yet. Add one below.</td></tr>`;
       }
 
       function bindCatActions() {
         document.querySelectorAll('.mcat-del').forEach(btn => {
           btn.onclick = async () => {
-            if (!confirm('Delete this category? This will fail if machines are using it.')) return;
-            const r2 = await UFCL.machineCategoriesDelete(STORAGE.user.id, Number(btn.dataset.id));
-            if (!r2.ok) { showOverlayError(r2.error); return; }
-            await rebindCatTable();
+            btn.disabled = true;
+            try {
+              const r2 = await UFCL.machineCategoriesDelete(STORAGE.user.id, Number(btn.dataset.id));
+              if (!r2.ok) { showOverlayError(r2.error); btn.disabled = false; return; }
+              await openCatOverlay();
+            } catch (e) {
+              showOverlayError(e?.message || 'Delete failed');
+              btn.disabled = false;
+            }
           };
         });
 
@@ -6674,8 +6848,8 @@ async function renderMachines() {
                   <button class="bs1" id="mcat-cancel-edit" style="flex-shrink:0;align-self:flex-end;margin-bottom:0">Cancel</button>
                 </div>
               </div>`;
-            $('mcat-cancel-edit')?.addEventListener('click', () => { editArea.innerHTML = ''; });
-            $('mcat-save-btn')?.addEventListener('click', async () => {
+            $('mcat-cancel-edit').onclick = () => { editArea.innerHTML = ''; };
+            $('mcat-save-btn').onclick = async () => {
               const catId = Number($('mcat-save-btn').dataset.id);
               const r2 = await UFCL.machineCategoriesUpdate(STORAGE.user.id, catId, {
                 name: $('mcat-edit-name').value.trim(),
@@ -6683,31 +6857,53 @@ async function renderMachines() {
               });
               if (!r2.ok) { showOverlayError(r2.error); return; }
               editArea.innerHTML = '';
-              await rebindCatTable();
-            });
+              await openCatOverlay();
+            };
           };
         });
       }
 
-      $('mcat-add-btn')?.addEventListener('click', async () => {
-        const name = $('mcat-new-name')?.value?.trim();
-        if (!name) { showOverlayError('Category name is required'); return; }
-        const r2 = await UFCL.machineCategoriesCreate(STORAGE.user.id, {
-          name,
-          description: $('mcat-new-desc')?.value?.trim() || null
-        });
-        if (!r2.ok) { showOverlayError(r2.error); return; }
-        if ($('mcat-new-name')) $('mcat-new-name').value = '';
-        if ($('mcat-new-desc')) $('mcat-new-desc').value = '';
-        await rebindCatTable();
-      });
+      async function openCatOverlay() {
+        const cats = await loadCats();
+        openOverlay('Manage machine categories', 'Add, rename, or remove categories used when registering machines.', `
+          <div class="tw" style="margin-bottom:1.25rem"><table class="dt" style="min-width:0">
+            <thead><tr><th>Name</th><th>Description</th><th></th></tr></thead>
+            <tbody id="mcat-tbody">${catRows(cats)}</tbody>
+          </table></div>
+          <div id="mcat-edit-area"></div>
+          <div style="border-top:1px solid var(--bdr);padding-top:1rem">
+            <div style="font-weight:600;font-size:13px;margin-bottom:.625rem">Add new category</div>
+            <div class="frow" style="gap:.625rem">
+              <div class="fg" style="flex:2"><label>Category name *</label><input id="mcat-new-name" type="text" placeholder="e.g. Excavator, Bulldozer"></div>
+              <div class="fg" style="flex:3"><label>Description</label><input id="mcat-new-desc" type="text" placeholder="Optional description"></div>
+              <button class="bp1" id="mcat-add-btn" style="flex-shrink:0;align-self:flex-end;margin-bottom:0"><i class="ti ti-plus"></i>Add</button>
+            </div>
+          </div>
+          <div class="brow"><button class="bs1" id="ovCancel">Close</button></div>`,
+          async () => {}
+        );
+        $('mcat-add-btn').onclick = async () => {
+          const name = $('mcat-new-name').value.trim();
+          if (!name) { showOverlayError('Category name is required'); return; }
+          const r2 = await UFCL.machineCategoriesCreate(STORAGE.user.id, {
+            name,
+            description: $('mcat-new-desc').value.trim() || null
+          });
+          if (!r2.ok) { showOverlayError(r2.error); return; }
+          $('mcat-new-name').value = '';
+          $('mcat-new-desc').value = '';
+          await openCatOverlay();
+        };
+        bindCatActions();
+        renderMachines();
+      }
 
-      bindCatActions();
-    });
+      await openCatOverlay();
+    };
 
     document.querySelectorAll('.mch-edit').forEach(btn => {
       btn.onclick = () => {
-        const row = rows.find(r => r.id === btn.dataset.id);
+        const row = rows.find(r => String(r.id) === btn.dataset.id);
         if (!row) return;
         openOverlay('Edit machine', row.machine_code + ' — ' + row.name, machineForm(row), async () => {
           const r2 = await UFCL.machinesUpdate(STORAGE.user.id, row.id, {
@@ -6736,7 +6932,7 @@ async function renderMachines() {
 
     document.querySelectorAll('.mch-maint').forEach(btn => {
       btn.onclick = async () => {
-        const row = rows.find(r => r.id === btn.dataset.id);
+        const row = rows.find(r => String(r.id) === btn.dataset.id);
         if (!row) return;
         const mr = await UFCL.machineMaintList(STORAGE.user.id, row.id);
         const schedules = mr.ok ? (mr.rows || []) : [];
@@ -8929,6 +9125,7 @@ function wireTopbar() {
     $('upass').value = '';
   };
   $('notifBtn').onclick = () => showPage('notifications');
+  $('refreshBtn').onclick = () => showPage(CURRENT_PAGE);
 
   const sidebar = $('sidebar');
   const toggleBtn = $('sidebarToggle');
