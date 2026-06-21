@@ -85,6 +85,11 @@ function refreshStockView() {
   pool.query('refresh materialized view concurrently mv_stock_summary').catch(() => {});
 }
 
+// Also refresh the per-workshop view (non-concurrent; no unique index needed)
+function refreshStockByWorkshop() {
+  pool.query('refresh materialized view mv_stock_by_workshop').catch(() => {});
+}
+
 const ROLE_PAGES = {
   admin: ['dashboard', 'users', 'audit', 'export', 'notifications', 'changes',
           'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'value-added-timber', 'machine-logs',
@@ -146,7 +151,12 @@ async function getUser(userId) {
   const cached = _userCache.get(userId);
   if (cached && cached.expiresAt > now) return cached.user;
   const { rows } = await pool.query(
-    'select id, username, name, role, department, user_permissions, user_responsibilities, active, workshop_id from app_users where id=$1',
+    `select u.id, u.username, u.name, u.role, u.department, u.user_permissions,
+            u.user_responsibilities, u.active, u.workshop_id,
+            w.name as workshop_name
+     from app_users u
+     left join warehouses w on w.id = u.workshop_id
+     where u.id = $1`,
     [userId]
   );
   if (!rows.length) throw new Error('User not found');
@@ -266,26 +276,32 @@ async function rolesUpdate(userId, role, payload) {
   return { ok: true };
 }
 
-async function dailyList(userId) {
+async function dailyList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await canAccessDaily(user))) return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const [{ rows }, { rows: stockRows }, { rows: transportRows }] = await Promise.all([
     pool.query(
       `select id, to_char(log_date,'DD/MM/YYYY') as date, machine, product_size,
               timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
               timber_waste, poles_units, poles_waste, downtime_hours, logs_received,
-              supervisor, remarks, created_at, pending_deletion
+              supervisor, operators, remarks, created_at, pending_deletion
        from daily_logs
        where deleted_at is null
+         and ($1::bigint is null or workshop_id = $1 or workshop_id is null)
        order by log_date desc, id desc
-       limit 50`
+       limit 50`,
+      [wId]
     ),
     pool.query('select * from mv_stock_summary'),
     pool.query(
       `select
          coalesce(sum(case when transport_date = current_date then qty_transported else 0 end),0)::int as today_transported,
          coalesce(sum(case when extract(year from transport_date) = extract(year from now()) then qty_transported else 0 end),0)::int as annual_transported
-       from log_transport`
+       from log_transport
+       where ($1::bigint is null or workshop_id = $1 or workshop_id is null)`,
+      [wId]
     )
   ]);
   const tr = transportRows[0] || {};
@@ -300,16 +316,34 @@ async function dailyList(userId) {
   };
 }
 
+async function productionStaffList(userId) {
+  const user = await getUser(userId);
+  if (!(await canAccessDaily(user))) return { ok: false, error: 'Access denied' };
+  const { rows } = await pool.query(
+    `select id, name, role from app_users
+     where role in ('supervisor','sawmill-leader','poles-leader','vat-leader','mechanician','harvesting-leader')
+       and active = true and deleted_at is null
+     order by role, name`
+  );
+  return { ok: true, rows };
+}
+
 async function dailyCreate(userId, payload) {
   const user = await getUser(userId);
   if (!(await canAccessDaily(user))) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.date) return { ok: false, error: 'Date is required' };
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   const logsReceived = Number(p.logs_received || 0);
   if (logsReceived > 0) {
+    // Scope the log-transport validation to the same workshop so Gatare and Nyanza
+    // transport counts don't bleed into each other. Legacy NULL-workshop records count for all.
     const { rows: [lt] } = await pool.query(
-      `select coalesce(sum(qty_transported),0)::int as transported from log_transport where transport_date=$1`,
-      [p.date]
+      `select coalesce(sum(qty_transported),0)::int as transported
+       from log_transport
+       where transport_date=$1
+         and ($2::bigint is null or workshop_id = $2 or workshop_id is null)`,
+      [p.date, workshopId]
     );
     const transported = Number(lt?.transported || 0);
     if (transported === 0) return { ok: false, error: `No logs were transported on ${p.date}. Record a Log Transport entry first.` };
@@ -319,31 +353,63 @@ async function dailyCreate(userId, payload) {
   const ccaTreated  = Number(p.timber_cca_treated || 0);
   const untreated   = Number(p.timber_untreated   || 0);
   const timberTotal = kilnDried + ccaTreated + untreated || Number(p.timber_units || 0);
+
+  if (timberTotal > 0 && !p.machine) return { ok: false, error: 'Machine is required for timber production entries' };
+
+  const polesUnits = Number(p.poles_units || 0);
+  const polesWaste = Number(p.poles_waste || 0);
+  if (polesUnits > 0) {
+    // Validate against approved poles stock — only when the delivery system has been used for this workshop
+    const { rows: [avail] } = await pool.query(
+      `select
+         coalesce(sum(case when status='quality_checked' then approved_qty else 0 end),0)::int as approved_total
+       from poles_deliveries
+       where ($1::bigint is null or workshop_id = $1)`,
+      [workshopId]
+    );
+    const approvedTotal = Number(avail.approved_total);
+    if (approvedTotal > 0) {
+      const { rows: [used] } = await pool.query(
+        `select coalesce(sum(poles_units + poles_waste),0)::int as produced_total
+         from daily_logs
+         where deleted_at is null and ($1::bigint is null or workshop_id = $1 or workshop_id is null)`,
+        [workshopId]
+      );
+      const available = Math.max(0, approvedTotal - Number(used.produced_total));
+      if (polesUnits + polesWaste > available) {
+        return { ok: false, error: `Insufficient approved pole stock: ${available} available, ${polesUnits + polesWaste} needed. Record a delivery and complete a quality check first.` };
+      }
+    }
+  }
+
   await pool.query(
-    `insert into daily_logs(log_date, supervisor, timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
-                            timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, product_size, machine, logs_received, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+    `insert into daily_logs(log_date, supervisor, operators, timber_units, timber_kiln_dried, timber_cca_treated, timber_untreated,
+                            timber_waste, poles_units, poles_waste, downtime_hours, downtime_reason, remarks, product_size, machine, logs_received, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
     [
       p.date,
-      p.supervisor || user.name,
+      p.supervisor || null,
+      p.operators  || null,
       timberTotal,
       kilnDried,
       ccaTreated,
       untreated,
       Number(p.timber_waste || 0),
-      Number(p.poles_units  || 0),
-      Number(p.poles_waste  || 0),
+      polesUnits,
+      polesWaste,
       Number(p.downtime_hours || 0),
       p.downtime_reason || null,
       p.remarks || null,
       p.product_size || null,
       p.machine || null,
       Number(p.logs_received || 0),
-      user.id
+      user.id,
+      workshopId
     ]
   );
-  logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date, timber: timberTotal, poles: Number(p.poles_units || 0) });
+  logAudit(user, `Created daily log for ${p.date}`, 'ti-clipboard-list', { date: p.date, timber: timberTotal, poles: polesUnits });
   refreshStockView();
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -500,9 +566,11 @@ async function weeklyPerformanceReport(userId) {
   };
 }
 
-async function salesList(userId) {
+async function salesList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'sales'))) return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const [{ rows }, { rows: stockRows }] = await Promise.all([
     pool.query(
       `select so.id, so.order_number, so.customer_name, so.customer_id,
@@ -527,8 +595,10 @@ async function salesList(userId) {
          where sales_order_id = so.id
        ) del on true
        where so.deleted_at is null
+         and ($1::bigint is null or so.workshop_id = $1 or so.workshop_id is null)
        order by so.created_at desc, so.id desc
-       limit 50`
+       limit 50`,
+      [wId]
     ),
     pool.query('select * from mv_stock_summary')
   ]);
@@ -549,6 +619,7 @@ async function salesCreate(userId, payload) {
   const priceTaxType = ['Inclusive','Exclusive'].includes(p.price_tax_type) ? p.price_tax_type : 'Exclusive';
   const paymentDue   = p.payment_due_date || null;
   const customerId   = p.customer_id ? Number(p.customer_id) : null;
+  const workshopId   = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   let customerName   = p.customer_name || '';
   if (customerId) {
     const { rows: cRows } = await pool.query('select name from customers where id=$1', [customerId]);
@@ -557,17 +628,18 @@ async function salesCreate(userId, payload) {
   await pool.query(
     `insert into sales_orders(order_number, customer_name, customer_id, product_type, product_sub_type, product_size,
                               quantity, unit_price, currency, price_tax_type, payment_due_date, payment_status,
-                              notes, reason, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+                              notes, reason, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
     [
       p.order_number, customerName, customerId, p.product_type, p.product_sub_type || null, p.product_size,
       Number(p.quantity), Number(p.unit_price), currency, priceTaxType, paymentDue, 'Unpaid',
-      p.notes || null, p.reason, user.id
+      p.notes || null, p.reason, user.id, workshopId
     ]
   );
   const label = p.product_sub_type ? `${p.product_sub_type} ${p.product_size}` : `${p.product_type} ${p.product_size}`;
   logAudit(user, `Created order ${p.order_number} — ${p.customer_name}: ${p.quantity} × ${label}`, 'ti-shopping-cart', { order_number: p.order_number, sub_type: p.product_sub_type });
   refreshStockView();
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -1066,16 +1138,59 @@ async function usersList(userId) {
            to_char(u.created_at,'DD Mon YYYY') as created
     from app_users u
     left join warehouses w on w.id = u.workshop_id
+    where u.deleted_at is null
     order by u.id`);
   const { rows: workshops } = await pool.query(`select id, name from warehouses where active=true order by name`);
   return { ok: true, rows, workshops };
 }
+
+async function usersDelete(userId, targetUserId) {
+  const user = await getUser(userId);
+  if (user.role !== 'admin') return { ok: false, error: 'Only administrators can delete user accounts' };
+
+  const tid = Number(targetUserId);
+  if (Number(userId) === tid) return { ok: false, error: 'You cannot delete your own account' };
+
+  const { rows: target } = await pool.query(
+    'select id, username, role from app_users where id=$1 and deleted_at is null', [tid]
+  );
+  if (!target.length) return { ok: false, error: 'User not found' };
+
+  if (target[0].role === 'admin') {
+    const { rows: adminCount } = await pool.query(
+      'select count(*)::int as n from app_users where role=$1 and active=true and deleted_at is null', ['admin']
+    );
+    if (adminCount[0].n <= 1) return { ok: false, error: 'Cannot delete the last administrator account' };
+  }
+
+  await pool.query(
+    'update app_users set active=false, deleted_at=now(), deleted_by=$1 where id=$2',
+    [Number(userId), tid]
+  );
+  invalidateUserCache(tid);
+  logAudit(user, `Deleted user account: ${target[0].username}`, 'ti-user-x', {
+    deletedUserId: tid,
+    deletedUsername: target[0].username,
+    deletedRole: target[0].role,
+  });
+  return { ok: true };
+}
+
+// Roles that must always be assigned to a specific workshop — server-side enforcement.
+const WORKSHOP_ONLY_ROLES = new Set([
+  'supervisor', 'storekeeper', 'storekeeper-assistant', 'mechanician',
+  'harvesting-leader', 'sawmill-leader', 'poles-leader', 'vat-leader',
+  'sales-staff', 'showroom-staff',
+]);
 
 async function usersCreate(userId, payload) {
   const user = await getUser(userId);
   if (!['ceo', 'operations', 'admin'].includes(user.role)) return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.username || !p.name || !p.role || !p.password) return { ok: false, error: 'Missing required fields' };
+  if (WORKSHOP_ONLY_ROLES.has(p.role) && !p.workshop_id) {
+    return { ok: false, error: `Role "${p.role}" requires a workshop assignment` };
+  }
   const hash = await bcrypt.hash(String(p.password), 10);
   await pool.query(
     `insert into app_users(username,name,role,department,user_permissions,user_responsibilities,password_hash,active,workshop_id)
@@ -1113,6 +1228,12 @@ async function usersUpdate(userId, targetUserId, payload) {
   );
   // workshop_id is updated separately when explicitly provided
   if ('workshop_id' in p) {
+    // Determine the effective role after the update (may have just changed)
+    const { rows: targetRows } = await pool.query('select role from app_users where id=$1', [targetUserId]);
+    const effectiveRole = p.role || targetRows[0]?.role;
+    if (WORKSHOP_ONLY_ROLES.has(effectiveRole) && !p.workshop_id) {
+      return { ok: false, error: `Role "${effectiveRole}" requires a workshop assignment` };
+    }
     await pool.query(
       `update app_users set workshop_id=$1 where id=$2`,
       [p.workshop_id ? Number(p.workshop_id) : null, targetUserId]
@@ -1717,6 +1838,133 @@ async function stockTransferApprove(userId, movementId, action, rejectionReason)
   }
 }
 
+// ── Poles Procurement Workflow ────────────────────────────────────────────────
+
+async function polesPurchaseList(userId, workshopId) {
+  const user = await getUser(userId);
+  if (!(await canAccessDaily(user))) return { ok: false, error: 'Access denied' };
+  const wid = workshopId ? Number(workshopId) : (user.workshop_id || null);
+
+  const { rows: requests } = await pool.query(
+    `select pr.id, pr.supplier_name, pr.requested_qty, pr.unit_price, pr.notes, pr.status,
+            pr.requested_at, pr.approved_at, pr.rejection_reason,
+            u1.name as requested_by_name, u2.name as approved_by_name
+     from poles_purchase_requests pr
+     left join app_users u1 on u1.id = pr.requested_by
+     left join app_users u2 on u2.id = pr.approved_by
+     where ($1::bigint is null or pr.workshop_id = $1)
+     order by pr.requested_at desc`,
+    [wid]
+  );
+
+  const { rows: deliveries } = await pool.query(
+    `select d.id, d.purchase_request_id, d.delivery_date, d.supplier_name, d.delivered_qty,
+            d.delivery_note_ref, d.approved_qty, d.rejected_qty, d.rejection_reason,
+            d.status, d.notes, d.confirmed_at, d.quality_checked_at,
+            u1.name as confirmed_by_name, u2.name as quality_checked_by_name
+     from poles_deliveries d
+     left join app_users u1 on u1.id = d.confirmed_by
+     left join app_users u2 on u2.id = d.quality_checked_by
+     where ($1::bigint is null or d.workshop_id = $1)
+     order by d.delivery_date desc, d.id desc`,
+    [wid]
+  );
+
+  const { rows: [stock] } = await pool.query(
+    `select
+       coalesce(sum(case when d.status='quality_checked' then d.approved_qty else 0 end),0)::int as approved_total,
+       coalesce((select sum(dl.poles_units + dl.poles_waste) from daily_logs dl
+                  where dl.deleted_at is null and ($1::bigint is null or dl.workshop_id = $1 or dl.workshop_id is null)),0)::int as produced_total
+     from poles_deliveries d
+     where ($1::bigint is null or d.workshop_id = $1)`,
+    [wid]
+  );
+  const available = Math.max(0, Number(stock.approved_total) - Number(stock.produced_total));
+
+  return { ok: true, requests, deliveries, available_qty: available, approved_total: Number(stock.approved_total) };
+}
+
+async function polesPurchaseCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations','supervisor','poles-leader'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.supplier_name) return { ok: false, error: 'Supplier name is required' };
+  if (!p.requested_qty || Number(p.requested_qty) <= 0) return { ok: false, error: 'Requested quantity must be greater than 0' };
+  const wid = user.workshop_id || (p.workshop_id ? Number(p.workshop_id) : null);
+  const { rows } = await pool.query(
+    `insert into poles_purchase_requests(supplier_name, requested_qty, unit_price, notes, requested_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6) returning id`,
+    [p.supplier_name, Number(p.requested_qty), p.unit_price ? Number(p.unit_price) : null, p.notes || null, user.id, wid]
+  );
+  logAudit(user, `Created poles purchase request — ${p.supplier_name} for ${p.requested_qty} poles`, 'ti-package', { ...p });
+  return { ok: true, id: rows[0].id };
+}
+
+async function polesPurchaseApprove(userId, requestId, approve, rejectionReason) {
+  const user = await getUser(userId);
+  if (user.role !== 'ceo') return { ok: false, error: 'Only the CEO can approve purchase requests' };
+  const { rows: [req] } = await pool.query('select id, status from poles_purchase_requests where id=$1', [Number(requestId)]);
+  if (!req) return { ok: false, error: 'Purchase request not found' };
+  if (req.status !== 'pending') return { ok: false, error: 'This request has already been processed' };
+  const newStatus = approve ? 'approved' : 'rejected';
+  await pool.query(
+    `update poles_purchase_requests set status=$1, approved_by=$2, approved_at=now(), rejection_reason=$3 where id=$4`,
+    [newStatus, user.id, approve ? null : (rejectionReason || null), Number(requestId)]
+  );
+  logAudit(user, `${approve ? 'Approved' : 'Rejected'} poles purchase request #${requestId}`, 'ti-package', { requestId, approve, rejectionReason });
+  return { ok: true };
+}
+
+async function polesDeliveryCreate(userId, payload) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations','supervisor','poles-leader'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const p = payload || {};
+  if (!p.delivery_date) return { ok: false, error: 'Delivery date is required' };
+  if (!p.delivered_qty || Number(p.delivered_qty) <= 0) return { ok: false, error: 'Delivered quantity must be greater than 0' };
+  const wid = user.workshop_id || (p.workshop_id ? Number(p.workshop_id) : null);
+  const { rows } = await pool.query(
+    `insert into poles_deliveries(purchase_request_id, delivery_date, supplier_name, delivered_qty, delivery_note_ref, notes, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
+    [
+      p.purchase_request_id ? Number(p.purchase_request_id) : null,
+      p.delivery_date,
+      p.supplier_name || null,
+      Number(p.delivered_qty),
+      p.delivery_note_ref || null,
+      p.notes || null,
+      user.id,
+      wid
+    ]
+  );
+  logAudit(user, `Recorded poles delivery — ${p.delivered_qty} poles from ${p.supplier_name || 'supplier'}`, 'ti-truck-delivery', { ...p });
+  return { ok: true, id: rows[0].id };
+}
+
+async function polesDeliveryQualityCheck(userId, deliveryId, payload) {
+  const user = await getUser(userId);
+  if (!['admin','ceo','operations','supervisor','poles-leader'].includes(user.role))
+    return { ok: false, error: 'Only a supervisor or poles leader can complete a quality check' };
+  const p = payload || {};
+  if (p.approved_qty === undefined || p.approved_qty === null) return { ok: false, error: 'Approved quantity is required' };
+  const approved = Number(p.approved_qty);
+  const { rows: [del] } = await pool.query('select id, delivered_qty, status from poles_deliveries where id=$1', [Number(deliveryId)]);
+  if (!del) return { ok: false, error: 'Delivery not found' };
+  if (del.status === 'quality_checked') return { ok: false, error: 'Quality check already completed for this delivery' };
+  if (approved > Number(del.delivered_qty)) return { ok: false, error: 'Approved quantity cannot exceed delivered quantity' };
+  const rejected = Number(del.delivered_qty) - approved;
+  await pool.query(
+    `update poles_deliveries
+     set status='quality_checked', approved_qty=$1, rejected_qty=$2, rejection_reason=$3,
+         quality_checked_by=$4, quality_checked_at=now()
+     where id=$5`,
+    [approved, rejected, p.rejection_reason || null, user.id, Number(deliveryId)]
+  );
+  logAudit(user, `Quality check: ${approved} poles approved, ${rejected} rejected`, 'ti-circle-check', { deliveryId, approved, rejected, reason: p.rejection_reason });
+  return { ok: true };
+}
+
 // ── Stock Transfers (multi-stage) ─────────────────────────────────────────────
 
 async function stockTransfersList(userId, workshopId) {
@@ -1753,7 +2001,15 @@ async function stockTransfersList(userId, workshopId) {
          from stock_catalog sc left join stock_levels sl on sl.item_id=sc.id
          where sc.active=true group by sc.id order by sc.category, sc.name`);
   const { rows: wh } = await pool.query(`select id, name from warehouses where active=true order by name`);
-  return { ok: true, rows, items, warehouses: wh, user_workshop_id: user.workshop_id };
+  const { rows: vehicles } = await pool.query(
+    `select id, registration,
+            trim(coalesce(make,'') || case when model is not null then ' ' || model else '' end) as label,
+            driver_assigned
+     from vehicles
+     where coalesce(status,'Active') = 'Active'
+     order by registration`
+  );
+  return { ok: true, rows, items, warehouses: wh, vehicles, user_workshop_id: user.workshop_id };
 }
 
 async function stockTransfersCreate(userId, payload) {
@@ -1802,10 +2058,12 @@ async function stockTransfersApproveReject(userId, transferId, action, rejection
   return { ok: true };
 }
 
-async function stockTransfersDispatch(userId, transferId, qty, reference, notes) {
+async function stockTransfersDispatch(userId, transferId, payload) {
   const user = await getUser(userId);
   if (!['admin', 'ceo', 'operations', 'logistics', 'supervisor', 'storekeeper'].includes(user.role))
     return { ok: false, error: 'Access denied' };
+  const { qty, vehicle_id, driver_name, dispatched_at, reference, notes } = payload || {};
+  if (!vehicle_id) return { ok: false, error: 'A vehicle must be assigned before dispatch can be completed' };
   const qty_n = Number(qty);
   if (!qty_n || qty_n <= 0) return { ok: false, error: 'Quantity must be greater than zero' };
   const client = await pool.connect();
@@ -1849,15 +2107,67 @@ async function stockTransfersDispatch(userId, transferId, qty, reference, notes)
       `update stock_transfers set dispatched_qty=dispatched_qty+$1, status='in_transit' where id=$2`,
       [qty_n, transferId]
     );
+    const { rows: dispRows } = await client.query(
+      `insert into stock_transfer_dispatches(transfer_id, vehicle_id, driver_name, qty, dispatched_at, reference, notes, dispatched_by)
+       values ($1,$2,$3,$4,coalesce($5::timestamptz, now()),$6,$7,$8)
+       returning id, to_char(dispatched_at,'DD/MM/YYYY HH24:MI') as dispatched_at_fmt`,
+      [transferId, Number(vehicle_id), driver_name || null, qty_n, dispatched_at || null, reference || null, notes || null, user.id]
+    );
     await client.query('commit');
-    logAudit(user, `Transfer #${transferId} dispatch: ${qty_n} units`, 'ti-truck', { transferId, qty_n });
-    return { ok: true };
+    logAudit(user, `Transfer #${transferId} dispatch: ${qty_n} units via vehicle #${vehicle_id}`, 'ti-truck', { transferId, qty_n, vehicle_id });
+    return {
+      ok: true,
+      dispatch: {
+        id: dispRows[0].id,
+        dispatched_at: dispRows[0].dispatched_at_fmt,
+        qty: qty_n,
+        driver_name: driver_name || null,
+        reference: reference || null,
+        notes: notes || null,
+        dispatched_by: user.name,
+      },
+    };
   } catch (e) {
     await client.query('rollback');
     throw e;
   } finally {
     client.release();
   }
+}
+
+async function stockTransfersDispatchHistory(userId, transferId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'stock-transfers'))) return { ok: false, error: 'Access denied' };
+  const { rows: dispatches } = await pool.query(
+    `select std.id, std.qty, std.driver_name, std.reference, std.notes,
+            v.registration,
+            trim(coalesce(v.make,'') || case when v.model is not null then ' ' || v.model else '' end) as vehicle_label,
+            u.name as dispatched_by_name,
+            to_char(std.dispatched_at,'DD/MM/YYYY HH24:MI') as dispatched_at
+     from stock_transfer_dispatches std
+     left join vehicles v on v.id = std.vehicle_id
+     left join app_users u on u.id = std.dispatched_by
+     where std.transfer_id = $1
+     order by std.dispatched_at asc`,
+    [transferId]
+  );
+  const { rows: tr } = await pool.query(
+    `select st.id, st.status, st.requested_qty, st.dispatched_qty, st.received_qty, st.reference as transfer_ref,
+            sc.name as item_name, sc.uom,
+            fw.name as from_warehouse_name, tw.name as to_warehouse_name,
+            u1.name as requested_by, u2.name as approved_by,
+            to_char(st.requested_at,'DD/MM/YYYY HH24:MI') as requested_at,
+            to_char(st.approved_at,'DD/MM/YYYY HH24:MI') as approved_at
+     from stock_transfers st
+     join stock_catalog sc on sc.id = st.item_id
+     join warehouses fw on fw.id = st.from_warehouse_id
+     join warehouses tw on tw.id = st.to_warehouse_id
+     left join app_users u1 on u1.id = st.requested_by
+     left join app_users u2 on u2.id = st.approved_by
+     where st.id = $1`,
+    [transferId]
+  );
+  return { ok: true, transfer: tr[0] || null, dispatches };
 }
 
 async function stockTransfersReceive(userId, transferId, qty, notes) {
@@ -2540,9 +2850,11 @@ async function dispatchReview(userId, requestId, status, notes) {
 
 // ── Harvest ───────────────────────────────────────────────────────────────────
 
-async function harvestList(userId) {
+async function harvestList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'harvest'))) return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const { rows } = await pool.query(
     `select hl.id, hl.location, hl.species, hl.quantity, hl.uom, hl.notes,
             to_char(hl.harvest_date,'DD/MM/YYYY') as harvest_date,
@@ -2551,8 +2863,10 @@ async function harvestList(userId) {
      from harvest_logs hl
      left join app_users u on u.id=hl.logged_by
      where hl.deleted_at is null
+       and ($1::bigint is null or hl.workshop_id = $1 or hl.workshop_id is null)
      order by hl.harvest_date desc
-     limit 100`
+     limit 100`,
+    [wId]
   );
   const summary = {};
   for (const r of rows) {
@@ -2572,13 +2886,14 @@ async function harvestCreate(userId, payload) {
   const location = p.location || p.compt_name || '';
   const logsCrosscut = Number(p.logs_crosscut || 0);
   const logsHandrolled = Number(p.logs_handrolled || 0);
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   await pool.query(
-    `insert into harvest_logs(location, species, harvest_date, quantity, uom, notes, logged_by, compt_id, sub_name, logs_crosscut, logs_handrolled)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+    `insert into harvest_logs(location, species, harvest_date, quantity, uom, notes, logged_by, compt_id, sub_name, logs_crosscut, logs_handrolled, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
     [location, p.species, p.harvest_date, Number(p.quantity),
      p.uom || 'trees', p.notes || null, user.id,
      p.compt_id ? Number(p.compt_id) : null, p.sub_name || null,
-     logsCrosscut, logsHandrolled]
+     logsCrosscut, logsHandrolled, workshopId]
   );
   // Auto-check if compartment is now fully harvested
   if (p.compt_id) {
@@ -2628,13 +2943,15 @@ async function timberInventoryList(userId) {
   return { ok: true, stock, logs7, harvestSummary: harvestRows, wasteRate };
 }
 
-async function dailyHarvestData(userId) {
+async function dailyHarvestData(userId, workshopId) {
   const user = await getUser(userId);
   const userPerms = Array.isArray(user.user_permissions) && user.user_permissions.length
     ? user.user_permissions
     : await getRolePages(user.role);
   if (!userPerms.includes('daily-harvest') && !userPerms.includes('harvest') && !userPerms.includes('daily'))
     return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const [{ rows }, { rows: compts }] = await Promise.all([
     pool.query(
       `select hl.id, hl.location, hl.species, hl.quantity, hl.uom, hl.notes,
@@ -2648,8 +2965,10 @@ async function dailyHarvestData(userId) {
        left join app_users u on u.id=hl.logged_by
        left join compartments c on c.id=hl.compt_id
        where hl.deleted_at is null
+         and ($1::bigint is null or hl.workshop_id = $1 or hl.workshop_id is null)
        order by hl.harvest_date desc
-       limit 100`
+       limit 100`,
+      [wId]
     ),
     pool.query(
       `select c.id, c.compt_name, c.sub_name, c.species, c.area_ha, c.volume_m3, c.status,
@@ -2820,12 +3139,12 @@ async function applyPendingEdit(pe) {
       const tot = kd + cca + unt || Number(p.timber_units || 0);
       await pool.query(
         `update daily_logs
-         set log_date=$1, supervisor=$2, timber_units=$3,
-             timber_kiln_dried=$4, timber_cca_treated=$5, timber_untreated=$6,
-             timber_waste=$7, poles_units=$8, poles_waste=$9,
-             downtime_hours=$10, downtime_reason=$11, remarks=$12
-         where id=$13`,
-        [p.date, p.supervisor, tot, kd, cca, unt,
+         set log_date=$1, supervisor=$2, operators=$3, timber_units=$4,
+             timber_kiln_dried=$5, timber_cca_treated=$6, timber_untreated=$7,
+             timber_waste=$8, poles_units=$9, poles_waste=$10,
+             downtime_hours=$11, downtime_reason=$12, remarks=$13
+         where id=$14`,
+        [p.date, p.supervisor || null, p.operators || null, tot, kd, cca, unt,
          Number(p.timber_waste || 0), Number(p.poles_units || 0), Number(p.poles_waste || 0),
          Number(p.downtime_hours || 0), p.downtime_reason || null, p.remarks || null,
          pe.entity_id]
@@ -2915,19 +3234,20 @@ async function dailyUpdate(userId, logId, payload) {
   const unt = Number(p.timber_untreated || 0);
   const total = kd + cca + unt || Number(p.timber_units || 0);
   await pool.query(
-    `update daily_logs set log_date=$1, supervisor=$2, timber_units=$3,
-     timber_kiln_dried=$4, timber_cca_treated=$5, timber_untreated=$6,
-     timber_waste=$7, poles_units=$8, poles_waste=$9,
-     downtime_hours=$10, downtime_reason=$11, remarks=$12, product_size=$13, machine=$14,
-     logs_received=$15
-     where id=$16`,
-    [p.date, p.supervisor || user.name, total, kd, cca, unt,
+    `update daily_logs set log_date=$1, supervisor=$2, operators=$3, timber_units=$4,
+     timber_kiln_dried=$5, timber_cca_treated=$6, timber_untreated=$7,
+     timber_waste=$8, poles_units=$9, poles_waste=$10,
+     downtime_hours=$11, downtime_reason=$12, remarks=$13, product_size=$14, machine=$15,
+     logs_received=$16
+     where id=$17`,
+    [p.date, p.supervisor || null, p.operators || null, total, kd, cca, unt,
      Number(p.timber_waste || 0), Number(p.poles_units || 0), Number(p.poles_waste || 0),
      Number(p.downtime_hours || 0), p.downtime_reason || null, p.remarks || null,
      p.product_size || null, p.machine || null, Number(p.logs_received || 0), logId]
   );
   logAudit(user, `Updated daily log #${logId}`, 'ti-edit', { logId, date: p.date });
   refreshStockView();
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -2942,6 +3262,7 @@ async function dailyDelete(userId, logId, reason) {
   );
   logAudit(user, `Moved daily log #${logId} to trash`, 'ti-trash', { logId, reason });
   refreshStockView();
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -2985,6 +3306,7 @@ async function salesDelete(userId, orderId, reason) {
   );
   logAudit(user, `Moved sales order ${rows[0].order_number} to trash`, 'ti-trash', { orderId, reason });
   refreshStockView();
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -3509,10 +3831,12 @@ async function compartmentsForDropdown(userId) {
 
 // ── Log Transport ─────────────────────────────────────────────────────────────
 
-async function logTransportList(userId) {
+async function logTransportList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'log-transport')) && !['admin','ceo','operations','logistics','supervisor'].includes(user.role))
     return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const [{ rows }, { rows: totals }] = await Promise.all([
     pool.query(
       `select lt.id, lt.transport_date, lt.qty_transported, lt.unit, lt.notes, lt.sub_name,
@@ -3525,15 +3849,20 @@ async function logTransportList(userId) {
        left join compartments c on c.id=lt.compt_id
        left join app_users u on u.id=lt.logged_by
        where lt.deleted_at is null
+         and ($1::bigint is null or lt.workshop_id = $1 or lt.workshop_id is null)
        order by lt.transport_date desc
-       limit 200`
+       limit 200`,
+      [wId]
     ),
     pool.query(
       `select
          coalesce(sum(hl.logs_handrolled),0)::int                              as total_logs_harvested,
-         coalesce((select sum(qty_transported) from log_transport),0)::int     as total_logs_transported,
+         coalesce((select sum(qty_transported) from log_transport
+                   where $1::bigint is null or workshop_id = $1 or workshop_id is null),0)::int as total_logs_transported,
          round(coalesce(sum(hl.logs_handrolled::numeric / 3.4),0)::numeric, 2) as total_volume_m3
-       from harvest_logs hl`
+       from harvest_logs hl
+       where $1::bigint is null or hl.workshop_id = $1 or hl.workshop_id is null`,
+      [wId]
     )
   ]);
   const t = totals[0] || {};
@@ -3556,12 +3885,13 @@ async function logTransportCreate(userId, payload) {
   const p = payload || {};
   if (!p.transport_date) return { ok: false, error: 'Date is required' };
   if (!p.qty_transported || Number(p.qty_transported) <= 0) return { ok: false, error: 'Quantity must be greater than 0' };
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   await pool.query(
-    `insert into log_transport(transport_date, compt_id, sub_name, qty_transported, unit, notes, logged_by, tractor_plate, loggers_number)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    `insert into log_transport(transport_date, compt_id, sub_name, qty_transported, unit, notes, logged_by, tractor_plate, loggers_number, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
     [p.transport_date, p.compt_id ? Number(p.compt_id) : null, p.sub_name || null,
      Number(p.qty_transported), p.unit || 'logs', p.notes || null, user.id,
-     p.tractor_plate?.trim() || null, p.loggers_number?.trim() || null]
+     p.tractor_plate?.trim() || null, p.loggers_number?.trim() || null, workshopId]
   );
   logAudit(user, `Log transport entry: ${p.qty_transported} logs`, 'ti-truck', { ...p });
   return { ok: true };
@@ -3583,20 +3913,49 @@ async function logTransportDelete(userId, id, reason) {
 
 // ── Value-Added Timber ───────────────────────────────────────────────────────
 
-async function valueAddedTimberList(userId) {
+async function vatInboundList(userId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'value-added-timber')) && !['admin','ceo','operations','supervisor'].includes(user.role))
     return { ok: false, error: 'Access denied' };
+  // Nyanza Workshop warehouse_id = 4; show stock transfers received at Nyanza
+  const { rows } = await pool.query(
+    `select st.id, st.item_description as product_size,
+            st.requested_qty, st.received_qty,
+            to_char(st.created_at,'DD/MM/YYYY') as requested_date,
+            st.status,
+            coalesce(
+              (select sum(vt.num_timber) from value_added_timber vt
+               where vt.source_transfer_id = st.id and vt.deleted_at is null),
+            0)::int as intake_used
+     from stock_transfers st
+     where st.to_warehouse_id = 4
+       and st.status in ('received','partially_received')
+       and st.received_qty > 0
+       and st.deleted_at is null
+     order by st.created_at desc`
+  );
+  return { ok: true, rows };
+}
+
+async function valueAddedTimberList(userId, workshopId) {
+  const user = await getUser(userId);
+  if (!(await mustRole(user, 'value-added-timber')) && !['admin','ceo','operations','supervisor'].includes(user.role))
+    return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const { rows } = await pool.query(
     `select vt.id, vt.type_value_added, vt.product_size, vt.num_timber,
+            vt.source_transfer_id,
             to_char(vt.entry_date,'DD/MM/YYYY') as date_fmt,
             to_char(vt.created_at,'DD/MM/YYYY') as created_at,
             u.name as created_by_name, vt.pending_deletion
      from value_added_timber vt
      left join app_users u on u.id=vt.created_by
      where vt.deleted_at is null
+       and ($1::bigint is null or vt.workshop_id = $1 or vt.workshop_id is null)
      order by vt.entry_date desc
-     limit 200`
+     limit 200`,
+    [wId]
   );
   return { ok: true, rows };
 }
@@ -3610,12 +3969,31 @@ async function valueAddedTimberCreate(userId, payload) {
   if (!p.type_value_added) return { ok: false, error: 'Value-added type is required' };
   if (!p.product_size) return { ok: false, error: 'Product size is required' };
   if (!p.num_timber || Number(p.num_timber) <= 0) return { ok: false, error: 'Number of timber must be greater than 0' };
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
+
+  // ADM-31: validate intake against inbound when a source transfer is selected
+  const sourceTransferId = p.source_transfer_id ? Number(p.source_transfer_id) : null;
+  if (sourceTransferId) {
+    const { rows: [st] } = await pool.query(
+      `select received_qty,
+              coalesce((select sum(vt.num_timber) from value_added_timber vt where vt.source_transfer_id=$1 and vt.deleted_at is null),0)::int as intake_used
+       from stock_transfers where id=$1`,
+      [sourceTransferId]
+    );
+    if (!st) return { ok: false, error: 'Source transfer not found' };
+    const available = Math.max(0, Number(st.received_qty) - Number(st.intake_used));
+    if (Number(p.num_timber) > available) {
+      return { ok: false, error: `Intake (${p.num_timber}) exceeds available inbound timber for this transfer (${available} remaining)` };
+    }
+  }
+
   await pool.query(
-    `insert into value_added_timber(entry_date, type_value_added, product_size, num_timber, created_by)
-     values ($1,$2,$3,$4,$5)`,
-    [p.entry_date, p.type_value_added, p.product_size, Number(p.num_timber), user.id]
+    `insert into value_added_timber(entry_date, type_value_added, product_size, num_timber, source_transfer_id, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7)`,
+    [p.entry_date, p.type_value_added, p.product_size, Number(p.num_timber), sourceTransferId, user.id, workshopId]
   );
   logAudit(user, `Value-added timber: ${p.num_timber} × ${p.product_size} (${p.type_value_added})`, 'ti-trees', { ...p });
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -3630,6 +4008,7 @@ async function valueAddedTimberDelete(userId, id, reason) {
     [user.id, reason || null, id]
   );
   logAudit(user, `Moved value-added timber #${id} to trash`, 'ti-trash', { id, reason });
+  refreshStockByWorkshop();
   return { ok: true };
 }
 
@@ -3765,10 +4144,12 @@ async function machineFuelLogsDelete(userId, id, reason) {
 
 // ── Casual Labour Requests ────────────────────────────────────────────────────
 
-async function casualLabourRequestsList(userId) {
+async function casualLabourRequestsList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'casual-requests')) && !['admin','ceo','operations','supervisor'].includes(user.role))
     return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const { rows } = await pool.query(
     `select clr.id, clr.start_date, clr.end_date, clr.task, clr.num_casuals,
             clr.labour_items, clr.description, clr.comments, clr.status,
@@ -3779,8 +4160,10 @@ async function casualLabourRequestsList(userId) {
      from casual_labour_requests clr
      left join app_users u on u.id=clr.created_by
      left join app_users rv on rv.id=clr.reviewed_by
+     where ($1::bigint is null or clr.workshop_id = $1 or clr.workshop_id is null)
      order by clr.start_date desc
-     limit 200`
+     limit 200`,
+    [wId]
   );
   return { ok: true, rows };
 }
@@ -3795,12 +4178,13 @@ async function casualLabourRequestsCreate(userId, payload) {
   if (!p.task?.trim()) return { ok: false, error: 'Task is required' };
   if (!p.num_casuals || Number(p.num_casuals) <= 0) return { ok: false, error: 'Number of casuals must be > 0' };
   const items = Array.isArray(p.labour_items) && p.labour_items.length ? p.labour_items : null;
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   await pool.query(
-    `insert into casual_labour_requests(start_date, end_date, task, num_casuals, labour_items, description, comments, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+    `insert into casual_labour_requests(start_date, end_date, task, num_casuals, labour_items, description, comments, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [p.start_date, p.end_date, p.task.trim(), Number(p.num_casuals),
      items ? JSON.stringify(items) : null,
-     p.description?.trim() || null, p.comments?.trim() || null, user.id]
+     p.description?.trim() || null, p.comments?.trim() || null, user.id, workshopId]
   );
   logAudit(user, `Casual request: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
   return { ok: true };
@@ -3816,13 +4200,14 @@ async function casualLabourRequestsSubmit(userId, payload) {
   if (!p.task?.trim()) return { ok: false, error: 'Task is required' };
   if (!p.num_casuals || Number(p.num_casuals) <= 0) return { ok: false, error: 'Number of casuals must be > 0' };
   const items = Array.isArray(p.labour_items) && p.labour_items.length ? p.labour_items : null;
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   await pool.query(
     `insert into casual_labour_requests
-       (start_date, end_date, task, num_casuals, labour_items, description, comments, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8)`,
+       (start_date, end_date, task, num_casuals, labour_items, description, comments, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
     [p.start_date, p.end_date, p.task.trim(), Number(p.num_casuals),
      items ? JSON.stringify(items) : null,
-     p.description?.trim() || null, p.comments?.trim() || null, user.id]
+     p.description?.trim() || null, p.comments?.trim() || null, user.id, workshopId]
   );
   logAudit(user, `Casual request submitted: ${p.num_casuals} casuals for "${p.task}"`, 'ti-users', { ...p });
   return { ok: true };
@@ -3851,10 +4236,12 @@ async function casualLabourRequestsDelete(userId, id, reason) {
 
 // ── Casuals ───────────────────────────────────────────────────────────────────
 
-async function casualsList(userId) {
+async function casualsList(userId, workshopId) {
   const user = await getUser(userId);
   if (!(await mustRole(user, 'casuals')) && !['admin','ceo','operations','supervisor'].includes(user.role))
     return { ok: false, error: 'Access denied' };
+  const restricted = isWorkshopRestricted(user);
+  const wId = restricted ? user.workshop_id : (workshopId || null);
   const { rows } = await pool.query(
     `select c.id, c.full_name, c.national_id, c.phone, c.gender, c.date_of_birth,
             c.address, c.department, c.work_location, c.job_role, c.supervisor,
@@ -3864,7 +4251,9 @@ async function casualsList(userId) {
             to_char(c.end_date,'DD/MM/YYYY') as end_fmt,
             to_char(c.created_at,'DD/MM/YYYY') as created_fmt
      from casuals c
-     order by c.full_name`
+     where ($1::bigint is null or c.workshop_id = $1 or c.workshop_id is null)
+     order by c.full_name`,
+    [wId]
   );
   return { ok: true, rows };
 }
@@ -3875,11 +4264,12 @@ async function casualsCreate(userId, payload) {
     return { ok: false, error: 'Access denied' };
   const p = payload || {};
   if (!p.full_name?.trim()) return { ok: false, error: 'Full name is required' };
+  const workshopId = isWorkshopRestricted(user) ? user.workshop_id : (p.workshop_id ? Number(p.workshop_id) : null);
   const { rows } = await pool.query(
     `insert into casuals(full_name, national_id, phone, gender, date_of_birth, address,
        department, work_location, job_role, supervisor, start_date, end_date,
-       emergency_name, emergency_relationship, emergency_phone, salary_per_action, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+       emergency_name, emergency_relationship, emergency_phone, salary_per_action, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
      returning id`,
     [p.full_name.trim(), p.national_id?.trim() || null, p.phone?.trim() || null,
      p.gender?.trim() || null, p.date_of_birth || null, p.address?.trim() || null,
@@ -3888,7 +4278,7 @@ async function casualsCreate(userId, payload) {
      p.start_date || null, p.end_date || null,
      p.emergency_name?.trim() || null, p.emergency_relationship?.trim() || null,
      p.emergency_phone?.trim() || null,
-     p.salary_per_action ? Number(p.salary_per_action) : null, user.id]
+     p.salary_per_action ? Number(p.salary_per_action) : null, user.id, workshopId]
   );
   logAudit(user, `Casual registered: ${p.full_name}`, 'ti-user-plus', { id: rows[0].id, name: p.full_name });
   return { ok: true, id: rows[0].id };
@@ -4235,6 +4625,7 @@ module.exports = {
   usersList,
   usersCreate,
   usersUpdate,
+  usersDelete,
   usersResetPassword,
   rolesList,
   rolesUpdate,
@@ -4254,6 +4645,7 @@ module.exports = {
   stockTransfersCreate,
   stockTransfersApproveReject,
   stockTransfersDispatch,
+  stockTransfersDispatchHistory,
   stockTransfersReceive,
   materialRequestsList,
   materialRequestsCreate,
@@ -4373,7 +4765,14 @@ module.exports = {
   deletionRequestReject,
   trashList,
   trashRestore,
-  trashPurge
+  trashPurge,
+  productionStaffList,
+  polesPurchaseList,
+  polesPurchaseCreate,
+  polesPurchaseApprove,
+  polesDeliveryCreate,
+  polesDeliveryQualityCheck,
+  vatInboundList,
 };
 
 // ── CEO Overview ──────────────────────────────────────────────────────────────
@@ -4553,15 +4952,21 @@ async function machineLogCategoriesDelete(userId, id) {
   return { ok: true };
 }
 
-async function machineLogsList(userId, machineId, month) {
+async function machineLogsList(userId, machineId, month, workshopId) {
   const user = await getUser(userId);
   const hasPerm = (await mustRole(user, 'machine-logs')) || (await mustRole(user, 'machines'));
   if (!hasPerm) return { ok: false, error: 'Access denied' };
 
+  const restricted = isWorkshopRestricted(user);
   let whereClause = '';
   const params = [];
   if (machineId) { params.push(machineId); whereClause += ` and mdl.machine_id = $${params.length}`; }
   if (month) { params.push(month); whereClause += ` and to_char(mdl.log_date,'YYYY-MM') = $${params.length}`; }
+  const effectiveWorkshop = restricted ? user.workshop_id : (workshopId || null);
+  if (effectiveWorkshop) {
+    params.push(effectiveWorkshop);
+    whereClause += ` and (mdl.workshop_id = $${params.length} or mdl.workshop_id is null)`;
+  }
 
   const { rows } = await pool.query(`
     select mdl.*, m.name as machine_name, m.machine_code, mc.name as category_name,
@@ -4597,16 +5002,19 @@ async function machineLogsCreate(userId, payload) {
           logs_loaded, logs_unloaded, loading_trips, remarks } = payload;
   if (!machine_id) return { ok: false, error: 'Machine is required' };
   if (!log_date) return { ok: false, error: 'Date is required' };
+  // Attribute the log to the machine's workshop (not necessarily the user's workshop)
+  const { rows: machineRows } = await pool.query('select workshop_id from machines where id=$1', [machine_id]);
+  const workshopId = machineRows[0]?.workshop_id || null;
   await pool.query(
     `insert into machine_daily_logs(machine_id, log_date, shift, hours_worked, downtime_hours, downtime_reason,
        fuel_consumed, daily_production, capacity_per_day, product_type, item_category,
-       logs_loaded, logs_unloaded, loading_trips, remarks, created_by)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+       logs_loaded, logs_unloaded, loading_trips, remarks, created_by, workshop_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
     [machine_id, log_date, shift || 'Full Day',
      hours_worked || 0, downtime_hours || 0, downtime_reason || null,
      fuel_consumed || 0, daily_production || 0, capacity_per_day || 0, product_type || null,
      item_category || null,
-     logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, userId]
+     logs_loaded || 0, logs_unloaded || 0, loading_trips || 0, remarks || null, userId, workshopId]
   );
   logAudit(user, `Machine log created: machine #${machine_id} on ${log_date}`, 'ti-list-details', { machine_id, log_date });
   return { ok: true };

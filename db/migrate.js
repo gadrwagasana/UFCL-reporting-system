@@ -53,6 +53,62 @@ async function ensureSchema() {
     `alter table app_users
      add column if not exists user_responsibilities jsonb not null default '[]'::jsonb`
   );
+  await pool.query(`alter table app_users add column if not exists deleted_at  timestamptz`);
+  await pool.query(`alter table app_users add column if not exists deleted_by  bigint`);
+  await pool.query(`alter table daily_logs add column if not exists operators text`);
+  await pool.query(`alter table value_added_timber add column if not exists source_transfer_id bigint references stock_transfers(id)`);
+  await pool.query(`
+    create table if not exists poles_purchase_requests (
+      id               bigserial primary key,
+      supplier_name    text not null,
+      requested_qty    int not null,
+      unit_price       numeric(12,2),
+      notes            text,
+      status           text not null default 'pending',
+      requested_by     bigint references app_users(id),
+      requested_at     timestamptz not null default now(),
+      approved_by      bigint references app_users(id),
+      approved_at      timestamptz,
+      rejection_reason text,
+      workshop_id      bigint references warehouses(id)
+    )
+  `);
+  await pool.query(`
+    create table if not exists poles_deliveries (
+      id                  bigserial primary key,
+      purchase_request_id bigint references poles_purchase_requests(id),
+      delivery_date       date not null,
+      supplier_name       text,
+      delivered_qty       int not null,
+      delivery_note_ref   text,
+      approved_qty        int,
+      rejected_qty        int,
+      rejection_reason    text,
+      confirmed_by        bigint references app_users(id),
+      confirmed_at        timestamptz,
+      quality_checked_by  bigint references app_users(id),
+      quality_checked_at  timestamptz,
+      status              text not null default 'pending',
+      notes               text,
+      workshop_id         bigint references warehouses(id),
+      created_by          bigint references app_users(id),
+      created_at          timestamptz not null default now()
+    )
+  `);
+  await pool.query(`
+    create table if not exists stock_transfer_dispatches (
+      id            bigserial primary key,
+      transfer_id   bigint not null references stock_transfers(id),
+      vehicle_id    bigint references vehicles(id),
+      driver_name   text,
+      qty           int not null,
+      dispatched_at timestamptz not null default now(),
+      reference     text,
+      notes         text,
+      dispatched_by bigint references app_users(id),
+      created_at    timestamptz not null default now()
+    )
+  `);
   await pool.query(
     `alter table daily_logs
      add column if not exists machine text`
@@ -196,6 +252,82 @@ async function ensureSchema() {
 
   // Labour request breakdown items
   await pool.query(`alter table casual_labour_requests add column if not exists labour_items jsonb`);
+
+  // ── Workshop isolation columns ────────────────────────────────────────────────
+  // Tags each production/sales/labour record with the warehouse that owns it.
+  // NULL = legacy (pre-isolation) record, visible to all authorised cross-workshop roles.
+  await pool.query(`alter table daily_logs             add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table harvest_logs           add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table value_added_timber     add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table machine_daily_logs     add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table log_transport          add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table sales_orders           add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table casual_labour_requests add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table casuals                add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table weekly_expenses        add column if not exists workshop_id bigint references warehouses(id)`);
+  await pool.query(`alter table kpi_budgets            add column if not exists workshop_id bigint references warehouses(id)`);
+
+  // Indexes for per-workshop filtering
+  await pool.query(`create index if not exists idx_daily_logs_workshop    on daily_logs(workshop_id)          where deleted_at is null`);
+  await pool.query(`create index if not exists idx_harvest_logs_workshop   on harvest_logs(workshop_id)         where deleted_at is null`);
+  await pool.query(`create index if not exists idx_vat_workshop            on value_added_timber(workshop_id)   where deleted_at is null`);
+  await pool.query(`create index if not exists idx_mdl_workshop            on machine_daily_logs(workshop_id)   where deleted_at is null`);
+  await pool.query(`create index if not exists idx_log_transport_workshop  on log_transport(workshop_id)        where deleted_at is null`);
+  await pool.query(`create index if not exists idx_sales_orders_workshop   on sales_orders(workshop_id)         where deleted_at is null`);
+  await pool.query(`create index if not exists idx_casual_req_workshop     on casual_labour_requests(workshop_id)`);
+  await pool.query(`create index if not exists idx_casuals_workshop        on casuals(workshop_id)`);
+
+  // ── Per-workshop stock summary materialized view ──────────────────────────────
+  // Mirrors the logic of mv_stock_summary but grouped by workshop_id.
+  // The global mv_stock_summary is left unchanged so all existing dashboard
+  // queries continue to work without modification.
+  await pool.query(`drop materialized view if exists mv_stock_by_workshop cascade`);
+  await pool.query(`
+    create materialized view mv_stock_by_workshop as
+    with produced as (
+      select workshop_id,
+             coalesce(sum(timber_units),0)::int as timber,
+             coalesce(sum(poles_units),0)::int  as poles
+      from daily_logs where deleted_at is null
+      group by workshop_id
+    ),
+    value_added as (
+      select workshop_id,
+             coalesce(sum(case when type_value_added='Kiln-dried timber'  then num_timber else 0 end),0)::int as kiln_dried,
+             coalesce(sum(case when type_value_added='CCA treated timber' then num_timber else 0 end),0)::int as cca_treated
+      from value_added_timber where deleted_at is null
+      group by workshop_id
+    ),
+    sold as (
+      select workshop_id,
+             coalesce(sum(case when product_type='Timber' then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as timber,
+             coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Kiln-dried'  then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as kiln_dried,
+             coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='CCA-treated' then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as cca_treated,
+             coalesce(sum(case when product_type='Timber' and coalesce(product_sub_type,'')='Untreated'   then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as untreated,
+             coalesce(sum(case when product_type='Poles'  then quantity - coalesce(qty_returned_to_stock,0) else 0 end),0)::int as poles
+      from sales_orders where deleted_at is null and status != 'Cancelled'
+      group by workshop_id
+    )
+    select
+      p.workshop_id,
+      p.timber                                                                         as timber_produced,
+      p.poles                                                                          as poles_produced,
+      coalesce(va.kiln_dried,  0)                                                      as kiln_dried_produced,
+      coalesce(va.cca_treated, 0)                                                      as cca_treated_produced,
+      greatest(p.timber - coalesce(va.kiln_dried,0) - coalesce(va.cca_treated,0), 0)  as untreated_produced,
+      coalesce(s.timber,     0) as timber_sold,      coalesce(s.poles,      0) as poles_sold,
+      coalesce(s.kiln_dried, 0) as kiln_dried_sold,  coalesce(s.cca_treated,0) as cca_treated_sold,
+      coalesce(s.untreated,  0) as untreated_sold,
+      (p.timber - coalesce(s.timber,    0))                                            as timber_stock,
+      (p.poles  - coalesce(s.poles,     0))                                            as poles_stock,
+      (coalesce(va.kiln_dried, 0)  - coalesce(s.kiln_dried, 0))                       as kiln_dried_stock,
+      (coalesce(va.cca_treated,0)  - coalesce(s.cca_treated,0))                       as cca_treated_stock,
+      (greatest(p.timber - coalesce(va.kiln_dried,0) - coalesce(va.cca_treated,0), 0)
+        - coalesce(s.untreated,0))                                                     as untreated_stock
+    from produced p
+    left join value_added va on va.workshop_id is not distinct from p.workshop_id
+    left join sold        s  on s.workshop_id  is not distinct from p.workshop_id
+  `);
 
   // Sales order — currency, tax type, payment due date & payment status
   await pool.query(`alter table sales_orders add column if not exists currency text not null default 'RWF'`);
@@ -433,6 +565,26 @@ async function seedDefaultWarehouse() {
   );
 }
 
+// Seed the four official workshop locations as warehouses (idempotent — skips if name exists).
+// These become the selectable workshop options for user assignment and record tagging.
+async function seedWorkshops() {
+  const WORKSHOPS = [
+    { name: 'Headquarters',    location: 'Main Office', workshop_type: 'HQ'       },
+    { name: 'Gatare Workshop', location: 'Gatare',      workshop_type: 'Timber'   },
+    { name: 'Nyanza Workshop', location: 'Nyanza',      workshop_type: 'Poles'    },
+    { name: 'Showroom',        location: 'Showroom',    workshop_type: 'Showroom' }
+  ];
+  for (const w of WORKSHOPS) {
+    const { rows } = await pool.query(`select id from warehouses where name=$1`, [w.name]);
+    if (!rows.length) {
+      await pool.query(
+        `insert into warehouses(name, location, workshop_type, active) values ($1,$2,$3,true)`,
+        [w.name, w.location, w.workshop_type]
+      );
+    }
+  }
+}
+
 async function seedExpenseCategories() {
   const { rows } = await pool.query('select count(*)::int as n from expense_categories');
   if (rows[0].n > 0) return;
@@ -529,16 +681,42 @@ async function updateRolePermissions() {
                  'machine-fuel', 'casual-requests', 'casuals'],
     sales: ['dashboard', 'sales', 'products', 'audit', 'export', 'notifications', 'changes', 'deliveries', 'transport'],
     finance: ['dashboard', 'weekly-cost', 'monthly', 'sage', 'audit', 'export', 'notifications', 'changes'],
-    logistics: ['dashboard', 'logistics', 'inventory', 'audit', 'export', 'notifications', 'changes',
+    logistics: ['dashboard', 'logistics', 'logistics-dashboard', 'inventory', 'audit', 'export', 'notifications', 'changes',
                 'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'vehicles', 'deliveries', 'dispatch', 'transport',
-                'machines', 'log-transport', 'machine-fuel'],
+                'machines', 'log-transport', 'machine-fuel',
+                'casual-requests', 'casuals', 'material-requests'],
     supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
                  'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
                  'machine-logs', 'compartments', 'log-transport', 'value-added-timber',
                  'machine-fuel', 'casual-requests', 'casuals',
                  'workshop-overview', 'material-requests', 'stock-transfers'],
-    storekeeper: ['dashboard', 'inventory', 'audit', 'export', 'notifications',
-                  'warehouses', 'stock-items', 'stock-movements', 'stock-transfers']
+    storekeeper: ['dashboard', 'logistics-dashboard', 'workshop-overview', 'inventory', 'audit', 'export', 'notifications',
+                  'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'material-requests'],
+    'logistics-officer': ['dashboard', 'logistics-dashboard', 'workshop-overview', 'inventory',
+                          'warehouses', 'stock-items', 'stock-movements', 'stock-transfers',
+                          'vehicles', 'deliveries', 'transport', 'material-requests',
+                          'notifications', 'audit', 'export'],
+    'storekeeper-assistant': ['dashboard', 'workshop-overview', 'stock-movements', 'machine-fuel',
+                               'material-requests', 'notifications'],
+    'mechanician': ['dashboard', 'material-requests', 'notifications'],
+    // Phase 2 — Operations leaders (all workshop-restricted, no approval rights)
+    'harvesting-leader': ['dashboard', 'daily-harvest', 'harvest', 'log-transport', 'compartments',
+                          'casual-requests', 'workshop-overview',
+                          'notifications', 'audit', 'export'],
+    'sawmill-leader':    ['dashboard', 'daily-timber', 'timber-inventory', 'machine-logs', 'machine-fuel',
+                          'material-requests', 'casual-requests', 'workshop-overview',
+                          'notifications', 'audit', 'export'],
+    'poles-leader':      ['dashboard', 'daily-poles', 'machine-logs', 'machine-fuel',
+                          'material-requests', 'casual-requests', 'workshop-overview',
+                          'notifications', 'audit', 'export'],
+    'vat-leader':        ['dashboard', 'value-added-timber', 'timber-inventory',
+                          'material-requests', 'casual-requests', 'workshop-overview',
+                          'notifications', 'audit', 'export'],
+    // Phase 2 — Sales roles (all workshop-restricted, no approval rights)
+    'sales-staff':       ['dashboard', 'sales', 'deliveries', 'products',
+                          'notifications', 'audit', 'export'],
+    'showroom-staff':    ['dashboard', 'sales', 'deliveries', 'products', 'timber-inventory',
+                          'notifications', 'audit', 'export']
   };
 
   for (const [role, perms] of Object.entries(permissionsByRole)) {
@@ -553,6 +731,70 @@ async function updateRolePermissions() {
   }
 }
 
+async function seedNewLogisticsRoles() {
+  const newRoles = [
+    {
+      role: 'logistics-officer',
+      label: 'Logistics Officer',
+      description: 'Monitors workshop inventory and product movements. Can manage stock movements and transfers within assigned scope but cannot approve or delete records.',
+    },
+    {
+      role: 'storekeeper-assistant',
+      label: 'Storekeeper Assistant',
+      description: 'Supports the workshop stockkeeper. Focuses on consumption recording for mechanical operations and assists with stock transactions.',
+    },
+    {
+      role: 'mechanician',
+      label: 'Mechanician',
+      description: 'Requests spare parts and maintenance materials from the workshop store. Access limited to material requests only.',
+    },
+    // Phase 2 — Operations leaders (Gatare)
+    {
+      role: 'harvesting-leader',
+      label: 'Harvesting Leader',
+      description: 'Leads harvesting operations at Gatare Workshop. Records harvest, log transport, and compartment activity. No access to sawmill, poles, VAT, or sales modules.',
+    },
+    {
+      role: 'sawmill-leader',
+      label: 'Sawmill Leader',
+      description: 'Leads sawmill operations at Gatare Workshop. Records daily timber production, machine logs, fuel, and material requests. No access to harvesting, poles, or sales modules.',
+    },
+    // Phase 2 — Operations leaders (Nyanza)
+    {
+      role: 'poles-leader',
+      label: 'Poles Production Leader',
+      description: 'Leads poles production at Nyanza Workshop. Records daily poles output, machine logs, fuel, and material requests. No access to timber, harvesting, or sales modules.',
+    },
+    {
+      role: 'vat-leader',
+      label: 'Value-Added Timber Leader',
+      description: 'Leads value-added timber processing at Nyanza Workshop. Records VAT entries and views timber inventory. No access to harvesting, poles, or sales modules.',
+    },
+    // Phase 2 — Sales roles
+    {
+      role: 'sales-staff',
+      label: 'Workshop Sales Staff',
+      description: 'Handles sales for their assigned workshop only. Access limited to sales, deliveries, and products. No production or logistics permissions.',
+    },
+    {
+      role: 'showroom-staff',
+      label: 'Showroom Sales Staff',
+      description: 'Manages showroom sales only. Access limited to sales, deliveries, products, and read-only timber inventory to support showroom sales decisions.',
+    },
+  ];
+
+  for (const r of newRoles) {
+    const { rows } = await pool.query('select 1 from role_definitions where role=$1', [r.role]);
+    if (!rows.length) {
+      await pool.query(
+        `insert into role_definitions(role, label, description, responsibilities, permissions)
+         values ($1,$2,$3,$4,$5)`,
+        [r.role, r.label, r.description, JSON.stringify([]), JSON.stringify([])]
+      );
+    }
+  }
+}
+
 async function migrate() {
   await ensureDatabaseExists();
   await ensureSchema();
@@ -563,7 +805,9 @@ async function migrate() {
   await seedDefaultWarehouse();
   await seedMachineCategories();
   await seedMachineKpiDefinitions();
+  await seedNewLogisticsRoles();
   await updateRolePermissions();
+  await seedWorkshops();
 }
 
 if (require.main === module) {

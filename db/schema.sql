@@ -262,6 +262,19 @@ create table if not exists stock_transfers (
   deletion_reason text
 );
 
+create table if not exists stock_transfer_dispatches (
+  id            bigserial primary key,
+  transfer_id   bigint not null references stock_transfers(id),
+  vehicle_id    bigint references vehicles(id),
+  driver_name   text,
+  qty           int not null,
+  dispatched_at timestamptz not null default now(),
+  reference     text,
+  notes         text,
+  dispatched_by bigint references app_users(id),
+  created_at    timestamptz not null default now()
+);
+
 create table if not exists material_requests (
   id bigserial primary key,
   item_id bigint not null references stock_catalog(id),
@@ -553,6 +566,47 @@ alter table daily_logs add column if not exists timber_cca_treated int not null 
 alter table daily_logs add column if not exists timber_untreated int not null default 0;
 alter table daily_logs add column if not exists product_size text;
 alter table daily_logs add column if not exists machine text;
+alter table daily_logs add column if not exists operators text;
+
+-- ── Poles Procurement Workflow ────────────────────────────────────────────────
+create table if not exists poles_purchase_requests (
+  id               bigserial primary key,
+  supplier_name    text not null,
+  requested_qty    int not null,
+  unit_price       numeric(12,2),
+  notes            text,
+  status           text not null default 'pending',
+  requested_by     bigint references app_users(id),
+  requested_at     timestamptz not null default now(),
+  approved_by      bigint references app_users(id),
+  approved_at      timestamptz,
+  rejection_reason text,
+  workshop_id      bigint references warehouses(id)
+);
+
+create table if not exists poles_deliveries (
+  id                  bigserial primary key,
+  purchase_request_id bigint references poles_purchase_requests(id),
+  delivery_date       date not null,
+  supplier_name       text,
+  delivered_qty       int not null,
+  delivery_note_ref   text,
+  approved_qty        int,
+  rejected_qty        int,
+  rejection_reason    text,
+  confirmed_by        bigint references app_users(id),
+  confirmed_at        timestamptz,
+  quality_checked_by  bigint references app_users(id),
+  quality_checked_at  timestamptz,
+  status              text not null default 'pending',
+  notes               text,
+  workshop_id         bigint references warehouses(id),
+  created_by          bigint references app_users(id),
+  created_at          timestamptz not null default now()
+);
+
+-- ADM-31: link VAT entries to their source stock transfer
+alter table value_added_timber add column if not exists source_transfer_id bigint references stock_transfers(id);
 
 -- ── Log Transport ─────────────────────────────────────────────────────────────
 
@@ -583,6 +637,30 @@ create table if not exists value_added_timber (
 create index if not exists idx_compartments_status on compartments(status);
 create index if not exists idx_log_transport_date on log_transport(transport_date desc);
 create index if not exists idx_value_added_timber_date on value_added_timber(entry_date desc);
+
+-- ── Workshop Isolation ────────────────────────────────────────────────────────
+-- Each production, sales, and labour record is tagged with the warehouse/workshop
+-- that owns it. NULL means legacy (pre-isolation) — visible to all authorised roles.
+alter table daily_logs             add column if not exists workshop_id bigint references warehouses(id);
+alter table harvest_logs           add column if not exists workshop_id bigint references warehouses(id);
+alter table value_added_timber     add column if not exists workshop_id bigint references warehouses(id);
+alter table machine_daily_logs     add column if not exists workshop_id bigint references warehouses(id);
+alter table log_transport          add column if not exists workshop_id bigint references warehouses(id);
+alter table sales_orders           add column if not exists workshop_id bigint references warehouses(id);
+alter table casual_labour_requests add column if not exists workshop_id bigint references warehouses(id);
+alter table casuals                add column if not exists workshop_id bigint references warehouses(id);
+alter table weekly_expenses        add column if not exists workshop_id bigint references warehouses(id);
+alter table kpi_budgets            add column if not exists workshop_id bigint references warehouses(id);
+
+-- Partial indexes on active records for fast per-workshop filtering
+create index if not exists idx_daily_logs_workshop   on daily_logs(workshop_id)          where deleted_at is null;
+create index if not exists idx_harvest_logs_workshop  on harvest_logs(workshop_id)         where deleted_at is null;
+create index if not exists idx_vat_workshop           on value_added_timber(workshop_id)   where deleted_at is null;
+create index if not exists idx_mdl_workshop           on machine_daily_logs(workshop_id)   where deleted_at is null;
+create index if not exists idx_log_transport_workshop on log_transport(workshop_id)        where deleted_at is null;
+create index if not exists idx_sales_orders_workshop  on sales_orders(workshop_id)         where deleted_at is null;
+create index if not exists idx_casual_req_workshop    on casual_labour_requests(workshop_id);
+create index if not exists idx_casuals_workshop       on casuals(workshop_id);
 
 -- ── Machine Fuel / Consumption Logs ──────────────────────────────────────────
 

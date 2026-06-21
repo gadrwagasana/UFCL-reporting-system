@@ -46,11 +46,18 @@ contextBridge.exposeInMainWorld('UFCL', {
 
   getBootstrap: (userId) => ipcRenderer.invoke('app:getBootstrap', { userId }),
 
-  dailyList: (userId) => ipcRenderer.invoke('daily:list', { userId }),
+  dailyList: (userId, workshopId) => ipcRenderer.invoke('daily:list', { userId, workshopId }),
   dailyCreate: (userId, payload) => ipcRenderer.invoke('daily:create', { userId, payload }),
-  dailyHarvestData: (userId) => ipcRenderer.invoke('daily:harvest-data', { userId }),
+  dailyHarvestData: (userId, workshopId) => ipcRenderer.invoke('daily:harvest-data', { userId, workshopId }),
+  productionStaffList: (userId) => ipcRenderer.invoke('production:staff-list', { userId }),
+  polesPurchaseList: (userId, workshopId) => ipcRenderer.invoke('poles:purchase-list', { userId, workshopId }),
+  polesPurchaseCreate: (userId, payload) => ipcRenderer.invoke('poles:purchase-create', { userId, payload }),
+  polesPurchaseApprove: (userId, requestId, approve, rejectionReason) => ipcRenderer.invoke('poles:purchase-approve', { userId, requestId, approve, rejectionReason }),
+  polesDeliveryCreate: (userId, payload) => ipcRenderer.invoke('poles:delivery-create', { userId, payload }),
+  polesDeliveryQualityCheck: (userId, deliveryId, payload) => ipcRenderer.invoke('poles:delivery-qc', { userId, deliveryId, payload }),
+  vatInboundList: (userId) => ipcRenderer.invoke('vat:inbound-list', { userId }),
 
-  salesList: (userId) => ipcRenderer.invoke('sales:list', { userId }),
+  salesList: (userId, workshopId) => ipcRenderer.invoke('sales:list', { userId, workshopId }),
   salesCreate: (userId, payload) => ipcRenderer.invoke('sales:create', { userId, payload }),
   salesUpdateStatus: (userId, orderId, status) => ipcRenderer.invoke('sales:updateStatus', { userId, orderId, status }),
   salesProductsForDropdown: (userId) => ipcRenderer.invoke('sales:products-for-dropdown', { userId }),
@@ -89,6 +96,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   usersCreate: (userId, payload) => ipcRenderer.invoke('users:create', { userId, payload }),
   usersUpdate: (userId, targetUserId, payload) => ipcRenderer.invoke('users:update', { userId, targetUserId, payload }),
   usersResetPassword: (userId, targetUserId, newPassword) => ipcRenderer.invoke('users:resetPassword', { userId, targetUserId, newPassword }),
+  usersDelete: (userId, targetUserId) => ipcRenderer.invoke('users:delete', { userId, targetUserId }),
   rolesList: (userId) => ipcRenderer.invoke('roles:list', { userId }),
   rolesUpdate: (userId, role, payload) => ipcRenderer.invoke('roles:update', { userId, role, payload }),
 
@@ -119,7 +127,8 @@ contextBridge.exposeInMainWorld('UFCL', {
   stockTransfersList: (userId, workshopId) => ipcRenderer.invoke('stock-transfers:list', { userId, workshopId }),
   stockTransfersCreate: (userId, payload) => ipcRenderer.invoke('stock-transfers:create', { userId, payload }),
   stockTransfersApprove: (userId, transferId, action, reason) => ipcRenderer.invoke('stock-transfers:approve', { userId, transferId, action, reason }),
-  stockTransfersDispatch: (userId, transferId, qty, reference, notes) => ipcRenderer.invoke('stock-transfers:dispatch', { userId, transferId, qty, reference, notes }),
+  stockTransfersDispatch: (userId, transferId, payload) => ipcRenderer.invoke('stock-transfers:dispatch', { userId, transferId, payload }),
+  stockTransfersDispatchHistory: (userId, transferId) => ipcRenderer.invoke('stock-transfers:dispatch-history', { userId, transferId }),
   stockTransfersReceive: (userId, transferId, qty, notes) => ipcRenderer.invoke('stock-transfers:receive', { userId, transferId, qty, notes }),
   materialRequestsList: (userId, workshopId) => ipcRenderer.invoke('material-requests:list', { userId, workshopId }),
   materialRequestsCreate: (userId, payload) => ipcRenderer.invoke('material-requests:create', { userId, payload }),
@@ -145,7 +154,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   dispatchCreate: (userId, payload) => ipcRenderer.invoke('dispatch:create', { userId, payload }),
   dispatchReview: (userId, requestId, status, notes) => ipcRenderer.invoke('dispatch:review', { userId, requestId, status, notes }),
 
-  harvestList: (userId) => ipcRenderer.invoke('harvest:list', { userId }),
+  harvestList: (userId, workshopId) => ipcRenderer.invoke('harvest:list', { userId, workshopId }),
   harvestCreate: (userId, payload) => ipcRenderer.invoke('harvest:create', { userId, payload }),
 
   timberInventoryList: (userId) => ipcRenderer.invoke('timber-inventory:list', { userId }),
@@ -201,7 +210,7 @@ contextBridge.exposeInMainWorld('UFCL', {
   machineLogCatsDelete: (userId, id) => ipcRenderer.invoke('machine-log-cats:delete', { userId, id }),
 
   // Machine Daily Logs
-  machineLogsList:   (userId, machineId, month) => ipcRenderer.invoke('machine-logs:list', { userId, machineId, month }),
+  machineLogsList:   (userId, machineId, month, workshopId) => ipcRenderer.invoke('machine-logs:list', { userId, machineId, month, workshopId }),
   machineLogsCreate: (userId, payload) => ipcRenderer.invoke('machine-logs:create', { userId, payload }),
   machineLogsUpdate: (userId, logId, payload) => ipcRenderer.invoke('machine-logs:update', { userId, logId, payload }),
   machineLogsDelete: (userId, logId, reason) => ipcRenderer.invoke('machine-logs:delete', { userId, logId, reason }),
@@ -230,13 +239,13 @@ contextBridge.exposeInMainWorld('UFCL', {
   compartmentsForDropdown: (userId) => ipcRenderer.invoke('compartments:for-dropdown', { userId }),
 
   // Log Transport
-  logTransportList:   (userId) => ipcRenderer.invoke('log-transport:list', { userId }),
+  logTransportList:   (userId, workshopId) => ipcRenderer.invoke('log-transport:list', { userId, workshopId }),
   logTransportCreate: (userId, payload) => ipcRenderer.invoke('log-transport:create', { userId, payload }),
   logTransportUpdate: (userId, id, payload) => ipcRenderer.invoke('log-transport:update', { userId, id, payload }),
   logTransportDelete: (userId, id, reason) => ipcRenderer.invoke('log-transport:delete', { userId, id, reason }),
 
   // Value-Added Timber
-  valueAddedTimberList:   (userId) => ipcRenderer.invoke('value-added-timber:list', { userId }),
+  valueAddedTimberList:   (userId, workshopId) => ipcRenderer.invoke('value-added-timber:list', { userId, workshopId }),
   valueAddedTimberCreate: (userId, payload) => ipcRenderer.invoke('value-added-timber:create', { userId, payload }),
   valueAddedTimberUpdate: (userId, id, payload) => ipcRenderer.invoke('value-added-timber:update', { userId, id, payload }),
   valueAddedTimberDelete: (userId, id, reason) => ipcRenderer.invoke('value-added-timber:delete', { userId, id, reason }),
@@ -253,14 +262,14 @@ contextBridge.exposeInMainWorld('UFCL', {
   machineFuelLogsDelete: (userId, id, reason) => ipcRenderer.invoke('machine-fuel:delete', { userId, id, reason }),
 
   // Casual Labour Requests
-  casualLabourRequestsList:   (userId) => ipcRenderer.invoke('casual-requests:list', { userId }),
+  casualLabourRequestsList:   (userId, workshopId) => ipcRenderer.invoke('casual-requests:list', { userId, workshopId }),
   casualLabourRequestsCreate: (userId, payload) => ipcRenderer.invoke('casual-requests:create', { userId, payload }),
   casualLabourRequestsSubmit: (userId, payload) => ipcRenderer.invoke('casual-requests:submit', { userId, payload }),
   casualLabourRequestsReview: (userId, requestId, status) => ipcRenderer.invoke('casual-requests:review', { userId, requestId, status }),
   casualLabourRequestsDelete: (userId, id) => ipcRenderer.invoke('casual-requests:delete', { userId, id }),
 
   // Casuals
-  casualsList:   (userId) => ipcRenderer.invoke('casuals:list', { userId }),
+  casualsList:   (userId, workshopId) => ipcRenderer.invoke('casuals:list', { userId, workshopId }),
   casualsCreate: (userId, payload) => ipcRenderer.invoke('casuals:create', { userId, payload }),
   casualsUpdate: (userId, casualId, payload) => ipcRenderer.invoke('casuals:update', { userId, casualId, payload }),
   casualsDelete: (userId, casualId) => ipcRenderer.invoke('casuals:delete', { userId, casualId }),

@@ -162,11 +162,18 @@ ipcMain.handle('app:getBootstrap', async (_evt, { userId }) => {
   return data.getBootstrap(userId);
 });
 
-ipcMain.handle('daily:list', async (_evt, { userId }) => data.dailyList(userId));
+ipcMain.handle('daily:list', async (_evt, { userId, workshopId }) => data.dailyList(userId, workshopId));
 ipcMain.handle('daily:create', async (_evt, { userId, payload }) => data.dailyCreate(userId, payload));
-ipcMain.handle('daily:harvest-data', async (_evt, { userId }) => data.dailyHarvestData(userId));
+ipcMain.handle('daily:harvest-data', async (_evt, { userId, workshopId }) => data.dailyHarvestData(userId, workshopId));
+ipcMain.handle('production:staff-list', async (_evt, { userId }) => data.productionStaffList(userId));
+ipcMain.handle('poles:purchase-list', async (_evt, { userId, workshopId }) => data.polesPurchaseList(userId, workshopId));
+ipcMain.handle('poles:purchase-create', async (_evt, { userId, payload }) => data.polesPurchaseCreate(userId, payload));
+ipcMain.handle('poles:purchase-approve', async (_evt, { userId, requestId, approve, rejectionReason }) => data.polesPurchaseApprove(userId, requestId, approve, rejectionReason));
+ipcMain.handle('poles:delivery-create', async (_evt, { userId, payload }) => data.polesDeliveryCreate(userId, payload));
+ipcMain.handle('poles:delivery-qc', async (_evt, { userId, deliveryId, payload }) => data.polesDeliveryQualityCheck(userId, deliveryId, payload));
+ipcMain.handle('vat:inbound-list', async (_evt, { userId }) => data.vatInboundList(userId));
 
-ipcMain.handle('sales:list', async (_evt, { userId }) => data.salesList(userId));
+ipcMain.handle('sales:list', async (_evt, { userId, workshopId }) => data.salesList(userId, workshopId));
 ipcMain.handle('sales:create', async (_evt, { userId, payload }) => data.salesCreate(userId, payload));
 ipcMain.handle('sales:updateStatus', async (_evt, { userId, orderId, status }) => data.salesUpdateStatus(userId, orderId, status));
 ipcMain.handle('sales:products-for-dropdown', async (_evt, { userId }) => data.salesProductsForDropdown(userId));
@@ -217,6 +224,9 @@ ipcMain.handle('users:update', async (_evt, { userId, targetUserId, payload }) =
 ipcMain.handle('users:resetPassword', async (_evt, { userId, targetUserId, newPassword }) =>
   data.usersResetPassword(userId, targetUserId, newPassword)
 );
+ipcMain.handle('users:delete', async (_evt, { userId, targetUserId }) =>
+  data.usersDelete(userId, targetUserId)
+);
 ipcMain.handle('roles:list', async (_evt, { userId }) => data.rolesList(userId));
 ipcMain.handle('roles:update', async (_evt, { userId, role, payload }) => data.rolesUpdate(userId, role, payload));
 
@@ -248,7 +258,8 @@ ipcMain.handle('stock-movements:transfer-approve', async (_evt, { userId, moveme
 ipcMain.handle('stock-transfers:list', async (_evt, { userId, workshopId }) => data.stockTransfersList(userId, workshopId));
 ipcMain.handle('stock-transfers:create', async (_evt, { userId, payload }) => data.stockTransfersCreate(userId, payload));
 ipcMain.handle('stock-transfers:approve', async (_evt, { userId, transferId, action, reason }) => data.stockTransfersApproveReject(userId, transferId, action, reason));
-ipcMain.handle('stock-transfers:dispatch', async (_evt, { userId, transferId, qty, reference, notes }) => data.stockTransfersDispatch(userId, transferId, qty, reference, notes));
+ipcMain.handle('stock-transfers:dispatch', async (_evt, { userId, transferId, payload }) => data.stockTransfersDispatch(userId, transferId, payload));
+ipcMain.handle('stock-transfers:dispatch-history', async (_evt, { userId, transferId }) => data.stockTransfersDispatchHistory(userId, transferId));
 ipcMain.handle('stock-transfers:receive', async (_evt, { userId, transferId, qty, notes }) => data.stockTransfersReceive(userId, transferId, qty, notes));
 ipcMain.handle('material-requests:list', async (_evt, { userId, workshopId }) => data.materialRequestsList(userId, workshopId));
 ipcMain.handle('material-requests:create', async (_evt, { userId, payload }) => data.materialRequestsCreate(userId, payload));
@@ -278,7 +289,7 @@ ipcMain.handle('dispatch:create', async (_evt, { userId, payload }) => data.disp
 ipcMain.handle('dispatch:review', async (_evt, { userId, requestId, status, notes }) => data.dispatchReview(userId, requestId, status, notes));
 
 // Harvest
-ipcMain.handle('harvest:list', async (_evt, { userId }) => data.harvestList(userId));
+ipcMain.handle('harvest:list', async (_evt, { userId, workshopId }) => data.harvestList(userId, workshopId));
 ipcMain.handle('harvest:create', async (_evt, { userId, payload }) => data.harvestCreate(userId, payload));
 
 // Timber inventory
@@ -338,7 +349,7 @@ ipcMain.handle('machine-log-cats:create', async (_evt, { userId, payload }) => d
 ipcMain.handle('machine-log-cats:delete', async (_evt, { userId, id }) => data.machineLogCategoriesDelete(userId, id));
 
 // Machine Daily Logs
-ipcMain.handle('machine-logs:list',   async (_evt, { userId, machineId, month }) => data.machineLogsList(userId, machineId, month));
+ipcMain.handle('machine-logs:list',   async (_evt, { userId, machineId, month, workshopId }) => data.machineLogsList(userId, machineId, month, workshopId));
 ipcMain.handle('machine-logs:create', async (_evt, { userId, payload }) => data.machineLogsCreate(userId, payload));
 ipcMain.handle('machine-logs:update', async (_evt, { userId, logId, payload }) => data.machineLogsUpdate(userId, logId, payload));
 ipcMain.handle('machine-logs:delete', async (_evt, { userId, logId, reason }) => data.machineLogsDelete(userId, logId, reason));
@@ -367,13 +378,13 @@ ipcMain.handle('compartments:delete', async (_evt, { userId, comptId, reason }) 
 ipcMain.handle('compartments:for-dropdown', async (_evt, { userId }) => data.compartmentsForDropdown(userId));
 
 // Log Transport
-ipcMain.handle('log-transport:list',   async (_evt, { userId }) => data.logTransportList(userId));
+ipcMain.handle('log-transport:list',   async (_evt, { userId, workshopId }) => data.logTransportList(userId, workshopId));
 ipcMain.handle('log-transport:create', async (_evt, { userId, payload }) => data.logTransportCreate(userId, payload));
 ipcMain.handle('log-transport:update', async (_evt, { userId, id, payload }) => data.logTransportUpdate(userId, id, payload));
 ipcMain.handle('log-transport:delete', async (_evt, { userId, id, reason }) => data.logTransportDelete(userId, id, reason));
 
 // Value-Added Timber
-ipcMain.handle('value-added-timber:list',   async (_evt, { userId }) => data.valueAddedTimberList(userId));
+ipcMain.handle('value-added-timber:list',   async (_evt, { userId, workshopId }) => data.valueAddedTimberList(userId, workshopId));
 ipcMain.handle('value-added-timber:create', async (_evt, { userId, payload }) => data.valueAddedTimberCreate(userId, payload));
 ipcMain.handle('value-added-timber:update', async (_evt, { userId, id, payload }) => data.valueAddedTimberUpdate(userId, id, payload));
 ipcMain.handle('value-added-timber:delete', async (_evt, { userId, id, reason }) => data.valueAddedTimberDelete(userId, id, reason));
@@ -390,14 +401,14 @@ ipcMain.handle('machine-fuel:update', async (_evt, { userId, id, payload }) => d
 ipcMain.handle('machine-fuel:delete', async (_evt, { userId, id, reason }) => data.machineFuelLogsDelete(userId, id, reason));
 
 // Casual Labour Requests
-ipcMain.handle('casual-requests:list',   async (_evt, { userId }) => data.casualLabourRequestsList(userId));
+ipcMain.handle('casual-requests:list',   async (_evt, { userId, workshopId }) => data.casualLabourRequestsList(userId, workshopId));
 ipcMain.handle('casual-requests:create', async (_evt, { userId, payload }) => data.casualLabourRequestsCreate(userId, payload));
 ipcMain.handle('casual-requests:submit', async (_evt, { userId, payload }) => data.casualLabourRequestsSubmit(userId, payload));
 ipcMain.handle('casual-requests:review', async (_evt, { userId, requestId, status }) => data.casualLabourRequestsReview(userId, requestId, status));
 ipcMain.handle('casual-requests:delete', async (_evt, { userId, id }) => data.casualLabourRequestsDelete(userId, id));
 
 // Casuals
-ipcMain.handle('casuals:list',   async (_evt, { userId }) => data.casualsList(userId));
+ipcMain.handle('casuals:list',   async (_evt, { userId, workshopId }) => data.casualsList(userId, workshopId));
 ipcMain.handle('casuals:create', async (_evt, { userId, payload }) => data.casualsCreate(userId, payload));
 ipcMain.handle('casuals:update', async (_evt, { userId, casualId, payload }) => data.casualsUpdate(userId, casualId, payload));
 ipcMain.handle('casuals:delete', async (_evt, { userId, casualId }) => data.casualsDelete(userId, casualId));

@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UFCL ERP — End-to-End System UAT Package</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:11pt;color:#1a1a1a;background:#f4f6f8}
+  .cover{background:linear-gradient(135deg,#1a3c5e 0%,#2d6a4f 100%);color:#fff;padding:60px 50px;min-height:220px;page-break-after:always}
+  .cover h1{font-size:28pt;font-weight:700;letter-spacing:1px;margin-bottom:8px}
+  .cover h2{font-size:16pt;font-weight:300;margin-bottom:30px;opacity:.85}
+  .cover-meta{display:flex;gap:60px;margin-top:20px;font-size:10pt;opacity:.9}
+  .cover-meta div{display:flex;flex-direction:column;gap:4px}
+  .cover-meta strong{font-size:9pt;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+  .toc{background:#fff;margin:20px;padding:30px 40px;border-radius:8px;page-break-after:always}
+  .toc h3{font-size:14pt;color:#1a3c5e;margin-bottom:16px;border-bottom:2px solid #1a3c5e;padding-bottom:8px}
+  .toc ol{padding-left:20px;line-height:2}
+  .toc a{color:#2d6a4f;text-decoration:none;font-size:10.5pt}
+  .toc a:hover{text-decoration:underline}
+  .flow-divider{margin:24px 20px 8px;padding:18px 28px;border-radius:10px;color:#fff;font-size:13pt;font-weight:700;letter-spacing:.5px}
+  .flow-divider.timber{background:linear-gradient(135deg,#1a3c5e,#2d6a4f)}
+  .flow-divider.poles{background:linear-gradient(135deg,#7a2e00,#b5500a)}
+  .flow-divider.cross{background:linear-gradient(135deg,#2e1a5e,#4a1a6e)}
+  .flow-chain{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:10px;font-size:9.5pt}
+  .flow-step{background:rgba(255,255,255,.22);padding:4px 13px;border-radius:20px;white-space:nowrap}
+  .flow-arrow{font-size:13pt;opacity:.75}
+  .section{background:#fff;margin:20px;border-radius:8px;overflow:hidden;page-break-inside:avoid}
+  .section-header{padding:14px 24px;display:flex;align-items:center;gap:12px}
+  .section-header h2{font-size:13pt;font-weight:700;color:#fff}
+  .section-header .sec-num{background:rgba(255,255,255,.25);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11pt;color:#fff;flex-shrink:0}
+  .s1 .section-header{background:#1a3c5e}
+  .s2 .section-header{background:#2d6a4f}
+  .s3 .section-header{background:#3a6b2e}
+  .s4 .section-header{background:#0a7a6e}
+  .s5 .section-header{background:#5b4fcf}
+  .s6 .section-header{background:#1a5070}
+  .s7 .section-header{background:#b5500a}
+  .s8 .section-header{background:#7a2e00}
+  .s9 .section-header{background:#6b2a6e}
+  .s10 .section-header{background:#1a5c3a}
+  .s11 .section-header{background:#4a1a6e}
+  .s12 .section-header{background:#1a3a3a}
+  .section-body{padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+  .tc{border:1px solid #d8dce2;border-radius:6px;overflow:hidden;page-break-inside:avoid}
+  .tc-header{display:flex;justify-content:space-between;align-items:center;background:#f0f3f7;padding:8px 14px;border-bottom:1px solid #d8dce2}
+  .tc-id{font-weight:700;font-size:10pt;color:#1a3c5e;font-family:monospace}
+  .tc-title{font-weight:600;font-size:10.5pt;color:#2c3e50}
+  .tc-table{width:100%;border-collapse:collapse;font-size:9.5pt}
+  .tc-table tr{border-bottom:1px solid #eaecef}
+  .tc-table tr:last-child{border-bottom:none}
+  .tc-table td{padding:7px 12px;vertical-align:top;line-height:1.45}
+  .tc-table td:first-child{width:160px;font-weight:600;color:#555;background:#fafbfc;white-space:nowrap}
+  .tc-table ol,.tc-table ul{padding-left:16px;margin:0}
+  .tc-table li{margin-bottom:2px}
+  .blank{background:#fffde7;min-height:22px;border-radius:3px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:8.5pt;font-weight:600}
+  .badge-high{background:#fde8e8;color:#b00}
+  .badge-med{background:#fff3cd;color:#856404}
+  .badge-low{background:#d4edda;color:#155724}
+  .badge-neg{background:#f3e8ff;color:#5b00b0}
+  .pass-col{width:90px;text-align:center}
+  .summary-table{width:100%;border-collapse:collapse;font-size:10pt}
+  .summary-table th{background:#1a3c5e;color:#fff;padding:8px 12px;text-align:left}
+  .summary-table td{padding:7px 12px;border-bottom:1px solid #eaecef;vertical-align:top}
+  .summary-table tr:nth-child(even) td{background:#f9fafb}
+  .verdict-box{background:#e8f5e9;border:2px solid #2d6a4f;border-radius:8px;padding:20px;text-align:center;margin:16px 0}
+  .verdict-box h3{color:#1a5c30;font-size:14pt;margin-bottom:6px}
+  .verdict-box p{color:#2d6a4f;font-size:10pt}
+  .sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin:20px}
+  .sign-box{border:1px solid #ccc;border-radius:6px;padding:16px;text-align:center}
+  .sign-line{border-bottom:1px solid #666;margin:30px 10px 6px;height:1px}
+  .sign-label{font-size:9pt;color:#666}
+  @media print{
+    body{background:#fff}
+    .section,.toc,.sign-row{margin:0;border-radius:0}
+    .section{page-break-inside:avoid}
+    .tc{page-break-inside:avoid}
+    @page{margin:1.5cm 1.8cm;size:A4}
+    .cover{page-break-after:always}
+    .toc{page-break-after:always}
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>UFCL ERP System</h1>
+  <h2>End-to-End System Flow — User Acceptance Testing Package</h2>
+  <div class="cover-meta">
+    <div><strong>Document Type</strong>UAT Test Package</div>
+    <div><strong>Role Under Test</strong>Administrator (admin)</div>
+    <div><strong>System Version</strong>v1.3.0</div>
+    <div><strong>Prepared By</strong>QA Engineering</div>
+    <div><strong>Date</strong>June 2026</div>
+    <div><strong>Total Test Cases</strong>63</div>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <p style="margin-bottom:14px;color:#555;font-size:10pt">This package tests the system as two end-to-end production chains, not by module. Each chain is tested top-to-bottom as operators would use it in real production days.</p>
+  <p style="font-weight:700;color:#1a3c5e;margin-bottom:6px;font-size:11pt">&#9654; FLOW 1 — TIMBER CHAIN</p>
+  <ol>
+    <li><a href="#s1">System Setup: Admin Creates Users &amp; Logistics Registers Equipment (ADM-01 – ADM-08)</a></li>
+    <li><a href="#s2">Harvesting Operations &amp; Log Transport (ADM-09 – ADM-13)</a></li>
+    <li><a href="#s3">Sawmill — Timber Production (ADM-14 – ADM-20)</a></li>
+    <li><a href="#s4">Stock Transfer: Gatare → Nyanza (ADM-21 – ADM-24)</a></li>
+    <li><a href="#s5">Value-Added Timber at Nyanza (ADM-25 – ADM-31)</a></li>
+    <li><a href="#s6">Timber Sales (ADM-32 – ADM-35)</a></li>
+  </ol>
+  <p style="font-weight:700;color:#b5500a;margin:14px 0 6px;font-size:11pt">&#9654; FLOW 2 — POLES CHAIN</p>
+  <ol start="7">
+    <li><a href="#s7">Poles Purchase Request &amp; CEO Approval (ADM-36 – ADM-41)</a></li>
+    <li><a href="#s8">Supplier Delivery &amp; Quality Check (ADM-42 – ADM-47)</a></li>
+    <li><a href="#s9">Poles Production (ADM-48 – ADM-53)</a></li>
+    <li><a href="#s10">Poles Sales (ADM-54 – ADM-56)</a></li>
+  </ol>
+  <p style="font-weight:700;color:#4a1a6e;margin:14px 0 6px;font-size:11pt">&#9654; CROSS-CUTTING</p>
+  <ol start="11">
+    <li><a href="#s11">Security, Audit Trail &amp; Workshop Isolation (ADM-57 – ADM-63)</a></li>
+    <li><a href="#s12">Final Sign-Off Summary</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════ FLOW 1 BANNER ══════════════ -->
+<div class="flow-divider timber">
+  FLOW 1 — TIMBER CHAIN
+  <div class="flow-chain">
+    <span class="flow-step">Admin Creates Users</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Logistics Registers Equipment</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Harvesting</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Log Transport</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Sawmill Production</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Stock Transfer to Nyanza</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Value-Added Timber</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Sales</span>
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 1 ══════════════ -->
+<div class="section s1" id="s1">
+  <div class="section-header"><div class="sec-num">1</div><h2>System Setup — Admin Creates Users &amp; Logistics Registers Equipment</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-01</span><span class="tc-title">Admin login</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the admin account authenticates and loads the correct session.</td></tr>
+        <tr><td>Preconditions</td><td>Database is seeded with a single admin user. Application is running.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Open the UFCL ERP application.</li><li>Enter username: <strong>admin</strong></li><li>Enter password: <strong>Admin@1234</strong></li><li>Click Login.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Username: admin | Password: Admin@1234</td></tr>
+        <tr><td>Expected Result</td><td>Login succeeds. Application transitions to the main dashboard. Session stores role = <em>admin</em>. All navigation modules are accessible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-02</span><span class="tc-title">Create CEO user (cross-workshop, no workshop assigned)</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Create the CEO account — needed later for poles purchase approval.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin. Users page open.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Click "Add User".</li><li>Enter Full Name: <strong>Emmanuel Kayitare</strong></li><li>Enter Username: <strong>ceo.ufcl</strong></li><li>Enter Password: <strong>UFCL@CEO1</strong></li><li>Select Role: <strong>ceo</strong></li><li>Leave Workshop field blank (CEO is cross-workshop).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Name: Emmanuel Kayitare | Username: ceo.ufcl | Role: ceo | Workshop: none</td></tr>
+        <tr><td>Expected Result</td><td>User created. Appears in user list with role=ceo, no workshop. CEO can log in and sees all workshops.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-03</span><span class="tc-title">Create Logistics user</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Create a logistics user who will register machines, vehicles, and compartments.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Click "Add User".</li><li>Full Name: <strong>Jean Pierre Habimana</strong></li><li>Username: <strong>jp.logistics</strong></li><li>Password: <strong>UFCL@Log1</strong></li><li>Role: <strong>logistics</strong></li><li>Workshop: leave blank (logistics is cross-workshop).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Name: Jean Pierre Habimana | Username: jp.logistics | Role: logistics</td></tr>
+        <tr><td>Expected Result</td><td>User created with role=logistics. Can log in and access Machines, Vehicles, and Compartments modules.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-04</span><span class="tc-title">Create production staff — Supervisor and Sawmill Leader (Gatare)</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Create two production staff accounts at Gatare. These names must appear in the supervisor dropdown on the Timber Production form.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin. Gatare Workshop (warehouse_id=3) exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Add user: Name <strong>Alice Uwera</strong>, Username <strong>alice.sup</strong>, Role <strong>supervisor</strong>, Workshop <strong>Gatare</strong>. Save.</li><li>Add user: Name <strong>Bernard Nkusi</strong>, Username <strong>bernard.saw</strong>, Role <strong>sawmill-leader</strong>, Workshop <strong>Gatare</strong>. Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Alice Uwera | supervisor | Gatare &nbsp;||&nbsp; Bernard Nkusi | sawmill-leader | Gatare</td></tr>
+        <tr><td>Expected Result</td><td>Both users created and visible in the user list. Both will appear in the production staff dropdown when logging Gatare timber entries.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-05</span><span class="tc-title">Create VAT Leader and Poles Leader</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Create the remaining production staff needed across both chains.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin. Nyanza Workshop (warehouse_id=4) exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Add user: Name <strong>Claire Musoni</strong>, Username <strong>claire.vat</strong>, Role <strong>vat-leader</strong>, Workshop <strong>Nyanza</strong>. Save.</li><li>Add user: Name <strong>Denis Mugabo</strong>, Username <strong>denis.poles</strong>, Role <strong>poles-leader</strong>, Workshop <strong>Gatare</strong>. Save.</li><li>Add user: Name <strong>Eric Habimana</strong>, Username <strong>eric.harvest</strong>, Role <strong>harvesting-leader</strong>, Workshop <strong>Gatare</strong>. Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>All three users created. Claire appears in VAT-related dropdowns at Nyanza. Denis and Alice appear in poles production dropdowns at Gatare.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-06</span><span class="tc-title">Create Sales user</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Create a sales user to record timber and poles sales at the end of each chain.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Add user: Name <strong>Fiona Mukamana</strong>, Username <strong>fiona.sales</strong>, Role <strong>sales</strong>, Workshop blank (or Showroom).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>User created with role=sales. Can access Sales and Deliveries modules.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-07</span><span class="tc-title">Logistics registers machines (harvesting + sawmill)</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Log in as logistics and register two machines — one for harvesting, one for sawmill. The sawmill machine must appear in the Timber Production machine dropdown.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as jp.logistics. Machines module accessible.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Machines.</li><li>Click "Add Machine".</li><li>Register machine: Name <strong>Chainsaw CX-400</strong>, Type <strong>Harvesting</strong>, Workshop <strong>Gatare</strong>. Save.</li><li>Register machine: Name <strong>Sawmill Blade SB-200</strong>, Type <strong>Sawmill</strong>, Workshop <strong>Gatare</strong>. Save.</li><li>Register machine: Name <strong>Poles Lathe PL-10</strong>, Type <strong>Poles</strong>, Workshop <strong>Gatare</strong>. Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Chainsaw CX-400 | Sawmill Blade SB-200 | Poles Lathe PL-10</td></tr>
+        <tr><td>Expected Result</td><td>All three machines appear in the machine list. Sawmill Blade SB-200 and Poles Lathe PL-10 appear in the Machine dropdown on Daily Production forms.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-08</span><span class="tc-title">Logistics registers vehicle and forest compartment</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Register a transport vehicle (used in log transport) and a forest compartment (source of logs).</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as jp.logistics.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Logistics → Vehicles. Click "Add Vehicle".</li><li>Register: Plate <strong>RAB 123A</strong>, Type <strong>Truck</strong>, Workshop <strong>Gatare</strong>. Save.</li><li>Navigate to Logistics → Compartments. Click "Add Compartment".</li><li>Register: Name <strong>Compartment 7A</strong>, Forest <strong>Gishwati</strong>, Area <strong>12 ha</strong>. Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Vehicle: RAB 123A / Truck | Compartment: 7A / Gishwati / 12 ha</td></tr>
+        <tr><td>Expected Result</td><td>Vehicle appears in vehicle list. Compartment appears in compartment list and will be selectable in Harvest daily entries.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 2 ══════════════ -->
+<div class="section s2" id="s2">
+  <div class="section-header"><div class="sec-num">2</div><h2>Harvesting Operations &amp; Log Transport</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-09</span><span class="tc-title">Harvesting leader logs a daily harvest entry</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Record a day's timber harvest from Compartment 7A.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as eric.harvest or admin. Compartment 7A registered. Harvest module accessible.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Harvest Daily.</li><li>Click "New Harvest Entry".</li><li>Select Date: <strong>today</strong>.</li><li>Select Compartment: <strong>Compartment 7A</strong>.</li><li>Enter Logs Cut: <strong>120</strong>.</li><li>Enter Volume (m³): <strong>48.5</strong>.</li><li>Select Species: <strong>Eucalyptus</strong>.</li><li>Add remarks: <em>Good weather, full shift</em>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Compartment: 7A | Logs: 120 | Volume: 48.5 m³ | Species: Eucalyptus</td></tr>
+        <tr><td>Expected Result</td><td>Entry saved. Appears in harvest daily list. Logs count is reflected in the Sawmill "Logs Ready for Production" balance.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-10</span><span class="tc-title">Log transport trip from forest to sawmill</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Record a truck trip carrying logs from the forest to Gatare sawmill.</td></tr>
+        <tr><td>Preconditions</td><td>Vehicle RAB 123A registered. Harvest entry exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Log Transport.</li><li>Click "New Transport".</li><li>Select Vehicle: <strong>RAB 123A</strong>.</li><li>Select From: <strong>Compartment 7A / Gishwati</strong>.</li><li>Select To: <strong>Gatare Workshop</strong>.</li><li>Enter Logs Transported: <strong>80</strong>.</li><li>Enter Trip Date: <strong>today</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Vehicle: RAB 123A | Logs: 80 | From: Gishwati | To: Gatare</td></tr>
+        <tr><td>Expected Result</td><td>Transport record saved. Appears in Log Transport list. Sawmill "Logs Received" balance updates.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-11</span><span class="tc-title">Sawmill dashboard shows correct logs received balance</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify that the logs received on the Sawmill page matches the transport records.</td></tr>
+        <tr><td>Preconditions</td><td>Transport entry (ADM-10) saved. Navigate to Daily Timber page.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Timber (Sawmill).</li><li>Check the "Logs Received" summary card at the top.</li><li>Confirm the number equals the sum of log transport records into Gatare Workshop.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>"Logs Received" shows 80 (matching the transport entry). The figure is correctly derived from log transport records, not harvest cuts.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-12</span><span class="tc-title">Record a second log transport trip (remaining logs)</span><span class="badge badge-low">Medium</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Record the second truck trip for remaining 40 logs. Verify the running total updates.</td></tr>
+        <tr><td>Preconditions</td><td>First transport record (80 logs) exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Log Transport → New Transport.</li><li>Same vehicle, same route, Logs: <strong>40</strong>, Date: <strong>today</strong>.</li><li>Click Save.</li><li>Return to Daily Timber page and check Logs Received.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Logs Received shows 120 (80 + 40). Both transport records visible in Log Transport list.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-13</span><span class="tc-title">Attempt harvest entry with missing required fields</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the form blocks submission when required fields are empty.</td></tr>
+        <tr><td>Preconditions</td><td>Harvest Daily form open.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Open a new harvest entry form.</li><li>Leave Compartment blank.</li><li>Enter Logs: <strong>50</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Form does not save. Validation error shown indicating Compartment is required.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 3 ══════════════ -->
+<div class="section s3" id="s3">
+  <div class="section-header"><div class="sec-num">3</div><h2>Sawmill — Timber Production</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-14</span><span class="tc-title">Timber production form — supervisor is a dropdown (not auto-filled)</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the supervisor field is a dropdown of registered production staff and does NOT pre-populate with the logged-in user's name.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin. Alice Uwera (supervisor) and Bernard Nkusi (sawmill-leader) created in ADM-04.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Timber.</li><li>Click "New Timber Entry".</li><li>Inspect the Supervisor field.</li><li>Confirm it is a &lt;select&gt; dropdown, not a text field.</li><li>Confirm it is EMPTY by default (no auto-population with admin name).</li><li>Click the dropdown and verify it lists: <strong>Alice Uwera (supervisor)</strong>, <strong>Bernard Nkusi (sawmill-leader)</strong>, and other registered production staff.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Supervisor is a dropdown. Default value is blank/placeholder. The logged-in admin's name does NOT appear as a pre-filled value. Dropdown lists active production-role users only.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-15</span><span class="tc-title">Machine field is required — save blocked when empty</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system blocks a timber production entry if no machine is selected.</td></tr>
+        <tr><td>Preconditions</td><td>New Timber Entry form open. Machine dropdown present.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Fill in: Date today, Supervisor Alice Uwera, Product Size <strong>2×4</strong>, Timber Units <strong>200</strong>.</li><li>Leave Machine field blank/unselected.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Timber Units: 200 | Machine: (none)</td></tr>
+        <tr><td>Expected Result</td><td>Save is blocked. Error message: <em>"Machine is required for timber production entries"</em> (or similar). No record is created in the database.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-16</span><span class="tc-title">Save timber production entry with all required fields</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Successfully create a complete timber production record with supervisor from dropdown, machine selected, and operators on shift filled.</td></tr>
+        <tr><td>Preconditions</td><td>New Timber Entry form open. Machine "Sawmill Blade SB-200" exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Enter Date: <strong>today</strong>.</li><li>Select Supervisor: <strong>Alice Uwera</strong> from dropdown.</li><li>Enter Operators on Shift: <strong>John Nzeyimana, Peter Uwimana</strong>.</li><li>Select Machine: <strong>Sawmill Blade SB-200</strong>.</li><li>Select Product Size: <strong>2×4</strong>.</li><li>Enter Timber Units: <strong>180</strong>.</li><li>Enter Timber Waste: <strong>20</strong>.</li><li>Enter Remarks: <em>Blade changed mid-shift</em>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Supervisor: Alice Uwera | Operators: John Nzeyimana, Peter Uwimana | Machine: Sawmill Blade SB-200 | Units: 180 | Waste: 20</td></tr>
+        <tr><td>Expected Result</td><td>Entry saved. Appears in the timber production table. Supervisor shows Alice Uwera. Operators on shift text is visible below her name in the table row.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-17</span><span class="tc-title">Timber production table shows supervisor and operators correctly</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the production table displays the supervisor name (from dropdown selection) and the operators text below it.</td></tr>
+        <tr><td>Preconditions</td><td>Entry from ADM-16 saved.</td></tr>
+        <tr><td>Steps</td><td><ol><li>On the Daily Timber page, find the row for today's entry.</li><li>Inspect the Supervisor/Operators column.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Column shows <strong>Alice Uwera</strong> on the main line. Below it in smaller grey text: <em>John Nzeyimana, Peter Uwimana</em>. Machine column shows Sawmill Blade SB-200.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-18</span><span class="tc-title">Edit timber production entry — supervisor dropdown pre-selects saved value</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>When editing an existing entry, the supervisor dropdown should pre-select the previously saved supervisor name.</td></tr>
+        <tr><td>Preconditions</td><td>Entry from ADM-16 exists with Supervisor = Alice Uwera.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Click the Edit (pencil) icon on the ADM-16 entry.</li><li>Inspect the Supervisor dropdown — it should show <strong>Alice Uwera</strong> pre-selected.</li><li>Change Supervisor to <strong>Bernard Nkusi</strong>.</li><li>Change Operators to: <strong>John Nzeyimana, Paul Habimana</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Edit form opens with Alice Uwera pre-selected in dropdown. After save, the table row now shows Bernard Nkusi as supervisor with updated operators text.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-19</span><span class="tc-title">Add second timber entry (different size) and verify size tracking</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Record a second production entry for a different timber size to confirm multiple sizes tracked independently.</td></tr>
+        <tr><td>Preconditions</td><td>First entry exists for size 2×4. Machine and supervisor available.</td></tr>
+        <tr><td>Steps</td><td><ol><li>New Timber Entry.</li><li>Supervisor: <strong>Alice Uwera</strong>, Machine: <strong>Sawmill Blade SB-200</strong>.</li><li>Product Size: <strong>3×6</strong>, Units: <strong>120</strong>, Waste: <strong>15</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Size: 3×6 | Units: 120 | Waste: 15</td></tr>
+        <tr><td>Expected Result</td><td>Second entry saved. Table shows two rows with different sizes. Timber summary totals reflect both entries.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-20</span><span class="tc-title">Production staff request deletion — admin approves pending deletion</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the pending-deletion workflow: a production user flags an entry for deletion; admin sees and approves it.</td></tr>
+        <tr><td>Preconditions</td><td>A timber entry exists. Logged in as a non-admin production staff user.</td></tr>
+        <tr><td>Steps</td><td><ol><li>As a production staff user, click the Delete icon on a timber entry.</li><li>Confirm the request is flagged as "pending deletion" (not immediately deleted).</li><li>Log in as admin. Navigate to Daily Timber.</li><li>Find the pending deletion entry (highlighted or badged).</li><li>Click Approve Deletion.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Entry is soft-deleted (deleted_at set). It no longer appears in the active list. Audit trail records the deletion request and admin approval.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 4 ══════════════ -->
+<div class="section s4" id="s4">
+  <div class="section-header"><div class="sec-num">4</div><h2>Stock Transfer — Gatare → Nyanza</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-21</span><span class="tc-title">Create a stock transfer from Gatare to Nyanza</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Transfer processed timber from the Gatare sawmill to Nyanza for value-added processing. This transfer will appear as an "Inbound" on the Nyanza VAT page.</td></tr>
+        <tr><td>Preconditions</td><td>Timber production entries exist at Gatare. Logged in as admin or operations.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Stock Transfers.</li><li>Click "New Transfer".</li><li>From Workshop: <strong>Gatare (Warehouse 3)</strong>.</li><li>To Workshop: <strong>Nyanza (Warehouse 4)</strong>.</li><li>Item / Timber Size: <strong>2×4</strong>.</li><li>Quantity: <strong>100</strong> units.</li><li>Transfer Date: <strong>today</strong>.</li><li>Notes: <em>VAT batch 1</em>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>From: Gatare | To: Nyanza | Size: 2×4 | Qty: 100</td></tr>
+        <tr><td>Expected Result</td><td>Transfer record created. Appears in Stock Transfers list. Gatare stock balance decreases by 100 units of 2×4. Nyanza VAT page will show this as an inbound transfer.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-22</span><span class="tc-title">Transfer record visible in transfer list with correct details</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the transfer appears correctly in the transfer list with status, quantity, and route.</td></tr>
+        <tr><td>Preconditions</td><td>Transfer from ADM-21 saved.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Stock Transfers list.</li><li>Find today's transfer.</li><li>Confirm: From = Gatare, To = Nyanza, Qty = 100, Item = 2×4.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Transfer row shows correct route, quantity, date, and the initiating user. Status shown (e.g. completed/pending).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-23</span><span class="tc-title">Attempt transfer exceeding available Gatare stock</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system blocks a transfer quantity that exceeds what Gatare has in stock.</td></tr>
+        <tr><td>Preconditions</td><td>Gatare has 80 units of 3×6 timber (from ADM-19).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Create a new transfer: From Gatare → To Nyanza, Size <strong>3×6</strong>, Quantity <strong>500</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Transfer blocked with an error indicating insufficient stock. No record created.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-24</span><span class="tc-title">Nyanza VAT page shows the inbound transfer</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that the Nyanza VAT page receives the transfer and displays it in the "Inbound Timber" section.</td></tr>
+        <tr><td>Preconditions</td><td>Transfer ADM-21 (100 units of 2×4 → Nyanza) created.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Value-Added Timber page (or log in as claire.vat).</li><li>Look for the "Inbound Timber at Nyanza" section / card at the top of the page.</li><li>Confirm Transfer #[id] appears with Qty=100, Size=2×4, remaining balance=100.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Inbound section shows the transfer from Gatare. Available balance = 100 (no intake yet). Transfer ID, source, size, and received quantity all visible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 5 ══════════════ -->
+<div class="section s5" id="s5">
+  <div class="section-header"><div class="sec-num">5</div><h2>Value-Added Timber at Nyanza</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-25</span><span class="tc-title">VAT page shows inbound section only when transfers exist</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the "Inbound Timber" card is visible when there are transfers destined for Nyanza, and hidden when there are none.</td></tr>
+        <tr><td>Preconditions</td><td>Transfer ADM-21 exists. Logged in as claire.vat or admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Value-Added Timber page.</li><li>Observe the top of the page for the Inbound Timber card.</li><li>Confirm the card shows the transfer.</li><li>(Optional) Switch to a workshop with no transfers and confirm the card is hidden.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Inbound card is visible and shows the Gatare→Nyanza transfer. No inbound card is shown for workshops that have received no transfers.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-26</span><span class="tc-title">Add VAT intake entry linked to inbound transfer</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Record a value-added timber production entry that draws from the inbound transfer balance.</td></tr>
+        <tr><td>Preconditions</td><td>Inbound transfer (100 units, 2×4) visible on VAT page. New Entry form available.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Click "Add VAT Entry".</li><li>Select Source Transfer: <strong>Transfer #[id] — 2×4 | 100 available</strong>.</li><li>Enter Timber Size: <strong>2×4</strong>.</li><li>Enter Quantity (Intake): <strong>60</strong>.</li><li>Select Supervisor: <strong>Claire Musoni</strong> from dropdown.</li><li>Enter Date: <strong>today</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Source Transfer: #[id] | Intake Qty: 60 | Supervisor: Claire Musoni</td></tr>
+        <tr><td>Expected Result</td><td>VAT entry saved. The inbound transfer balance updates from 100 → 40 remaining. Entry appears in the VAT production table with the transfer reference shown.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-27</span><span class="tc-title">Inbound balance decreases after intake — verify remaining balance</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the inbound balance correctly reflects 60 consumed, 40 remaining after ADM-26.</td></tr>
+        <tr><td>Preconditions</td><td>ADM-26 saved (60 units consumed from the 100-unit transfer).</td></tr>
+        <tr><td>Steps</td><td><ol><li>On the VAT page, look at the Inbound Timber card for the transfer.</li><li>Confirm: Received = 100, Used = 60, Remaining = 40.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Remaining balance = 40 units. The system correctly subtracts all linked intake entries from the original received quantity.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-28</span><span class="tc-title">Attempt intake exceeding available inbound balance — blocked</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system blocks a VAT intake that exceeds the remaining inbound balance for the linked transfer.</td></tr>
+        <tr><td>Preconditions</td><td>Transfer balance = 40 remaining (after ADM-26 consumed 60).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Open a new VAT entry form.</li><li>Select the same Source Transfer.</li><li>Enter Intake Qty: <strong>80</strong> (exceeds the 40 remaining).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Save blocked. Error message indicating insufficient inbound balance (40 available, 80 requested). No entry created.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-29</span><span class="tc-title">Add second VAT entry consuming remaining balance</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Use up the remaining 40 units so the transfer balance reaches zero.</td></tr>
+        <tr><td>Preconditions</td><td>Transfer balance = 40 remaining.</td></tr>
+        <tr><td>Steps</td><td><ol><li>New VAT entry, same source transfer, Intake: <strong>40</strong>.</li><li>Click Save.</li><li>Check the inbound card.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Entry saved. Inbound balance now = 0. Transfer is fully consumed. The inbound card reflects this (0 remaining).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-30</span><span class="tc-title">VAT production table shows source transfer reference</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify each VAT entry in the production table shows which transfer it was sourced from.</td></tr>
+        <tr><td>Preconditions</td><td>Two VAT entries exist, both linked to Transfer #[id].</td></tr>
+        <tr><td>Steps</td><td><ol><li>On the VAT page, look at the production entries table.</li><li>Find the "Inbound Transfer" or "Source" column.</li><li>Confirm it shows <strong>Transfer #[id]</strong> for both entries.</li><li>For an entry with no transfer link (if any), confirm it shows "—".</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Each linked entry displays the transfer ID. Traceability is clear: which batch of raw timber became which VAT output.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-31</span><span class="tc-title">VAT entry form shows available quantity hint when transfer selected</span><span class="badge badge-low">Medium</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>When a user selects a source transfer in the form, the UI should show a live hint of how many units are still available.</td></tr>
+        <tr><td>Preconditions</td><td>Create a second transfer (50 units of 3×6 from Gatare to Nyanza). Navigate to VAT new entry form.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Open "Add VAT Entry".</li><li>Select the new 3×6 transfer from the Source Transfer dropdown.</li><li>Observe the hint text below the dropdown immediately after selection.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>A hint message appears showing e.g. <em>"50 units available from this transfer"</em>. The hint updates dynamically when a different transfer is selected.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 6 ══════════════ -->
+<div class="section s6" id="s6">
+  <div class="section-header"><div class="sec-num">6</div><h2>Timber Sales</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-32</span><span class="tc-title">Record a timber sale from Nyanza</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Log a sales transaction for value-added timber dispatched from the Nyanza showroom.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as fiona.sales or admin. Timber stock available at Nyanza.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Sales.</li><li>Click "New Sale".</li><li>Customer: <strong>REMA Construction Ltd</strong>.</li><li>Product: <strong>Timber 2×4</strong>, Quantity: <strong>50</strong>, Unit Price: <strong>3,500 RWF</strong>.</li><li>Workshop / Source: <strong>Nyanza</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Customer: REMA Construction | Qty: 50 | Price: 3,500 RWF | Source: Nyanza</td></tr>
+        <tr><td>Expected Result</td><td>Sale recorded. Appears in sales list. Nyanza stock balance decreases by 50 units of 2×4.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-33</span><span class="tc-title">Record a timber sale from Gatare direct warehouse</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Log a sale for raw-sawn timber dispatched directly from Gatare (not via Nyanza VAT).</td></tr>
+        <tr><td>Preconditions</td><td>Timber stock available at Gatare after production.</td></tr>
+        <tr><td>Steps</td><td><ol><li>New Sale: Customer <strong>ABC Traders</strong>, Product <strong>Timber 3×6</strong>, Qty <strong>30</strong>, Price <strong>4,200 RWF</strong>, Source <strong>Gatare</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Sale recorded against Gatare stock. Gatare 3×6 balance decreases by 30.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-34</span><span class="tc-title">Sales report shows revenue and volume by workshop</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the sales report aggregates volume and revenue correctly across both source workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Sales ADM-32 and ADM-33 recorded.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Reports → Sales.</li><li>Set date range to include today.</li><li>Review total volume and revenue per workshop.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Report shows: Nyanza = 50 units / 175,000 RWF revenue. Gatare = 30 units / 126,000 RWF revenue. Grand total reflects both.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-35</span><span class="tc-title">Attempt sale exceeding available stock</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system blocks a sale when the requested quantity exceeds available inventory.</td></tr>
+        <tr><td>Preconditions</td><td>Gatare has limited 3×6 remaining after ADM-33.</td></tr>
+        <tr><td>Steps</td><td><ol><li>New Sale: Product 3×6, Qty <strong>9999</strong>, Source Gatare.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Sale blocked with an error message indicating insufficient stock. No record created.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ FLOW 2 BANNER ══════════════ -->
+<div class="flow-divider poles">
+  FLOW 2 — POLES CHAIN
+  <div class="flow-chain">
+    <span class="flow-step">Submit Purchase Request</span><span class="flow-arrow">→</span>
+    <span class="flow-step">CEO Approves</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Supplier Delivers</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Quality Check (approve/reject)</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Poles Production</span><span class="flow-arrow">→</span>
+    <span class="flow-step">Sales</span>
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 7 ══════════════ -->
+<div class="section s7" id="s7">
+  <div class="section-header"><div class="sec-num">7</div><h2>Poles Purchase Request &amp; CEO Approval</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-36</span><span class="tc-title">Submit a poles purchase request</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>A production staff member (poles-leader or supervisor) submits a request to purchase poles from an external supplier.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as denis.poles (poles-leader). Daily Poles page accessible.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles.</li><li>Click "New Purchase Request".</li><li>Supplier Name: <strong>Gahara Wood Suppliers</strong>.</li><li>Requested Quantity: <strong>500</strong> poles.</li><li>Unit Price: <strong>800 RWF</strong>.</li><li>Notes: <em>Urgent — current stock depleted</em>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Supplier: Gahara Wood Suppliers | Qty: 500 | Price: 800 RWF/pole</td></tr>
+        <tr><td>Expected Result</td><td>Purchase request created with status = <strong>pending</strong>. Appears in the Purchase Requests section on the Daily Poles page. No stock is allocated yet.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-37</span><span class="tc-title">Non-CEO user sees Approve/Reject buttons but is blocked when clicking</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that only the CEO role can approve purchase requests. Other roles are blocked.</td></tr>
+        <tr><td>Preconditions</td><td>Purchase request ADM-36 is pending. Logged in as admin (role=admin, not CEO).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles.</li><li>Find the pending purchase request from ADM-36.</li><li>Click the <strong>Approve</strong> button on the request.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Approval is blocked. Error or message states that only the CEO can approve purchase requests. Request remains in pending status.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-38</span><span class="tc-title">CEO approves the poles purchase request</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>The CEO logs in and approves the pending purchase request, authorising procurement to proceed.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as ceo.ufcl (CEO). Purchase request ADM-36 is pending.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles.</li><li>Find the pending request from Gahara Wood Suppliers.</li><li>Click <strong>Approve</strong>.</li><li>Confirm the action in any confirmation prompt.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Request status changes to <strong>approved</strong>. Approval timestamp and CEO name recorded. The "New Delivery" action is now available against this request. Audit trail records the approval.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-39</span><span class="tc-title">Attempt poles production before any delivery/quality check — blocked</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that no poles production entry can be created when there is no approved stock on hand (purchase approved but nothing delivered yet).</td></tr>
+        <tr><td>Preconditions</td><td>Purchase request approved but no delivery recorded. Available stock = 0.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles → Production section.</li><li>Click "New Production Entry".</li><li>Enter Poles Units: <strong>50</strong>, select Supervisor and Machine.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>If the system has any poles delivery records for this workshop, production is blocked with an "insufficient approved stock" error. If no deliveries exist at all for this workshop, the system allows it (backward-compatible — no block when poles delivery system has no records).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-40</span><span class="tc-title">CEO rejects a second purchase request with a reason</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can reject a purchase request and the reason is stored and displayed.</td></tr>
+        <tr><td>Preconditions</td><td>Submit a second purchase request (Supplier: Muhanga Timber, Qty: 200, Price: 750 RWF). Logged in as ceo.ufcl.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Find the second pending request on the Daily Poles page.</li><li>Click <strong>Reject</strong>.</li><li>Enter rejection reason: <em>"Budget not approved for this period"</em>.</li><li>Confirm.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Rejection reason: Budget not approved for this period</td></tr>
+        <tr><td>Expected Result</td><td>Request status = <strong>rejected</strong>. Rejection reason visible on the request card. No delivery can be recorded against a rejected request.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-41</span><span class="tc-title">Available Stock summary card shows zero before any delivery</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the summary card on the Daily Poles page accurately shows 0 available stock when no delivery has been quality-checked yet.</td></tr>
+        <tr><td>Preconditions</td><td>Purchase request approved but no delivery recorded.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles.</li><li>Observe the summary cards at the top: Available Stock, Pending Requests, Awaiting QC.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Available Stock = 0 (red/alert color). Pending Requests = 0 (approved). Awaiting QC = 0. No red alert banner since no delivery history exists yet.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 8 ══════════════ -->
+<div class="section s8" id="s8">
+  <div class="section-header"><div class="sec-num">8</div><h2>Supplier Delivery &amp; Quality Check</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-42</span><span class="tc-title">Record supplier delivery against approved purchase request</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Log the physical arrival of poles from Gahara Wood Suppliers against the approved purchase request.</td></tr>
+        <tr><td>Preconditions</td><td>Purchase request ADM-38 is approved. Logged in as admin or poles-leader.</td></tr>
+        <tr><td>Steps</td><td><ol><li>On Daily Poles page, find the approved request.</li><li>Click <strong>"Record Delivery"</strong>.</li><li>Delivery Date: <strong>today</strong>.</li><li>Delivered Quantity: <strong>480</strong> (supplier delivered 480 of 500 ordered).</li><li>Delivery Note Ref: <strong>GWS/2026/061</strong>.</li><li>Supplier Name: <strong>Gahara Wood Suppliers</strong> (auto-filled from request or re-entered).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Delivered Qty: 480 | Delivery Note: GWS/2026/061 | Supplier: Gahara Wood Suppliers</td></tr>
+        <tr><td>Expected Result</td><td>Delivery record created with status = <strong>pending</strong> (awaiting quality check). Appears in "Deliveries &amp; Quality Check" section. "Awaiting QC" count increases to 1. No stock added yet — stock is only allocated after QC.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-43</span><span class="tc-title">Delivery appears in "Awaiting QC" list</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the Deliveries &amp; Quality Check section correctly shows the new delivery with a "Quality Check" action button.</td></tr>
+        <tr><td>Preconditions</td><td>Delivery from ADM-42 saved.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Look at the Deliveries section on the Daily Poles page.</li><li>Find the entry: Supplier = Gahara Wood Suppliers, Delivered = 480, Status = pending.</li><li>Confirm a <strong>Quality Check</strong> button is present.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Delivery row visible with status = pending. "Quality Check" action button present. Available Stock still = 0.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-44</span><span class="tc-title">Perform quality check — approve some, reject some</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Conduct a quality check on the delivery. Some poles are approved, some are rejected (defective). The rejected count should auto-calculate.</td></tr>
+        <tr><td>Preconditions</td><td>Delivery (480 poles) in pending/awaiting QC status.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Click "Quality Check" on the delivery row.</li><li>A form opens. Delivered Qty shows <strong>480</strong> (read-only).</li><li>Enter Approved Qty: <strong>450</strong>.</li><li>Observe the Rejected Qty field — it should auto-calculate to <strong>30</strong>.</li><li>Enter Rejection Reason: <em>"30 poles bent/cracked on inspection"</em>.</li><li>Click Save / Confirm Quality Check.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Delivered: 480 | Approved: 450 | Rejected (auto): 30 | Reason: 30 poles bent/cracked</td></tr>
+        <tr><td>Expected Result</td><td>QC saved. Delivery status = <strong>quality_checked</strong>. Approved Qty = 450. Rejected Qty = 30 (auto-calculated as 480 − 450). Available Stock now updates to 450.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-45</span><span class="tc-title">Rejected count auto-calculates live in QC form</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify that as the user types in the Approved Qty field, the Rejected Qty field updates immediately without saving.</td></tr>
+        <tr><td>Preconditions</td><td>A second delivery exists (record: Supplier Muhanga Timber with 200 delivered). Quality Check form open for it.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Open Quality Check form for the 200-pole delivery.</li><li>Type <strong>180</strong> in Approved Qty field.</li><li>Observe Rejected Qty without clicking Save.</li><li>Change Approved Qty to <strong>195</strong>.</li><li>Observe Rejected Qty again.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Rejected Qty shows <strong>20</strong> after typing 180, then updates to <strong>5</strong> after typing 195. Live update — no form submission required.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-46</span><span class="tc-title">Available Stock card updates after quality check</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>After completing quality check, the Available Stock summary card must reflect the approved quantity.</td></tr>
+        <tr><td>Preconditions</td><td>QC complete for ADM-44 delivery (450 approved). No production entries yet.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate back to Daily Poles page.</li><li>Observe the Available Stock summary card.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Available Stock = <strong>450</strong>. Card changes from red/alert (0) to normal color now that stock is available. Formula: sum(approved_qty where status=quality_checked) − sum(poles produced).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-47</span><span class="tc-title">Attempt to quality-check an already-checked delivery — blocked</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm a delivery that already has status=quality_checked cannot be QC'd again.</td></tr>
+        <tr><td>Preconditions</td><td>Delivery from ADM-44 has status = quality_checked.</td></tr>
+        <tr><td>Steps</td><td><ol><li>On the Deliveries section, find the completed delivery.</li><li>Confirm there is NO "Quality Check" button on it (button should be absent or disabled).</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>QC button is absent/disabled for already-checked deliveries. The delivery row shows the approved/rejected quantities as read-only. No duplicate QC is possible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 9 ══════════════ -->
+<div class="section s9" id="s9">
+  <div class="section-header"><div class="sec-num">9</div><h2>Poles Production</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-48</span><span class="tc-title">Production form shows available stock before entry</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the poles production area shows the current available stock balance so operators know their limit before entering production quantities.</td></tr>
+        <tr><td>Preconditions</td><td>Available Stock = 450 (from ADM-46). Navigate to Daily Poles.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles.</li><li>Look at the Available Stock summary card or the Production section.</li><li>Confirm the balance 450 is visible before creating any production entry.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Available stock of 450 is clearly displayed. Operators can see the limit before filling in production quantities.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-49</span><span class="tc-title">Attempt poles production exceeding available stock — blocked</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the backend blocks a production entry when poles_units + poles_waste exceeds the available approved stock.</td></tr>
+        <tr><td>Preconditions</td><td>Available Stock = 450. No production entries yet.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Daily Poles → New Production Entry.</li><li>Enter Poles Units: <strong>400</strong>, Poles Waste: <strong>100</strong> (total = 500 &gt; 450 available).</li><li>Select Supervisor and Machine.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Poles Units: 400 | Waste: 100 | Total: 500 | Available: 450</td></tr>
+        <tr><td>Expected Result</td><td>Save blocked. Error: <em>"Insufficient approved pole stock: 450 available, 500 requested"</em> (or similar). No record created.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-50</span><span class="tc-title">Create valid poles production entry within stock limit</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Successfully create a poles production record with supervisor from dropdown, machine required, and within available stock.</td></tr>
+        <tr><td>Preconditions</td><td>Available Stock = 450. Machine "Poles Lathe PL-10" registered. Supervisor Denis Mugabo (poles-leader) exists.</td></tr>
+        <tr><td>Steps</td><td><ol><li>New Production Entry.</li><li>Date: <strong>today</strong>.</li><li>Select Supervisor: <strong>Denis Mugabo</strong> (from dropdown — not auto-filled).</li><li>Enter Operators: <strong>Marie Mukamana, Samuel Niyonzima</strong>.</li><li>Select Machine: <strong>Poles Lathe PL-10</strong>.</li><li>Poles Units: <strong>200</strong>, Poles Waste: <strong>10</strong> (total = 210 ≤ 450).</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Supervisor: Denis Mugabo | Machine: Poles Lathe PL-10 | Units: 200 | Waste: 10</td></tr>
+        <tr><td>Expected Result</td><td>Entry saved. Available Stock decreases to 240 (450 − 210). Entry appears in production records table.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-51</span><span class="tc-title">Available Stock decreases correctly after production entry</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the Available Stock balance = approved_total − produced_total after ADM-50.</td></tr>
+        <tr><td>Preconditions</td><td>ADM-50 saved (200 units + 10 waste = 210 consumed).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Return to Daily Poles page.</li><li>Read the Available Stock summary card.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Available Stock = 240 (450 approved − 210 produced). Card shown in normal color (stock still available).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-52</span><span class="tc-title">Machine field required on poles production — blocked when empty</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that the machine field is required for poles production, same as timber production.</td></tr>
+        <tr><td>Preconditions</td><td>New Production Entry form open. Available stock &gt; 0.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Enter Poles Units: <strong>50</strong>, select Supervisor.</li><li>Leave Machine blank.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Save blocked with error: machine is required. No record created.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-53</span><span class="tc-title">Attempt production after stock is fully depleted</span><span class="badge badge-neg">Negative</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>After Available Stock reaches 0, confirm all further production attempts are blocked.</td></tr>
+        <tr><td>Preconditions</td><td>Available Stock = 240. Create one more entry consuming all 240 (e.g. Units: 230, Waste: 10).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Create production entry: Units 230, Waste 10. Save. (Available → 0.)</li><li>Attempt another entry: Units <strong>1</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>After consuming all stock, the next attempt is blocked. Available Stock card turns red (0). Error message confirms no approved stock remaining.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 10 ══════════════ -->
+<div class="section s10" id="s10">
+  <div class="section-header"><div class="sec-num">10</div><h2>Poles Sales</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-54</span><span class="tc-title">Record a poles sale</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Log a sales transaction for finished poles from Gatare workshop.</td></tr>
+        <tr><td>Preconditions</td><td>Poles production entries exist (200 units produced in ADM-50). Logged in as fiona.sales or admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Sales → New Sale.</li><li>Customer: <strong>RECO Ltd</strong>.</li><li>Product: <strong>Poles</strong>, Quantity: <strong>100</strong>, Unit Price: <strong>1,200 RWF</strong>.</li><li>Source Workshop: <strong>Gatare</strong>.</li><li>Click Save.</li></ol></td></tr>
+        <tr><td>Sample Data</td><td>Customer: RECO Ltd | Qty: 100 | Price: 1,200 RWF | Source: Gatare</td></tr>
+        <tr><td>Expected Result</td><td>Sale recorded. Poles inventory balance at Gatare decreases by 100. Sale appears in the sales list with correct customer, amount, and date.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-55</span><span class="tc-title">Poles inventory balance correct after sale</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify that the poles stock balance at Gatare reflects the correct figure after production and sales.</td></tr>
+        <tr><td>Preconditions</td><td>ADM-50: 200 poles produced. ADM-54: 100 poles sold. Net = 100 remaining.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Inventory or Reports → Stock Summary.</li><li>Filter to Gatare workshop, item = Poles.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Poles balance at Gatare = 100 (200 produced − 100 sold). This matches: produced units minus waste minus sold units.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-56</span><span class="tc-title">Poles production vs. sales summary report</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the reports module shows a meaningful poles chain summary: procurement → approved → produced → sold → remaining.</td></tr>
+        <tr><td>Preconditions</td><td>All poles chain steps completed (ADM-36 through ADM-54).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Reports or KPI.</li><li>Find the poles summary or daily poles report.</li><li>Review figures for ordered, delivered, approved, rejected, produced, sold.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Report shows: Ordered=500, Delivered=480, Approved=450, Rejected=30, Produced=440 (200+230+10 waste), Sold=100, Remaining≈100. Numbers trace through the full chain without gaps.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ FLOW 3 BANNER ══════════════ -->
+<div class="flow-divider cross">
+  CROSS-CUTTING — Security, Audit Trail &amp; Workshop Isolation
+</div>
+
+<!-- ══════════════ SECTION 11 ══════════════ -->
+<div class="section s11" id="s11">
+  <div class="section-header"><div class="sec-num">11</div><h2>Security, Audit Trail &amp; Workshop Isolation</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-57</span><span class="tc-title">Audit trail records every create, edit, and delete action</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm all significant actions (create user, approve purchase, log production, delete entry) are recorded in the audit trail with the acting user's name, timestamp, and description.</td></tr>
+        <tr><td>Preconditions</td><td>All test cases ADM-01 to ADM-56 completed. Logged in as admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Audit Trail / Audit Log.</li><li>Look for entries corresponding to: user creation (ADM-02 to ADM-06), CEO approval of poles request (ADM-38), timber production create (ADM-16), pending deletion approval (ADM-20), VAT intake (ADM-26).</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Each of the above actions has a corresponding audit entry with: acting user, action description, timestamp, and the relevant record ID or data snapshot. No gaps.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-58</span><span class="tc-title">Manager role has read-only access — no edit or delete buttons visible</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that the manager role cannot edit or delete records. The system must NEVER grant managers write access without explicit admin approval.</td></tr>
+        <tr><td>Preconditions</td><td>Create a test user with role=manager. Log in as that user.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Create user: Name <strong>Test Manager</strong>, Role <strong>manager</strong>. Log in as that user.</li><li>Navigate to Daily Timber, Daily Poles, VAT, Users, and Sales pages.</li><li>Look for Edit (pencil) and Delete (trash) buttons on each page.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>No edit or delete buttons are visible or accessible for the manager role on any page. Manager can only read data.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-59</span><span class="tc-title">Workshop-scoped user sees only their own workshop data</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the workshop isolation rule: a user assigned to Nyanza cannot see Gatare's production entries, and vice versa.</td></tr>
+        <tr><td>Preconditions</td><td>Gatare production entries exist. Nyanza VAT entries exist. Log in as claire.vat (Nyanza).</td></tr>
+        <tr><td>Steps</td><td><ol><li>Log in as claire.vat.</li><li>Navigate to Daily Timber. Check what entries are visible.</li><li>Navigate to Daily Poles. Check what entries are visible.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>claire.vat (Nyanza) sees ONLY Nyanza data. Gatare timber production entries are NOT shown. No workshop filter dropdown is available to a workshop-scoped user.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-60</span><span class="tc-title">Nyanza VAT page only shows inbound transfers addressed to Nyanza</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that only transfers where destination = Nyanza appear in the Nyanza VAT inbound section. Transfers destined for other workshops are not shown.</td></tr>
+        <tr><td>Preconditions</td><td>One transfer to Nyanza exists. Create a second transfer from Gatare to Headquarters (warehouse 2). Log in as claire.vat.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Value-Added Timber page as claire.vat.</li><li>Check the Inbound Timber section.</li><li>Confirm only the Gatare→Nyanza transfer appears. The Gatare→Headquarters transfer must NOT appear.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Inbound section shows exactly 1 transfer (Gatare→Nyanza). The Headquarters-destined transfer is not visible at Nyanza.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-61</span><span class="tc-title">Admin cannot delete their own account</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system prevents an admin from deleting the account they are currently logged into.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Users.</li><li>Find the currently logged-in admin account in the list.</li><li>Click the Delete button on that account.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Delete button is disabled or the action is blocked with a message: "You cannot delete your own account." No deletion occurs.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-62</span><span class="tc-title">Cannot delete the last remaining admin account</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system prevents deleting the last admin account in the database to avoid an unrecoverable lockout.</td></tr>
+        <tr><td>Preconditions</td><td>Only one admin account exists. Logged in as admin.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Users.</li><li>Attempt to delete (or deactivate) the only admin account via any available action.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>Action blocked. Error message: "Cannot delete the last administrator account" or similar. The admin account remains active.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">ADM-63</span><span class="tc-title">Deleted user's historical records remain intact and attributable</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that soft-deleting a user does not destroy their historical records. All records created by or referencing that user must remain visible and properly attributed.</td></tr>
+        <tr><td>Preconditions</td><td>Bernard Nkusi (sawmill-leader) has at least one timber production entry. Admin logged in.</td></tr>
+        <tr><td>Steps</td><td><ol><li>Navigate to Users. Delete (soft-delete) the account for Bernard Nkusi.</li><li>Navigate to Daily Timber.</li><li>Find the timber entry previously attributed to Bernard Nkusi.</li></ol></td></tr>
+        <tr><td>Expected Result</td><td>The timber production entry still exists and still shows Bernard Nkusi's name. The audit trail entry for that record is also preserved. The deleted account's records are orphaned safely — they reference the old user ID but are not broken.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td class="pass-col">Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 12 ══════════════ -->
+<div class="section s12" id="s12">
+  <div class="section-header"><div class="sec-num">12</div><h2>Final Sign-Off Summary</h2></div>
+  <div class="section-body">
+
+    <p style="font-size:10pt;color:#555;margin-bottom:12px">Complete this table after all test cases have been executed. A system is ready for sign-off when all Critical and High priority cases Pass and any Medium/Low failures have documented workarounds.</p>
+
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Flow</th>
+          <th>Cases</th>
+          <th>Passed</th>
+          <th>Failed</th>
+          <th>Blocked</th>
+          <th>Tester</th>
+          <th>Date</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1 — System Setup</td><td>Timber</td><td>8</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>2 — Harvesting &amp; Transport</td><td>Timber</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>3 — Sawmill Production</td><td>Timber</td><td>7</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>4 — Stock Transfer</td><td>Timber</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>5 — Value-Added Timber</td><td>Timber</td><td>7</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>6 — Timber Sales</td><td>Timber</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>7 — Poles Purchase &amp; CEO Approval</td><td>Poles</td><td>6</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>8 — Delivery &amp; Quality Check</td><td>Poles</td><td>6</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>9 — Poles Production</td><td>Poles</td><td>6</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>10 — Poles Sales</td><td>Poles</td><td>3</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>11 — Security &amp; Isolation</td><td>Cross</td><td>7</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td><strong>TOTAL</strong></td><td></td><td><strong>63</strong></td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td></td><td></td></tr>
+      </tbody>
+    </table>
+
+    <div class="verdict-box">
+      <h3>Overall Test Verdict</h3>
+      <p>&#9744; Pass &nbsp;&nbsp;&nbsp; &#9744; Conditional Pass &nbsp;&nbsp;&nbsp; &#9744; Fail</p>
+      <p style="margin-top:10px;font-size:9.5pt">Comments / outstanding issues:</p>
+      <div class="blank" style="min-height:50px;margin-top:6px">&nbsp;</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- SIGN-OFF -->
+<div class="sign-row">
+  <div class="sign-box">
+    <div class="sign-line"></div>
+    <div class="sign-label">QA Tester Name &amp; Signature</div>
+    <div class="blank" style="margin-top:6px;min-height:18px">&nbsp;</div>
+    <div class="sign-label" style="margin-top:4px">Date:</div>
+  </div>
+  <div class="sign-box">
+    <div class="sign-line"></div>
+    <div class="sign-label">Operations Manager Name &amp; Signature</div>
+    <div class="blank" style="margin-top:6px;min-height:18px">&nbsp;</div>
+    <div class="sign-label" style="margin-top:4px">Date:</div>
+  </div>
+  <div class="sign-box">
+    <div class="sign-line"></div>
+    <div class="sign-label">System Administrator Name &amp; Signature</div>
+    <div class="blank" style="margin-top:6px;min-height:18px">&nbsp;</div>
+    <div class="sign-label" style="margin-top:4px">Date:</div>
+  </div>
+</div>
+
+</body>
+</html>
