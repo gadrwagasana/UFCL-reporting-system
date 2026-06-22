@@ -22,6 +22,7 @@
 12. [Security Architecture](#12-security-architecture)
 13. [Maintenance Checklist](#13-maintenance-checklist)
 14. [Troubleshooting](#14-troubleshooting)
+15. [HTTPS Setup with nginx](#15-https-setup-with-nginx)
 
 ---
 
@@ -29,21 +30,24 @@
 
 ```
 Company LAN (192.168.1.x)
-┌─────────────────────────────────────────────────────────────┐
-│                                                             │
-│   Android Phones          Server PC (192.168.1.5)          │
-│   ┌──────────────┐        ┌──────────────────────────┐     │
-│   │ UFCL Mobile  │◄──────►│ Mobile API (port 3001)   │     │
-│   │ (APK)        │  HTTP  │ node mobile-api/server.js│     │
-│   └──────────────┘  JWT   │                          │     │
-│                           │ Desktop App (Electron)   │     │
-│   Windows PCs             │                          │     │
-│   ┌──────────────┐        │ PostgreSQL (port 5432)   │     │
-│   │ UFCL Desktop │◄──────►│ DB: Report_Managements   │     │
-│   │ (Electron)   │  TCP   └──────────────────────────┘     │
-│   └──────────────┘                                         │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                                                                      │
+│   Android Phones            Server PC (192.168.1.5)                 │
+│   ┌──────────────┐          ┌─────────────────────────────────────┐  │
+│   │ UFCL Mobile  │ HTTPS    │  nginx  :443  (reverse proxy)       │  │
+│   │ (APK)        │◄────────►│     ↓  proxy_pass 127.0.0.1:3001   │  │
+│   └──────────────┘  JWT     │  Express  :3001  (localhost only)   │  │
+│                             │     ↓  require('../../db/...')      │  │
+│   Windows PCs               │  PostgreSQL  :5432                  │  │
+│   ┌──────────────┐          │  DB: Report_Managements             │  │
+│   │ UFCL Desktop │◄────────►│  Desktop App (Electron)             │  │
+│   │ (Electron)   │  TCP     └─────────────────────────────────────┘  │
+│   └──────────────┘                                                   │
+└──────────────────────────────────────────────────────────────────────┘
 ```
+
+**Production rule:** Express is bound to `127.0.0.1` (set `API_BIND_HOST=127.0.0.1` in `.env`).  
+Port 3001 is **not** reachable from the LAN — only nginx can reach it. See Section 15.
 
 **Key facts:**
 - Mobile app and Desktop app share the **same PostgreSQL database** — no data duplication
@@ -504,8 +508,8 @@ The CEO approval flow (poles purchase requests) was verified against the existin
 | Action | Desktop IPC | Mobile API | Same data function? |
 |---|---|---|---|
 | List poles requests | `poles-requests:list` | `GET /api/ceo/poles-requests` | ✅ Yes |
-| Approve request | `poles-requests:approve` | `POST /api/ceo/poles-requests/:id/approve` | ✅ Yes |
-| Reject request | `poles-requests:reject` | `POST /api/ceo/poles-requests/:id/reject` | ✅ Yes |
+| Approve request | `poles-requests:approve` | `POST /api/ceo/poles-requests/:id/approve` body `{approve:true}` | ✅ Yes |
+| Reject request | `poles-requests:reject` | `POST /api/ceo/poles-requests/:id/approve` body `{approve:false, rejectionReason}` | ✅ Yes |
 
 An approval made on mobile is immediately visible on the Desktop app and vice versa.
 
@@ -554,9 +558,20 @@ Audit entries are created by `data.js` functions. Since the mobile API calls the
 
 ### 12.2 Network security on the LAN
 
-- Mobile API listens on `0.0.0.0:3001` — accessible to any device on the LAN
+**Recommended (production): nginx reverse proxy + HTTPS**
+- nginx listens on `0.0.0.0:443` (HTTPS) and `0.0.0.0:80` (redirect only)
+- Express is bound to `127.0.0.1:3001` — not reachable directly from the LAN
+- All traffic is encrypted with TLS; JWT and credentials never travel in plaintext
+- See **Section 15** for the full nginx HTTPS setup guide
+
+**Minimum (development / pilot): direct HTTP**
+- Set `API_BIND_HOST=0.0.0.0` (default) to allow direct LAN access on port 3001
 - Only authenticated requests (valid JWT) can read or write data
-- Recommendation: Configure the router to isolate guest Wi-Fi from the server VLAN if guests visit the company premises
+- Suitable for initial testing on a trusted LAN only; do not use in production
+
+**General recommendations:**
+- Configure the router to isolate guest Wi-Fi from the server VLAN
+- Rate limiting is enforced server-side: 10 login attempts per 15 min, 300 req/min per device
 
 ### 12.3 Signing key security
 
@@ -705,3 +720,218 @@ mobile/
 ---
 
 *This document should be stored in the IT department's documentation system and updated with each significant release.*
+
+---
+
+## 15. HTTPS Setup with nginx
+
+This section covers the complete procedure for putting the Mobile API behind an nginx reverse proxy with TLS on the company LAN. After completing this section, all traffic between Android phones and the server will be encrypted.
+
+**Time required:** ~45 minutes on first setup.
+
+---
+
+### 15.1 Install nginx for Windows
+
+1. Download nginx for Windows from [nginx.org/en/download.html](https://nginx.org/en/download.html) — choose the latest **stable** release ZIP.
+2. Extract to `C:\nginx` (the folder should contain `nginx.exe`, `conf\`, `html\`, etc.).
+3. Test: open PowerShell and run:
+   ```powershell
+   C:\nginx\nginx.exe -v
+   ```
+   Expected: `nginx version: nginx/1.26.x`
+
+---
+
+### 15.2 Generate a LAN Certificate with mkcert
+
+`mkcert` creates a local certificate authority (CA) and issues certificates trusted by devices that install the CA root. This is the cleanest approach for a company LAN.
+
+**On the server PC (run once):**
+
+```powershell
+# Install mkcert (requires Chocolatey; or download the .exe from mkcert GitHub releases)
+choco install mkcert
+
+# Create and install the local CA on this PC
+mkcert -install
+
+# Generate a certificate for the server's LAN IP
+# Replace 192.168.1.5 with the actual static IP of the server PC
+cd C:\nginx\certs          # create this folder if it doesn't exist
+mkcert 192.168.1.5
+```
+
+This creates two files:
+- `C:\nginx\certs\192.168.1.5.pem` — the certificate
+- `C:\nginx\certs\192.168.1.5-key.pem` — the private key
+
+**Install the CA root on each Android phone (run once per device):**
+
+1. On the server PC, find the CA root certificate:
+   ```powershell
+   mkcert -CAROOT
+   ```
+   The output is a folder path. Inside it, find `rootCA.pem`.
+
+2. Copy `rootCA.pem` to the phone (via USB or internal file share).
+
+3. On the phone: **Settings → Security → Install a certificate → CA certificate** → select `rootCA.pem`.
+
+4. Name it `UFCL Internal CA` when prompted.
+
+After this, the phone will trust any certificate issued by the company CA — including the one for `192.168.1.5`.
+
+> **Note:** mkcert CA certificates are device-specific. If you re-run `mkcert -install` on a new PC, you must re-distribute the new `rootCA.pem` to all phones.
+
+---
+
+### 15.3 Configure nginx
+
+1. Create the directory `C:\nginx\conf\conf.d\` if it does not exist.
+
+2. Copy the nginx config file from the repository:
+   ```powershell
+   Copy-Item "C:\Users\hp\OneDrive\Desktop\UFCL 12\mobile-api\nginx\ufcl-mobile-api.conf" `
+             "C:\nginx\conf\conf.d\ufcl-mobile-api.conf"
+   ```
+
+3. Edit `C:\nginx\conf\conf.d\ufcl-mobile-api.conf` and replace `192.168.1.5` with the actual server IP if different.
+
+4. Edit `C:\nginx\conf\nginx.conf` and add `include conf.d/*.conf;` inside the `http {}` block:
+   ```nginx
+   http {
+       include       mime.types;
+       default_type  application/octet-stream;
+       # ... existing settings ...
+
+       include conf.d/*.conf;   # ← add this line
+   }
+   ```
+
+5. Test the configuration:
+   ```powershell
+   C:\nginx\nginx.exe -t
+   ```
+   Expected: `configuration file C:\nginx/conf/nginx.conf test is successful`
+
+6. Start nginx:
+   ```powershell
+   C:\nginx\nginx.exe
+   ```
+
+---
+
+### 15.4 Configure the Mobile API for Proxy Mode
+
+Add these two variables to the root `.env` file on the server PC:
+
+```env
+# Bind Express to localhost only — nginx handles external traffic
+API_BIND_HOST=127.0.0.1
+
+# Tell Express to trust the X-Real-IP header from nginx
+# so rate limiting counts per-device rather than per-proxy
+API_BEHIND_PROXY=true
+```
+
+Restart the Mobile API Windows Service after changing `.env`:
+```powershell
+sc stop  "UFCL Mobile API"
+sc start "UFCL Mobile API"
+```
+
+---
+
+### 15.5 Update the App's API URL
+
+In `.env.production` (and `.env.staging`), change the URL from HTTP to HTTPS:
+
+```env
+EXPO_PUBLIC_API_URL=https://192.168.1.5
+```
+
+Note: no port number — nginx listens on the standard HTTPS port 443.
+
+Rebuild and redistribute the APK after this change (`scripts\04_build_release_apk.bat`).
+
+---
+
+### 15.6 Configure the Windows Firewall
+
+Add a rule to allow HTTPS (port 443) and remove the old HTTP rule for port 3001:
+
+```powershell
+# Allow HTTPS from LAN
+netsh advfirewall firewall add rule `
+  name="UFCL Mobile API HTTPS" `
+  dir=in action=allow protocol=TCP localport=443
+
+# Remove direct port 3001 access — nginx now handles all external traffic
+netsh advfirewall firewall delete rule name="UFCL Mobile API"
+```
+
+Run both commands in PowerShell **as Administrator**.
+
+---
+
+### 15.7 Run nginx as a Windows Service (Recommended)
+
+So nginx starts automatically with Windows:
+
+```powershell
+# Install NSSM (Non-Sucking Service Manager)
+choco install nssm
+
+# Create a Windows service for nginx
+nssm install nginx C:\nginx\nginx.exe
+nssm set nginx AppDirectory C:\nginx
+sc start nginx
+```
+
+To stop or restart nginx:
+```powershell
+sc stop nginx
+C:\nginx\nginx.exe -s reload   # reload config without stopping
+```
+
+---
+
+### 15.8 Verify the Setup
+
+From a phone that has the CA root installed:
+
+1. Open Chrome → type `https://192.168.1.5/health` → should show `{"ok":true,...}` with a padlock icon.
+2. Open the UFCL Mobile App → Login should succeed over HTTPS.
+3. On the server, verify Express is not directly reachable:
+   ```powershell
+   curl http://192.168.1.5:3001/api/health   # should time out or be refused
+   curl https://192.168.1.5/api/health       # should return {"ok":true,...}
+   ```
+
+---
+
+### 15.9 HTTP-to-HTTPS Redirection
+
+The nginx config (§15.3) already includes the redirect block:
+
+```nginx
+server {
+    listen 80;
+    server_name 192.168.1.5;
+    location / { return 301 https://$host$request_uri; }
+}
+```
+
+Any old app builds that still use `http://` will be redirected automatically. However, React Native on Android blocks HTTP redirects to HTTPS by default — update the APK with the `https://` URL (§15.5) before distributing.
+
+---
+
+### 15.10 Maintenance Checklist Additions
+
+Add to the **Monthly IT Checks** list (Section 13):
+
+- [ ] nginx service is running: `sc query nginx`
+- [ ] HTTPS health check returns OK: `curl https://192.168.1.5/health`
+- [ ] nginx config test passes: `C:\nginx\nginx.exe -t`
+- [ ] Certificate expiry: mkcert certificates are valid for 2 years — check expiry annually with `certutil -dump C:\nginx\certs\192.168.1.5.pem | findstr "NotAfter"`
