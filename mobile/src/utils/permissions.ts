@@ -11,6 +11,7 @@ export type Permission =
   | 'poles.purchase'
   | 'poles.delivery'
   | 'poles.qc'
+  | 'vat.write'
   | 'material.request'
   | 'material.review'
   | 'labour.write'
@@ -38,7 +39,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   'harvesting-leader':    ['harvest.write', 'logtransport.write', 'material.request', 'labour.write'],
   'sawmill-leader':       ['sawmill.write', 'material.request', 'labour.write'],
   'poles-leader':         ['poles.write', 'poles.purchase', 'poles.delivery', 'poles.qc', 'material.request', 'labour.write'],
-  'vat-leader':           ['material.request', 'labour.write'],
+  'vat-leader':           ['vat.write', 'material.request', 'labour.write'],
 };
 
 export function hasPermission(role: UserRole, perm: Permission): boolean {

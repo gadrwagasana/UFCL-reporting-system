@@ -112,6 +112,9 @@ app.use('/api/fuel',             require('./routes/fuel'));
 app.use('/api/my-requests',      require('./routes/myRequests'));
 app.use('/api/meta',             require('./routes/meta'));
 
+// Sprint 4 — VAT workflow
+app.use('/api/vat',              require('./routes/vat'));
+
 // Phase 2 skeletons (routes exist, return 501 until implemented)
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));

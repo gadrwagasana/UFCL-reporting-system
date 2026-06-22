@@ -48,16 +48,78 @@ export interface CeoOverview {
 }
 
 export interface PolesRequest {
-  id:            number;
-  supplier_name: string;
-  requested_qty: number;
-  unit_price?:   number;
-  notes?:        string;
-  status:        'pending' | 'approved' | 'rejected';
+  id:                number;
+  supplier_name:     string;
+  requested_qty:     number;
+  unit_price?:       number;
+  notes?:            string;
+  status:            'pending' | 'approved' | 'rejected';
   rejection_reason?: string;
-  requested_at:  string;
-  approved_at?:  string;
+  requested_at:      string;
+  approved_at?:      string;
+  requested_by_name?: string;
   approved_by_name?: string;
+}
+
+export interface PolesDelivery {
+  id:                       number;
+  purchase_request_id?:     number;
+  delivery_date:            string;
+  supplier_name?:           string;
+  delivered_qty:            number;
+  delivery_note_ref?:       string;
+  approved_qty?:            number;
+  rejected_qty?:            number;
+  rejection_reason?:        string;
+  status:                   'pending' | 'quality_checked';
+  notes?:                   string;
+  confirmed_at?:            string;
+  quality_checked_at?:      string;
+  confirmed_by_name?:       string;
+  quality_checked_by_name?: string;
+}
+
+export interface PolesListResponse {
+  ok:             true;
+  requests:       PolesRequest[];
+  deliveries:     PolesDelivery[];
+  available_qty:  number;
+  approved_total: number;
+}
+
+// ─── VAT (Value-Added Timber) ─────────────────────────────────────────────────
+
+export interface VatInboundEntry {
+  id:           number;
+  product_size: string;
+  requested_qty: number;
+  received_qty:  number;
+  requested_date?: string;
+  status:        string;
+  intake_used:   number;
+}
+
+export interface VatInboundListResponse {
+  ok:   true;
+  rows: VatInboundEntry[];
+}
+
+export type VatTypeValueAdded = 'Kiln-dried timber' | 'CCA treated timber';
+
+export interface VatEntry {
+  id:                 number;
+  type_value_added:   VatTypeValueAdded;
+  product_size:       string;
+  num_timber:         number;
+  source_transfer_id?: number;
+  date_fmt?:          string;
+  created_at?:        string;
+  created_by_name?:   string;
+}
+
+export interface VatListResponse {
+  ok:   true;
+  rows: VatEntry[];
 }
 
 export interface MonthlyDashboard {

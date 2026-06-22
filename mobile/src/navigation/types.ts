@@ -2,8 +2,9 @@ import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-n
 import type { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
 import type {
-  PolesRequest, MaterialRequest, CasualLabourRequest,
+  PolesRequest, PolesDelivery, MaterialRequest, CasualLabourRequest,
   HarvestEntry, LogTransportEntry, DailyLog,
+  VatInboundEntry, VatEntry,
 } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
@@ -86,7 +87,8 @@ export type PolesTabParamList = {
 
 // ─── VAT leader tabs ─────────────────────────────────────────────────────────
 export type VatTabParamList = {
-  VatDashboard:    undefined;
+  VatInbound:      undefined;
+  VatEntries:      undefined;
   MaterialRequest: undefined;
   CasualLabour:    undefined;
   MyRequests:      undefined;
@@ -174,3 +176,58 @@ export type SawmillStackParamList = {
 
 export type SawmillStackScreenProps<T extends keyof SawmillStackParamList> =
   NativeStackScreenProps<SawmillStackParamList, T>;
+
+// ─── Poles Production stack ───────────────────────────────────────────────────
+export type PolesProductionStackParamList = {
+  PolesProductionList:   undefined;
+  PolesProductionCreate: undefined;
+  PolesProductionDetail: { entry: DailyLog };
+};
+
+export type PolesProductionStackScreenProps<T extends keyof PolesProductionStackParamList> =
+  NativeStackScreenProps<PolesProductionStackParamList, T>;
+
+// ─── Poles Purchase stack ─────────────────────────────────────────────────────
+export type PolesPurchaseStackParamList = {
+  PolesPurchaseList:   undefined;
+  PolesPurchaseCreate: undefined;
+};
+
+export type PolesPurchaseStackScreenProps<T extends keyof PolesPurchaseStackParamList> =
+  NativeStackScreenProps<PolesPurchaseStackParamList, T>;
+
+// ─── Poles Delivery stack ─────────────────────────────────────────────────────
+export type PolesDeliveryStackParamList = {
+  PolesDeliveryList:   undefined;
+  PolesDeliveryCreate: undefined;
+};
+
+export type PolesDeliveryStackScreenProps<T extends keyof PolesDeliveryStackParamList> =
+  NativeStackScreenProps<PolesDeliveryStackParamList, T>;
+
+// ─── Poles QC stack ───────────────────────────────────────────────────────────
+export type PolesQCStackParamList = {
+  PolesQCList:   undefined;
+  PolesQCDetail: { delivery: PolesDelivery };
+};
+
+export type PolesQCStackScreenProps<T extends keyof PolesQCStackParamList> =
+  NativeStackScreenProps<PolesQCStackParamList, T>;
+
+// ─── VAT Inbound stack ────────────────────────────────────────────────────────
+export type VatInboundStackParamList = {
+  VatInboundList:  undefined;
+  VatIntakeCreate: { transferId: number; productSize: string; available: number };
+};
+
+export type VatInboundStackScreenProps<T extends keyof VatInboundStackParamList> =
+  NativeStackScreenProps<VatInboundStackParamList, T>;
+
+// ─── VAT Entries stack ────────────────────────────────────────────────────────
+export type VatEntriesStackParamList = {
+  VatProcessingList: undefined;
+  VatDetail:         { entry: VatEntry };
+};
+
+export type VatEntriesStackScreenProps<T extends keyof VatEntriesStackParamList> =
+  NativeStackScreenProps<VatEntriesStackParamList, T>;

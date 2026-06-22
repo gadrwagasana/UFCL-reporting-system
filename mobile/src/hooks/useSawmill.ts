@@ -19,6 +19,8 @@ interface CreateSawmillPayload {
   timber_cca_treated?: number;
   timber_untreated?:  number;
   timber_waste?:      number;
+  poles_units?:       number;
+  poles_waste?:       number;
   logs_received?:     number;
   downtime_hours?:    number;
   downtime_reason?:   string;

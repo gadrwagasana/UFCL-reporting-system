@@ -25,6 +25,11 @@ export const EP = {
   SAWMILL_LIST:            '/api/sawmill',
   SAWMILL_CREATE:          '/api/sawmill',
 
+  // VAT (value-added timber)
+  VAT_INBOUND:             '/api/vat/inbound',
+  VAT_LIST:                '/api/vat',
+  VAT_CREATE:              '/api/vat',
+
   // Poles — purchase requests
   POLES_PURCHASE_LIST:     '/api/poles/purchase-requests',
   POLES_PURCHASE_CREATE:   '/api/poles/purchase-requests',

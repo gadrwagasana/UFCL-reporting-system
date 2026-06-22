@@ -2,25 +2,28 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
-import { VatTabParamList } from './types';
-import { DashboardScreen }       from '../screens/shared/DashboardScreen';
-import { MaterialRequestsStack } from './MaterialRequestsStack';
-import { CasualLabourStack }     from './CasualLabourStack';
-import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
-import { ProfileScreen }         from '../screens/profile/ProfileScreen';
+import { VatTabParamList }         from './types';
+import { VatInboundStack }         from './VatInboundStack';
+import { VatEntriesStack }         from './VatEntriesStack';
+import { MaterialRequestsStack }   from './MaterialRequestsStack';
+import { CasualLabourStack }       from './CasualLabourStack';
+import { MyRequestsScreen }        from '../screens/shared/MyRequestsScreen';
+import { ProfileScreen }           from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator<VatTabParamList>();
 
 const tabIcons: Record<keyof VatTabParamList, [string, string]> = {
-  VatDashboard:    ['today',   'today-outline'],
-  MaterialRequest: ['cube',    'cube-outline'],
-  CasualLabour:    ['people',  'people-outline'],
-  MyRequests:      ['list',    'list-outline'],
-  Profile:         ['person',  'person-outline'],
+  VatInbound:      ['arrow-down-circle', 'arrow-down-circle-outline'],
+  VatEntries:      ['layers',            'layers-outline'],
+  MaterialRequest: ['cube',              'cube-outline'],
+  CasualLabour:    ['people',            'people-outline'],
+  MyRequests:      ['list',              'list-outline'],
+  Profile:         ['person',            'person-outline'],
 };
 
 const tabLabels: Record<keyof VatTabParamList, string> = {
-  VatDashboard:    'Today',
+  VatInbound:      'Inbound',
+  VatEntries:      'Processed',
   MaterialRequest: 'Materials',
   CasualLabour:    'Labour',
   MyRequests:      'My Requests',
@@ -43,7 +46,8 @@ export function VatNavigator() {
         title: tabLabels[route.name as keyof VatTabParamList],
       })}
     >
-      <Tab.Screen name="VatDashboard"    component={DashboardScreen}       options={{ title: 'Today' }} />
+      <Tab.Screen name="VatInbound"      component={VatInboundStack}       options={{ title: 'Inbound' }} />
+      <Tab.Screen name="VatEntries"      component={VatEntriesStack}       options={{ title: 'Processed' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
