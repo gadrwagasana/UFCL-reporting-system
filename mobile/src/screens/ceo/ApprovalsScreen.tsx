@@ -34,13 +34,14 @@ export function ApprovalsScreen() {
   const pending = (data?.rows ?? []).filter((r) => r.status === 'pending');
 
   async function handleApprove(id: number) {
-    await post(EP.CEO_POLES_APPROVE(id), {});
+    await post(EP.CEO_POLES_APPROVE(id), { approve: true });
     qc.invalidateQueries({ queryKey: ['ceo-poles-requests'] });
     qc.invalidateQueries({ queryKey: ['ceo-overview'] });
   }
 
   async function handleReject(id: number, reason: string) {
-    await post(EP.CEO_POLES_REJECT(id), { reason });
+    // Single /approve endpoint handles both approve and reject via the approve boolean
+    await post(EP.CEO_POLES_APPROVE(id), { approve: false, rejectionReason: reason });
     qc.invalidateQueries({ queryKey: ['ceo-poles-requests'] });
     qc.invalidateQueries({ queryKey: ['ceo-overview'] });
   }
