@@ -2,11 +2,11 @@ const { Pool } = require('pg');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// In packaged app, .env is placed next to app.asar in resources/ via extraResources.
-// In dev, it lives at the project root.
-const envPath = process.resourcesPath
-  ? path.join(process.resourcesPath, '.env')
-  : path.join(__dirname, '..', '.env');
+// app.isPackaged = true when running as installed .exe/.app, false on npm start
+const { app } = require('electron');
+const envPath = app.isPackaged
+  ? path.join(process.resourcesPath, '.env')  // installed: resources/.env
+  : path.join(__dirname, '..', '.env');         // dev (Mac/Windows npm start): project root
 
 dotenv.config({ path: envPath });
 
