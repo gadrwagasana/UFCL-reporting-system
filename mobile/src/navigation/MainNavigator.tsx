@@ -14,6 +14,7 @@ import { OperationsNavigator }     from './OperationsNavigator';
 import { LogisticsNavigator }      from './LogisticsNavigator';
 import { SalesNavigator }          from './SalesNavigator';
 import { StorekeeperNavigator }    from './StorekeeperNavigator';
+import { VatNavigator }            from './VatNavigator';
 
 export function MainNavigator() {
   const role = useAuthStore((s) => s.user?.role) as UserRole | undefined;
@@ -53,8 +54,11 @@ export function MainNavigator() {
     case 'storekeeper-assistant':
       return <StorekeeperNavigator />;
 
+    case 'vat-leader':
+      return <VatNavigator />;
+
     default:
-      // 'vat-leader', 'finance', or unknown
+      // 'finance' or unknown role
       return <ComingSoonScreen />;
   }
 }

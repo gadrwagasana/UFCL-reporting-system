@@ -2,49 +2,48 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
-import { SawmillTabParamList } from './types';
+import { VatTabParamList } from './types';
 import { DashboardScreen }       from '../screens/shared/DashboardScreen';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
-import { ComingSoonScreen }      from '../screens/shared/ComingSoonScreen';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
-const Tab = createBottomTabNavigator<SawmillTabParamList>();
+const Tab = createBottomTabNavigator<VatTabParamList>();
 
-const tabIcons: Record<keyof SawmillTabParamList, [string, string]> = {
-  SawmillList:     ['construct', 'construct-outline'],
-  MaterialRequest: ['cube',      'cube-outline'],
-  CasualLabour:    ['people',    'people-outline'],
-  MyRequests:      ['list',      'list-outline'],
-  Profile:         ['person',    'person-outline'],
+const tabIcons: Record<keyof VatTabParamList, [string, string]> = {
+  VatDashboard:    ['today',   'today-outline'],
+  MaterialRequest: ['cube',    'cube-outline'],
+  CasualLabour:    ['people',  'people-outline'],
+  MyRequests:      ['list',    'list-outline'],
+  Profile:         ['person',  'person-outline'],
 };
 
-const tabLabels: Record<keyof SawmillTabParamList, string> = {
-  SawmillList:     'Production',
+const tabLabels: Record<keyof VatTabParamList, string> = {
+  VatDashboard:    'Today',
   MaterialRequest: 'Materials',
   CasualLabour:    'Labour',
   MyRequests:      'My Requests',
   Profile:         'Profile',
 };
 
-export function SawmillNavigator() {
+export function VatNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: Colors.green, borderTopWidth: 0, height: 62, paddingBottom: 8 },
+        tabBarStyle: { backgroundColor: Colors.navy, borderTopWidth: 0, height: 62, paddingBottom: 8 },
         tabBarActiveTintColor:   Colors.tabActive,
         tabBarInactiveTintColor: Colors.tabInactive,
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
         tabBarIcon: ({ focused, color, size }) => {
-          const [active, inactive] = tabIcons[route.name as keyof SawmillTabParamList];
+          const [active, inactive] = tabIcons[route.name as keyof VatTabParamList];
           return <Ionicons name={(focused ? active : inactive) as never} size={size} color={color} />;
         },
-        title: tabLabels[route.name as keyof SawmillTabParamList],
+        title: tabLabels[route.name as keyof VatTabParamList],
       })}
     >
-      <Tab.Screen name="SawmillList"     component={ComingSoonScreen}      options={{ title: 'Production' }} />
+      <Tab.Screen name="VatDashboard"    component={DashboardScreen}       options={{ title: 'Today' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />

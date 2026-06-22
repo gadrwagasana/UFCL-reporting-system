@@ -1,7 +1,7 @@
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import type { PolesRequest } from '../types/api';
+import type { PolesRequest, MaterialRequest, CasualLabourRequest } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -28,13 +28,28 @@ export type CeoTabParamList = {
   Profile:      undefined;
 };
 
+// ─── Material Requests stack (shared across role navigators) ─────────────────
+export type MaterialRequestsStackParamList = {
+  MaterialRequestsList:  undefined;
+  MaterialRequestCreate: undefined;
+  MaterialRequestDetail: { item: MaterialRequest };
+};
+
+// ─── Casual Labour stack (shared across role navigators) ─────────────────────
+export type CasualLabourStackParamList = {
+  CasualLabourList:   undefined;
+  CasualLabourCreate: undefined;
+  CasualLabourDetail: { item: CasualLabourRequest };
+};
+
 // ─── Supervisor tabs ─────────────────────────────────────────────────────────
 export type SupervisorTabParamList = {
   TodayDashboard: undefined;
-  MaterialRequest:undefined;
+  MaterialRequest: undefined;
   CasualLabour:   undefined;
   VehicleFuel:    undefined;
   MyRequests:     undefined;
+  Profile:        undefined;
 };
 
 // ─── Harvesting leader tabs ──────────────────────────────────────────────────
@@ -44,6 +59,7 @@ export type HarvestTabParamList = {
   MaterialRequest:   undefined;
   CasualLabour:      undefined;
   MyRequests:        undefined;
+  Profile:           undefined;
 };
 
 // ─── Sawmill leader tabs ─────────────────────────────────────────────────────
@@ -52,6 +68,7 @@ export type SawmillTabParamList = {
   MaterialRequest: undefined;
   CasualLabour:    undefined;
   MyRequests:      undefined;
+  Profile:         undefined;
 };
 
 // ─── Poles leader tabs ───────────────────────────────────────────────────────
@@ -61,6 +78,16 @@ export type PolesTabParamList = {
   PolesDelivery:   undefined;
   PolesQC:         undefined;
   MyRequests:      undefined;
+  Profile:         undefined;
+};
+
+// ─── VAT leader tabs ─────────────────────────────────────────────────────────
+export type VatTabParamList = {
+  VatDashboard:    undefined;
+  MaterialRequest: undefined;
+  CasualLabour:    undefined;
+  MyRequests:      undefined;
+  Profile:         undefined;
 };
 
 // ─── Mechanician tabs ────────────────────────────────────────────────────────
@@ -108,3 +135,9 @@ export type CeoTabScreenProps<T extends keyof CeoTabParamList> =
 
 export type CeoApprovalsStackScreenProps<T extends keyof CeoApprovalsStackParamList> =
   NativeStackScreenProps<CeoApprovalsStackParamList, T>;
+
+export type MaterialRequestsStackScreenProps<T extends keyof MaterialRequestsStackParamList> =
+  NativeStackScreenProps<MaterialRequestsStackParamList, T>;
+
+export type CasualLabourStackScreenProps<T extends keyof CasualLabourStackParamList> =
+  NativeStackScreenProps<CasualLabourStackParamList, T>;

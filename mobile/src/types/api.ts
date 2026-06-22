@@ -73,6 +73,73 @@ export interface MonthlyDashboard {
   [key: string]: unknown;
 }
 
+// ─── Material Requests ────────────────────────────────────────────────────────
+
+export interface MaterialRequest {
+  id:            number;
+  item_name:     string;
+  category?:     string;
+  uom?:          string;
+  workshop_name?: string;
+  workshop_id?:  number;
+  requested_qty: number;
+  approved_qty?: number;
+  reason?:       string;
+  priority:      'normal' | 'urgent' | 'critical';
+  status:        'pending' | 'approved' | 'rejected' | 'partial';
+  review_notes?: string;
+  requested_by?: string;
+  reviewed_by?:  string;
+  requested_at:  string;
+  reviewed_at?:  string;
+}
+
+export interface StockItem {
+  id:       number;
+  name:     string;
+  category?: string;
+  uom?:     string;
+}
+
+export interface MaterialRequestsListResponse {
+  ok:               true;
+  rows:             MaterialRequest[];
+  items:            StockItem[];
+  workshops:        { id: number; name: string }[];
+  user_workshop_id?: number;
+}
+
+export interface StockItemsResponse {
+  ok:   true;
+  rows: StockItem[];
+}
+
+// ─── Casual Labour ────────────────────────────────────────────────────────────
+
+export interface CasualLabourRequest {
+  id:               number;
+  start_date:       string;
+  end_date:         string;
+  task:             string;
+  num_casuals:      number;
+  labour_items?:    string | string[];
+  description?:     string;
+  comments?:        string;
+  status:           'Pending' | 'Approved' | 'Rejected';
+  start_fmt?:       string;
+  end_fmt?:         string;
+  created_fmt?:     string;
+  created_by_name?: string;
+  reviewed_by_name?: string;
+}
+
+export interface CasualLabourListResponse {
+  ok:   true;
+  rows: CasualLabourRequest[];
+}
+
+// ─── My Requests ──────────────────────────────────────────────────────────────
+
 export interface MyRequest {
   id:           number;
   action_type:  string;
