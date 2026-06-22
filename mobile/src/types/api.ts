@@ -87,6 +87,148 @@ export interface PolesListResponse {
   approved_total: number;
 }
 
+// ─── Deliveries ──────────────────────────────────────────────────────────────
+
+export type DeliveryStatus =
+  | 'Pending' | 'Assigned' | 'In Transit' | 'POD Recorded' | 'Failed';
+
+export interface DeliveryOrder {
+  id:                    number;
+  order_number:          string;
+  driver_name:           string;
+  status:                DeliveryStatus;
+  route?:                string;
+  notes?:                string;
+  qty_dispatched?:       number;
+  qty_accepted?:         number;
+  qty_rejected?:         number;
+  rejection_reason?:     string;
+  pod_recorded_at?:      string;
+  delivery_date?:        string;
+  created_at?:           string;
+  vehicle_registration?: string;
+  so_id?:                number;
+  sales_order_number?:   string;
+  customer_name?:        string;
+  so_quantity?:          number;
+  qty_accepted_total?:   number;
+  qty_remaining?:        number;
+  so_price_tax_type?:    string;
+  created_by?:           string;
+}
+
+export interface MetaVehicle {
+  id:                number;
+  registration:      string;
+  make?:             string;
+  model?:            string;
+  vehicle_category?: string;
+  driver_assigned?:  string;
+  status:            string;
+}
+
+export interface DeliveryListResponse {
+  ok:          true;
+  rows:        DeliveryOrder[];
+  vehicles:    MetaVehicle[];
+  salesOrders: unknown[];
+}
+
+// ─── Vehicle Fuel Logs ────────────────────────────────────────────────────────
+
+export interface FuelLog {
+  id:              number;
+  registration:    string;
+  liters:          number;
+  cost_per_liter?: number;
+  total_cost?:     number;
+  odometer?:       number;
+  log_date:        string;
+  notes?:          string;
+  logged_by?:      string;
+}
+
+export interface FuelLogListResponse {
+  ok:   true;
+  rows: FuelLog[];
+}
+
+// ─── Machine Fuel Logs ────────────────────────────────────────────────────────
+
+export interface MachineFuelLog {
+  id:              number;
+  log_date:        string;
+  date_fmt:        string;
+  operator?:       string;
+  fuel_type:       string;
+  quantity:        number;
+  unit:            string;
+  notes?:          string;
+  machine_code?:   string;
+  machine_name?:   string;
+  plate_number?:   string;
+  logged_by_name?: string;
+}
+
+export interface MachineFuelListResponse {
+  ok:   true;
+  rows: MachineFuelLog[];
+}
+
+export interface MachineFuelTarget {
+  source:        'machine' | 'vehicle';
+  id:            number;
+  code:          string;
+  label:         string;
+  plate_number?: string;
+}
+
+export interface MachineFuelTargetsResponse {
+  ok:   true;
+  rows: MachineFuelTarget[];
+}
+
+// ─── Machine Daily Logs ───────────────────────────────────────────────────────
+
+export interface MachineMeta {
+  id:                   number;
+  name:                 string;
+  machine_code?:        string;
+  category_name?:       string;
+  production_capacity?: number;
+  capacity_unit?:       string;
+}
+
+export interface MachineLog {
+  id:               number;
+  machine_id:       number;
+  machine_name?:    string;
+  machine_code?:    string;
+  category_name?:   string;
+  log_date:         string;
+  shift?:           string;
+  hours_worked?:    number;
+  downtime_hours?:  number;
+  downtime_reason?: string;
+  fuel_consumed?:   number;
+  fuel_issued?:     number;
+  daily_production?: number;
+  capacity_per_day?: number;
+  product_type?:    string;
+  item_category?:   string;
+  logs_loaded?:     number;
+  logs_unloaded?:   number;
+  loading_trips?:   number;
+  remarks?:         string;
+}
+
+export interface MachineLogListResponse {
+  ok:             true;
+  rows:           MachineLog[];
+  machines:       MachineMeta[];
+  itemCategories: { id: number; name: string }[];
+}
+
 // ─── VAT (Value-Added Timber) ─────────────────────────────────────────────────
 
 export interface VatInboundEntry {

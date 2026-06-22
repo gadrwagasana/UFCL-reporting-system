@@ -6,7 +6,7 @@ import { SupervisorTabParamList } from './types';
 import { DashboardScreen }       from '../screens/shared/DashboardScreen';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
-import { ComingSoonScreen }      from '../screens/shared/ComingSoonScreen';
+import { VehicleFuelStack }      from './stacks/VehicleFuelStack';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
@@ -49,7 +49,7 @@ export function SupervisorNavigator() {
       <Tab.Screen name="TodayDashboard"  component={DashboardScreen}       options={{ title: 'Today' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
-      <Tab.Screen name="VehicleFuel"     component={ComingSoonScreen}      options={{ title: 'Fuel' }} />
+      <Tab.Screen name="VehicleFuel"     component={VehicleFuelStack}      options={{ title: 'Fuel' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>

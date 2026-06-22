@@ -5,6 +5,7 @@ import type {
   PolesRequest, PolesDelivery, MaterialRequest, CasualLabourRequest,
   HarvestEntry, LogTransportEntry, DailyLog,
   VatInboundEntry, VatEntry,
+  DeliveryOrder, FuelLog, MachineFuelLog, MachineLog,
 } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
@@ -231,3 +232,46 @@ export type VatEntriesStackParamList = {
 
 export type VatEntriesStackScreenProps<T extends keyof VatEntriesStackParamList> =
   NativeStackScreenProps<VatEntriesStackParamList, T>;
+
+// ─── Delivery stack (Logistics) ───────────────────────────────────────────────
+export type DeliveryStackParamList = {
+  DeliveriesList: undefined;
+  DeliveryDetail: { order: DeliveryOrder };
+  DeliveryStatus: { order: DeliveryOrder };
+  PODList:        undefined;
+  PODCapture:     { order: DeliveryOrder };
+  PODDetail:      { order: DeliveryOrder };
+};
+
+export type DeliveryStackScreenProps<T extends keyof DeliveryStackParamList> =
+  NativeStackScreenProps<DeliveryStackParamList, T>;
+
+// ─── Vehicle Fuel stack (Supervisor) ─────────────────────────────────────────
+export type VehicleFuelStackParamList = {
+  VehicleFuelList:   undefined;
+  VehicleFuelCreate: undefined;
+  VehicleFuelDetail: { entry: FuelLog };
+};
+
+export type VehicleFuelStackScreenProps<T extends keyof VehicleFuelStackParamList> =
+  NativeStackScreenProps<VehicleFuelStackParamList, T>;
+
+// ─── Machine Fuel stack (Mechanician) ────────────────────────────────────────
+export type MachineFuelStackParamList = {
+  MachineFuelList:   undefined;
+  MachineFuelCreate: undefined;
+  MachineFuelDetail: { entry: MachineFuelLog };
+};
+
+export type MachineFuelStackScreenProps<T extends keyof MachineFuelStackParamList> =
+  NativeStackScreenProps<MachineFuelStackParamList, T>;
+
+// ─── Machine Log stack (Mechanician) ─────────────────────────────────────────
+export type MachineLogStackParamList = {
+  MachineLogList:   undefined;
+  MachineLogCreate: undefined;
+  MachineLogDetail: { entry: MachineLog };
+};
+
+export type MachineLogStackScreenProps<T extends keyof MachineLogStackParamList> =
+  NativeStackScreenProps<MachineLogStackParamList, T>;

@@ -3,8 +3,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { LogisticsTabParamList } from './types';
-import { ComingSoonScreen } from '../screens/shared/ComingSoonScreen';
 import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { DeliveryStack }    from './stacks/DeliveryStack';
 
 const Tab = createBottomTabNavigator<LogisticsTabParamList>();
 
@@ -27,7 +27,7 @@ export function LogisticsNavigator() {
         },
       })}
     >
-      <Tab.Screen name="DeliveryList" component={ComingSoonScreen} options={{ title: 'Deliveries' }} />
+      <Tab.Screen name="DeliveryList" component={DeliveryStack}   options={{ title: 'Deliveries' }} />
       <Tab.Screen name="MyRequests"   component={MyRequestsScreen} options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
