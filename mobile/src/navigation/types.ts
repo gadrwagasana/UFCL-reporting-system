@@ -1,7 +1,10 @@
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
-import type { PolesRequest, MaterialRequest, CasualLabourRequest } from '../types/api';
+import type {
+  PolesRequest, MaterialRequest, CasualLabourRequest,
+  HarvestEntry, LogTransportEntry, DailyLog,
+} from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -141,3 +144,33 @@ export type MaterialRequestsStackScreenProps<T extends keyof MaterialRequestsSta
 
 export type CasualLabourStackScreenProps<T extends keyof CasualLabourStackParamList> =
   NativeStackScreenProps<CasualLabourStackParamList, T>;
+
+// ─── Harvest stack ────────────────────────────────────────────────────────────
+export type HarvestStackParamList = {
+  HarvestList:   undefined;
+  HarvestCreate: undefined;
+  HarvestDetail: { entry: HarvestEntry };
+};
+
+export type HarvestStackScreenProps<T extends keyof HarvestStackParamList> =
+  NativeStackScreenProps<HarvestStackParamList, T>;
+
+// ─── Log Transport stack ──────────────────────────────────────────────────────
+export type LogTransportStackParamList = {
+  LogTransportList:   undefined;
+  LogTransportCreate: undefined;
+  LogTransportDetail: { entry: LogTransportEntry };
+};
+
+export type LogTransportStackScreenProps<T extends keyof LogTransportStackParamList> =
+  NativeStackScreenProps<LogTransportStackParamList, T>;
+
+// ─── Sawmill Production stack ─────────────────────────────────────────────────
+export type SawmillStackParamList = {
+  SawmillProductionList:   undefined;
+  SawmillProductionCreate: undefined;
+  SawmillProductionDetail: { entry: DailyLog };
+};
+
+export type SawmillStackScreenProps<T extends keyof SawmillStackParamList> =
+  NativeStackScreenProps<SawmillStackParamList, T>;

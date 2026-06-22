@@ -3,10 +3,10 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { HarvestTabParamList } from './types';
-import { DashboardScreen }       from '../screens/shared/DashboardScreen';
+import { HarvestStack }          from './HarvestStack';
+import { LogTransportStack }     from './LogTransportStack';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
-import { ComingSoonScreen }      from '../screens/shared/ComingSoonScreen';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
@@ -46,8 +46,8 @@ export function HarvestNavigator() {
         title: tabLabels[route.name as keyof HarvestTabParamList],
       })}
     >
-      <Tab.Screen name="HarvestList"      component={ComingSoonScreen}      options={{ title: 'Harvest' }} />
-      <Tab.Screen name="LogTransportList" component={ComingSoonScreen}      options={{ title: 'Log Transport' }} />
+      <Tab.Screen name="HarvestList"      component={HarvestStack}      options={{ title: 'Harvest' }} />
+      <Tab.Screen name="LogTransportList" component={LogTransportStack} options={{ title: 'Log Transport' }} />
       <Tab.Screen name="MaterialRequest"  component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"     component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="MyRequests"       component={MyRequestsScreen}      options={{ title: 'My Requests' }} />

@@ -3,10 +3,9 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { SawmillTabParamList } from './types';
-import { DashboardScreen }       from '../screens/shared/DashboardScreen';
+import { SawmillStack }          from './SawmillStack';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
-import { ComingSoonScreen }      from '../screens/shared/ComingSoonScreen';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
@@ -44,7 +43,7 @@ export function SawmillNavigator() {
         title: tabLabels[route.name as keyof SawmillTabParamList],
       })}
     >
-      <Tab.Screen name="SawmillList"     component={ComingSoonScreen}      options={{ title: 'Production' }} />
+      <Tab.Screen name="SawmillList"     component={SawmillStack}          options={{ title: 'Production' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />

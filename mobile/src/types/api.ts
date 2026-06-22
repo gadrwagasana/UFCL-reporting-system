@@ -73,6 +73,123 @@ export interface MonthlyDashboard {
   [key: string]: unknown;
 }
 
+// ─── Harvest ─────────────────────────────────────────────────────────────────
+
+export interface HarvestEntry {
+  id:              number;
+  location?:       string;
+  species:         string;
+  quantity:        number;
+  uom?:            string;
+  notes?:          string;
+  compt_id?:       number;
+  sub_name?:       string;
+  logs_crosscut?:  number;
+  logs_handrolled?: number;
+  harvest_date:    string;   // "DD/MM/YYYY"
+  created_at?:     string;
+  logged_by?:      string;
+  compt_name?:     string;
+}
+
+export interface HarvestSummary {
+  [species: string]: { trees: number; crosscut: number; handrolled: number };
+}
+
+export interface HarvestListResponse {
+  ok:           true;
+  rows:         HarvestEntry[];
+  summary:      HarvestSummary;
+  compartments: HarvestCompartment[];
+}
+
+export interface HarvestCompartment {
+  id:                  number;
+  compt_name:          string;
+  sub_name?:           string;
+  species?:            string;
+  area_ha?:            number;
+  volume_m3?:          number;
+  status?:             string;
+  trees_harvested?:    number;
+  volume_harvested_m3?: number;
+}
+
+// ─── Log Transport ────────────────────────────────────────────────────────────
+
+export interface LogTransportEntry {
+  id:               number;
+  transport_date:   string;
+  date_fmt?:        string;   // "DD/MM/YYYY"
+  qty_transported:  number;
+  unit?:            string;
+  notes?:           string;
+  sub_name?:        string;
+  tractor_plate?:   string;
+  loggers_number?:  string;
+  created_at?:      string;
+  compt_name?:      string;
+  species?:         string;
+  logged_by_name?:  string;
+}
+
+export interface LogTransportListResponse {
+  ok:     true;
+  rows:   LogTransportEntry[];
+  totals: {
+    totalLogsHarvested:  number;
+    totalLogsTransported: number;
+    remainingLogs:       number;
+    totalVolumeM3:       number;
+  };
+}
+
+// ─── Compartments (meta) ──────────────────────────────────────────────────────
+
+export interface Compartment {
+  id:                  number;
+  compt_name:          string;
+  sub_name?:           string;
+  species?:            string;
+  area_ha?:            number;
+  volume_m3?:          number;
+  status?:             string;
+  volume_harvested_m3?: number;
+}
+
+export interface CompartmentsResponse {
+  ok:   true;
+  rows: Compartment[];
+}
+
+// ─── Sawmill / Daily Log ──────────────────────────────────────────────────────
+
+export interface DailyLog {
+  id:                 number;
+  date:               string;  // "DD/MM/YYYY"
+  machine?:           string;
+  product_size?:      string;
+  timber_units?:      number;
+  timber_kiln_dried?: number;
+  timber_cca_treated?: number;
+  timber_untreated?:  number;
+  timber_waste?:      number;
+  poles_units?:       number;
+  poles_waste?:       number;
+  downtime_hours?:    number;
+  logs_received?:     number;
+  supervisor?:        string;
+  operators?:         string;
+  remarks?:           string;
+}
+
+export interface DailyListResponse {
+  ok:        true;
+  rows:      DailyLog[];
+  stock:     Record<string, unknown>;
+  transport: { todayTransported: number; annualTransported: number };
+}
+
 // ─── Material Requests ────────────────────────────────────────────────────────
 
 export interface MaterialRequest {

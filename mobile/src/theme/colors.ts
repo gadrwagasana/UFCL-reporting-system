@@ -8,6 +8,7 @@ export const Colors = {
   bg:         '#f4f6f8',
   card:       '#ffffff',
   navyDark:   '#122a43',
+  navyBg:     '#eef2ff',
   greenDark:  '#1e4a36',
 
   // Text

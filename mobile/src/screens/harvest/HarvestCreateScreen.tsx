@@ -1,0 +1,202 @@
+import React, { useState } from 'react';
+import {
+  StyleSheet, View, Text, ScrollView, Alert,
+  TouchableOpacity, ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { format } from 'date-fns';
+import { AppHeader }       from '../../components/AppHeader';
+import { FormInput }       from '../../components/FormInput';
+import { FormSelect }      from '../../components/FormSelect';
+import { DatePickerField } from '../../components/DatePickerField';
+import { useHarvestCreate, useCompartments } from '../../hooks/useHarvest';
+import { useOfflineStore } from '../../stores/offlineStore';
+import { EP }              from '../../api/endpoints';
+import { HarvestStackParamList } from '../../navigation/types';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
+
+type NavProp = NativeStackNavigationProp<HarvestStackParamList, 'HarvestCreate'>;
+
+export function HarvestCreateScreen() {
+  const navigation = useNavigation<NavProp>();
+  const { createEntry }       = useHarvestCreate();
+  const { data: comptData }   = useCompartments();
+  const { isOnline, enqueue } = useOfflineStore();
+
+  const [harvestDate, setHarvestDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [species,     setSpecies]     = useState('');
+  const [quantity,    setQuantity]    = useState('');
+  const [comptId,     setComptId]     = useState('');
+  const [logsCrosscut,    setLogsCrosscut]    = useState('');
+  const [logsHandrolled,  setLogsHandrolled]  = useState('');
+  const [notes,       setNotes]       = useState('');
+  const [submitting,  setSubmitting]  = useState(false);
+
+  const compartmentOptions = (comptData?.rows ?? []).map((c) => ({
+    label: c.compt_name + (c.sub_name ? ` (${c.sub_name})` : '') + (c.species ? ` — ${c.species}` : ''),
+    value: String(c.id),
+  }));
+
+  async function handleSubmit() {
+    if (!species.trim()) {
+      Alert.alert('Required', 'Species is required.'); return;
+    }
+    const qty = Number(quantity);
+    if (!quantity || isNaN(qty) || qty <= 0) {
+      Alert.alert('Required', 'Quantity must be a positive number.'); return;
+    }
+
+    const payload = {
+      harvest_date:    harvestDate,
+      species:         species.trim(),
+      quantity:        qty,
+      ...(comptId           && { compt_id: Number(comptId) }),
+      ...(logsCrosscut.trim()   && { logs_crosscut:   Number(logsCrosscut) }),
+      ...(logsHandrolled.trim() && { logs_handrolled: Number(logsHandrolled) }),
+      ...(notes.trim()      && { notes: notes.trim() }),
+    };
+
+    setSubmitting(true);
+    try {
+      if (!isOnline) {
+        enqueue({ endpoint: EP.HARVEST_CREATE, method: 'POST', body: payload, context: 'harvest' });
+        Alert.alert('Saved Offline', 'Entry will sync when connected.');
+        navigation.goBack();
+        return;
+      }
+      await createEntry(payload);
+      navigation.goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not save harvest entry.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar style="light" />
+      <AppHeader title="Log Harvest" dark onBack={() => navigation.goBack()} />
+
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Harvest Details</Text>
+
+          <DatePickerField
+            label="Harvest Date"
+            value={harvestDate}
+            onChange={setHarvestDate}
+            maxDate={new Date()}
+          />
+
+          <FormInput
+            label="Species"
+            value={species}
+            onChangeText={setSpecies}
+            placeholder="e.g. Eucalyptus, Pine"
+            required
+          />
+
+          <FormInput
+            label="Quantity (trees)"
+            value={quantity}
+            onChangeText={setQuantity}
+            placeholder="0"
+            keyboardType="numeric"
+            required
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Compartment (optional)</Text>
+
+          <FormSelect
+            label="Compartment"
+            value={comptId}
+            onChange={(v) => setComptId(String(v))}
+            options={[{ label: '— None —', value: '' }, ...compartmentOptions]}
+            placeholder="Select compartment"
+          />
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Log Details (optional)</Text>
+
+          <View style={styles.row}>
+            <View style={styles.col}>
+              <FormInput
+                label="Crosscut Logs"
+                value={logsCrosscut}
+                onChangeText={setLogsCrosscut}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.col}>
+              <FormInput
+                label="Handrolled Logs"
+                value={logsHandrolled}
+                onChangeText={setLogsHandrolled}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <FormInput
+            label="Remarks (optional)"
+            value={notes}
+            onChangeText={setNotes}
+            placeholder="Any additional notes…"
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={submitting}
+          activeOpacity={0.8}
+        >
+          {submitting
+            ? <ActivityIndicator color={Colors.white} />
+            : <Text style={styles.submitText}>{isOnline ? 'Save Entry' : 'Save Offline'}</Text>}
+        </TouchableOpacity>
+
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe:    { flex: 1, backgroundColor: Colors.bg },
+  scroll:  { flex: 1 },
+  content: { padding: Spacing.base, gap: Spacing.base, paddingBottom: Spacing.xxxl },
+
+  section: {
+    backgroundColor: Colors.card, borderRadius: Radius.lg,
+    padding: Spacing.base, gap: Spacing.sm, ...Shadow.sm,
+  },
+  sectionTitle: {
+    fontSize: Typography.sm, fontWeight: Typography.semibold,
+    color: Colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.6,
+    marginBottom: Spacing.xs,
+  },
+
+  row: { flexDirection: 'row', gap: Spacing.sm },
+  col: { flex: 1 },
+
+  submitBtn: {
+    backgroundColor: Colors.green, borderRadius: Radius.lg,
+    paddingVertical: Spacing.base, alignItems: 'center', ...Shadow.sm,
+  },
+  submitBtnDisabled: { opacity: 0.6 },
+  submitText: { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.white },
+});
