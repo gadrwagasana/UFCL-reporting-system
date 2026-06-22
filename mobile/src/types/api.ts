@@ -37,11 +37,12 @@ export interface QueueItem {
 
 export interface CeoOverview {
   ok: true;
-  harvest?:      { total_trees?: number; [k: string]: unknown };
+  harvest?:      { log_count?: number; total_trees?: number; [k: string]: unknown };
+  sawmill?:      { volume_m3?: number; [k: string]: unknown };
   production?:   { total_units?: number; [k: string]: unknown };
   poles?:        { total_units?: number; [k: string]: unknown };
-  sales?:        { total_orders?: number; [k: string]: unknown };
-  pendingPolesRequests?: number;
+  sales?:        { total_orders?: number; total_revenue?: number; [k: string]: unknown };
+  pendingPolesRequests?:   number;
   pendingMonthlyApproval?: boolean;
   [key: string]: unknown;
 }
@@ -57,6 +58,19 @@ export interface PolesRequest {
   requested_at:  string;
   approved_at?:  string;
   approved_by_name?: string;
+}
+
+export interface MonthlyDashboard {
+  ok: true;
+  month_key: string;
+  status: 'pending' | 'approved';
+  approved_at: string | null;
+  approved_by_name: string | null;
+  harvest?: { total_logs?: number; total_trees?: number; total_volume_m3?: number };
+  sawmill?: { total_volume_m3?: number; total_production?: number };
+  poles?: { total_purchase_requests?: number; total_delivered?: number };
+  sales?: { total_orders?: number; total_revenue?: number };
+  [key: string]: unknown;
 }
 
 export interface MyRequest {

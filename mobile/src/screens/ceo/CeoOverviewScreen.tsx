@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
@@ -13,17 +15,12 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { get }          from '../../api/client';
 import { EP }           from '../../api/endpoints';
 import { useAuthStore } from '../../stores/authStore';
+import { CeoTabParamList } from '../../navigation/types';
+import { CeoOverview } from '../../types/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 import { formatNumber } from '../../utils/formatters';
 
-interface OverviewData {
-  ok: true;
-  harvest?:   { log_count?: number; total_trees?: number };
-  sawmill?:   { volume_m3?: number };
-  poles?:     { total_units?: number };
-  sales?:     { total_orders?: number; total_revenue?: number };
-  pendingPolesRequests?: number;
-}
+type CeoTabNav = BottomTabNavigationProp<CeoTabParamList>;
 
 interface KpiCardProps { label: string; value: string; icon: string; color: string; }
 function KpiCard({ label, value, icon, color }: KpiCardProps) {
@@ -39,11 +36,12 @@ function KpiCard({ label, value, icon, color }: KpiCardProps) {
 }
 
 export function CeoOverviewScreen() {
-  const user = useAuthStore((s) => s.user);
+  const user       = useAuthStore((s) => s.user);
+  const navigation = useNavigation<CeoTabNav>();
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery<OverviewData>({
+  const { data, isLoading, isError, refetch, isRefetching } = useQuery<CeoOverview>({
     queryKey: ['ceo-overview'],
-    queryFn:  () => get<OverviewData>(EP.CEO_OVERVIEW),
+    queryFn:  () => get<CeoOverview>(EP.CEO_OVERVIEW),
     staleTime: 5 * 60_000,
   });
 
@@ -68,14 +66,32 @@ export function CeoOverviewScreen() {
         >
           <Text style={styles.greeting}>Good morning, {user?.name?.split(' ')[0] ?? 'CEO'}</Text>
 
-          {/* Alert banner for pending approvals */}
+          {/* Alert banner — pending poles requests */}
           {(data?.pendingPolesRequests ?? 0) > 0 ? (
-            <View style={styles.alertBanner}>
+            <TouchableOpacity
+              style={styles.alertBanner}
+              onPress={() => navigation.navigate('CeoApprovals')}
+              activeOpacity={0.8}
+            >
               <Ionicons name="alert-circle" size={18} color={Colors.warning} />
               <Text style={styles.alertText}>
                 {data?.pendingPolesRequests} poles purchase request{data?.pendingPolesRequests !== 1 ? 's' : ''} awaiting your approval
               </Text>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.warning} />
+            </TouchableOpacity>
+          ) : null}
+
+          {/* Alert banner — pending monthly approval */}
+          {data?.pendingMonthlyApproval ? (
+            <TouchableOpacity
+              style={styles.alertBanner}
+              onPress={() => navigation.navigate('CeoApprovals')}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="calendar" size={18} color={Colors.warning} />
+              <Text style={styles.alertText}>Monthly report awaiting your approval</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.warning} />
+            </TouchableOpacity>
           ) : null}
 
           {/* KPI cards */}

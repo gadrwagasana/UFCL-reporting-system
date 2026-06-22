@@ -1,6 +1,7 @@
 import type { NativeStackNavigationProp, NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabNavigationProp, BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { CompositeNavigationProp } from '@react-navigation/native';
+import type { PolesRequest } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
 export type RootStackParamList = {
@@ -14,11 +15,17 @@ export type AuthStackParamList = {
   Login: undefined;
 };
 
+// ─── CEO Approvals stack (nested in CEO Approvals tab) ───────────────────────
+export type CeoApprovalsStackParamList = {
+  PendingApprovals: undefined;
+  ApprovalDetail:   { item: PolesRequest };
+};
+
 // ─── CEO / Admin tabs ─────────────────────────────────────────────────────────
 export type CeoTabParamList = {
   CeoOverview:  undefined;
-  Approvals:    undefined;
-  MyRequests:   undefined;
+  CeoApprovals: undefined;
+  Profile:      undefined;
 };
 
 // ─── Supervisor tabs ─────────────────────────────────────────────────────────
@@ -98,3 +105,6 @@ export type AuthStackScreenProps<T extends keyof AuthStackParamList> =
 
 export type CeoTabScreenProps<T extends keyof CeoTabParamList> =
   BottomTabScreenProps<CeoTabParamList, T>;
+
+export type CeoApprovalsStackScreenProps<T extends keyof CeoApprovalsStackParamList> =
+  NativeStackScreenProps<CeoApprovalsStackParamList, T>;
