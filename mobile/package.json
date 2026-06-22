@@ -1,13 +1,19 @@
 {
   "name": "ufcl-mobile",
   "version": "1.0.0",
-  "main": "expo-router/entry",
+  "main": "App.tsx",
   "scripts": {
     "start": "expo start",
+    "start:dev": "APP_ENV=development expo start",
+    "start:staging": "APP_ENV=staging expo start",
     "android": "expo start --android",
-    "ios": "expo start --ios",
     "web": "expo start --web",
-    "type-check": "tsc --noEmit"
+    "prebuild": "expo prebuild --platform android --clean",
+    "build:debug": "cd android && gradlew.bat assembleDebug",
+    "build:release": "APP_ENV=production cd android && gradlew.bat assembleRelease",
+    "build:aab": "APP_ENV=production cd android && gradlew.bat bundleRelease",
+    "type-check": "tsc --noEmit",
+    "clean": "cd android && gradlew.bat clean"
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.2",

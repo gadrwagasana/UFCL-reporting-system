@@ -2,15 +2,28 @@ node_modules/
 .expo/
 dist/
 web-build/
+android/
+ios/
+
+# Signing — never commit these
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+release/keystore.properties
+release/ufcl-release.jks
+
+# Environment files — store securely, not in git
+.env
+.env.local
+.env.development
+.env.staging
+.env.production
+
+# OS
 *.orig.*
 npm-debug.*
 yarn-debug.*
 yarn-error.*
-.env
-.env.local
 .DS_Store
