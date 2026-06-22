@@ -1,6 +1,6 @@
 {
   "name": "ufcl-reporting-app",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "private": true,
   "description": "UFCL Production Management System (Electron + Postgres)",
   "main": "electron/main.js",
@@ -32,6 +32,12 @@
     "files": [
       "**/*",
       "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}"
+    ],
+    "extraResources": [
+      {
+        "from": ".env",
+        "to": ".env"
+      }
     ],
     "win": {
       "target": [

@@ -1,7 +1,14 @@
 const { Pool } = require('pg');
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config();
+// In packaged app, .env is placed next to app.asar in resources/ via extraResources.
+// In dev, it lives at the project root.
+const envPath = process.resourcesPath
+  ? path.join(process.resourcesPath, '.env')
+  : path.join(__dirname, '..', '.env');
+
+dotenv.config({ path: envPath });
 
 function required(name) {
   const v = process.env[name];
