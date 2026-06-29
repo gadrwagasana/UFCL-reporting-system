@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>UFCL Mobile — Pilot Deployment Plan (v1.0.0)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.6}
+  .page{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:28px 0 12px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:12px 0 6px}
+  p,li{font-size:13px}
+  ul,ol{margin:6px 0 8px 22px}
+  li{margin-bottom:3px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .card{background:#fff;border-radius:8px;padding:16px 18px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .info{background:#e0f2fe;border:1px solid #0284c7;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .warn{background:#fef3c7;border:1px solid #d97706;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .cb{display:inline-block;width:16px;height:16px;border:2px solid #1a3c5e;border-radius:3px;vertical-align:middle;margin-right:6px;flex-shrink:0}
+  .row{display:flex;align-items:flex-start;gap:8px;padding:5px 0;font-size:13px}
+  .bug-grid{display:grid;grid-template-columns:120px 1fr 1fr 1fr 80px;gap:0;font-size:12px}
+  .bug-hdr{background:#1a3c5e;color:#fff;padding:6px 8px;font-weight:700}
+  .bug-cell{padding:6px 8px;border-bottom:1px solid #e8edf4}
+  .bug-cell:nth-child(10n+6),.bug-cell:nth-child(10n+7),.bug-cell:nth-child(10n+8),.bug-cell:nth-child(10n+9),.bug-cell:nth-child(10n+10){background:#f8fafd}
+  .sev-crit{color:#dc2626;font-weight:700}
+  .sev-maj{color:#d97706;font-weight:700}
+  .sev-min{color:#059669;font-weight:700}
+  footer{text-align:center;margin-top:40px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>UFCL Mobile — Pilot Deployment Plan</h1>
+<div class="subtitle">v1.0.0 &nbsp;|&nbsp; Stage 2 — Limited rollout to 9 pilot users &nbsp;|&nbsp; Target: 2026-07-01 to 2026-07-14</div>
+
+<div class="info"><strong>Why a pilot?</strong> Real-world usage on actual data reveals issues that UAT cannot find. A 9-person pilot for 1–2 weeks gives you the issues that will affect everyone — caught before they hit 60+ users.</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Pilot Users</h2>
+<div class="card">
+  <table>
+    <tr><th>#</th><th>Role</th><th>Username</th><th>Department</th><th>Device</th><th>Installed</th></tr>
+    <tr><td>1</td><td>CEO</td><td>___________</td><td>Executive</td><td>___________</td><td>○</td></tr>
+    <tr><td>2</td><td>operations</td><td>___________</td><td>Operations</td><td>___________</td><td>○</td></tr>
+    <tr><td>3</td><td>harvesting-leader</td><td>___________</td><td>Harvesting</td><td>___________</td><td>○</td></tr>
+    <tr><td>4</td><td>harvesting-supervisor</td><td>___________</td><td>Harvesting</td><td>___________</td><td>○</td></tr>
+    <tr><td>5</td><td>sawmill-leader</td><td>___________</td><td>Sawmill</td><td>___________</td><td>○</td></tr>
+    <tr><td>6</td><td>poles-leader</td><td>___________</td><td>Poles</td><td>___________</td><td>○</td></tr>
+    <tr><td>7</td><td>vat-leader</td><td>___________</td><td>VAT Processing</td><td>___________</td><td>○</td></tr>
+    <tr><td>8</td><td>logistics</td><td>___________</td><td>Logistics</td><td>___________</td><td>○</td></tr>
+    <tr><td>9</td><td>mechanician</td><td>___________</td><td>Workshop</td><td>___________</td><td>○</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. Pilot Installation Steps (per user)</h2>
+<div class="card">
+  <ol>
+    <li>IT installs TLS certificate on device (Settings → Security → Install cert → select <code>ufcl.crt</code>)</li>
+    <li>Enable "Install from unknown sources" (Settings → Apps → Special app access)</li>
+    <li>Transfer APK to device via USB cable or shared folder</li>
+    <li>Tap APK file → Install → Open</li>
+    <li>Verify launcher icon shows "UFCL" (not "UFCL Dev")</li>
+    <li>Login with assigned credentials</li>
+    <li>Verify navigator tabs match role (see User Manual §2)</li>
+    <li>Create one test record in each module to confirm connectivity</li>
+    <li>Demonstrate offline mode: airplane mode → create record → reconnect → verify sync</li>
+  </ol>
+  <div class="warn"><strong>Note:</strong> If the device shows a certificate warning on first load, the TLS cert was not installed correctly. Repeat step 1 before proceeding.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. What to Tell Pilot Users</h2>
+<div class="card">
+  <p>Give each pilot user this brief:</p>
+  <ul>
+    <li><strong>Use the app for real work</strong> — enter your actual daily records, not test data</li>
+    <li><strong>Report anything that feels wrong</strong> — wrong calculations, missing data, confusing screens, slow loading, unexpected errors</li>
+    <li><strong>Report what you wish was different</strong> — missing fields, workflow that doesn't match how you actually work</li>
+    <li><strong>Try going offline</strong> (airplane mode) while creating records — check that they sync when you reconnect</li>
+    <li><strong>Check My Requests</strong> to see your submitted records and their approval status</li>
+    <li><strong>Contact IT immediately</strong> if you cannot log in or if data disappears</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. Feedback Collection</h2>
+<div class="card">
+  <p>Collect feedback in three ways:</p>
+  <ol>
+    <li><strong>WhatsApp group</strong> — create a "UFCL App Pilot" group, all 9 users + IT lead. Users report issues immediately as they happen.</li>
+    <li><strong>End-of-day check-in</strong> — brief 5-minute call or message each evening for first 3 days</li>
+    <li><strong>Weekly survey</strong> — short form at end of week 1 (see Section 5)</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. Feedback Form (Week 1)</h2>
+<div class="card">
+  <p>Send to all pilot users at end of Week 1:</p>
+  <ol>
+    <li>How easy was it to log in and find your screens? (1=very hard, 5=very easy)</li>
+    <li>Were there any records you could not enter that you expected to?</li>
+    <li>Did the offline mode work when you had no network?</li>
+    <li>Did your submitted records appear correctly in My Requests?</li>
+    <li>Was anything slow or took too long?</li>
+    <li>What is the most important thing that needs to change before full rollout?</li>
+    <li>Would you recommend this to a colleague? (Yes / With some changes / No)</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. Bug Log (IT to maintain during pilot)</h2>
+<div class="card">
+  <table>
+    <tr><th>Date</th><th>Reported by (role)</th><th>Description</th><th>Steps to reproduce</th><th>Severity</th><th>Status</th></tr>
+    <tr>
+      <td></td><td></td>
+      <td style="min-width:200px"></td>
+      <td style="min-width:160px"></td>
+      <td></td><td></td>
+    </tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+  </table>
+
+  <h3>Severity guide</h3>
+  <table style="width:auto">
+    <tr><th>Severity</th><th>Meaning</th><th>Response</th></tr>
+    <tr><td><span class="sev-crit">CRITICAL</span></td><td>Cannot log in, data loss, crash on basic use</td><td>Fix in v1.0.1 within 24h — mandatory update</td></tr>
+    <tr><td><span class="sev-maj">MAJOR</span></td><td>A core workflow is blocked</td><td>Fix in v1.0.1 within 3 days</td></tr>
+    <tr><td><span class="sev-min">MINOR</span></td><td>Wrong display, label, calculation, UX awkward</td><td>Batch into v1.0.1 or v1.1.0</td></tr>
+    <tr><td>SUGGESTION</td><td>Feature request, workflow improvement</td><td>Add to v1.1 backlog</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>7. IT Monitoring During Pilot</h2>
+<div class="card">
+  <table>
+    <tr><th>Check</th><th>Frequency</th><th>Command</th></tr>
+    <tr><td>Error log review</td><td>Morning daily</td><td><code>grep '"level":"error"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | jq .</code></td></tr>
+    <tr><td>PM2 status</td><td>Morning daily</td><td><code>pm2 status</code></td></tr>
+    <tr><td>API health</td><td>Morning daily</td><td><code>curl -k https://192.168.1.5/api/health | jq .ok</code></td></tr>
+    <tr><td>Database backup</td><td>Check each morning</td><td><code>tail -3 /opt/ufcl-backups/backup.log</code></td></tr>
+    <tr><td>Metrics dashboard</td><td>Twice daily (morning + afternoon)</td><td>Browser: <code>https://192.168.1.5/dashboard.html</code></td></tr>
+    <tr><td>Audit log sample</td><td>Every 2 days</td><td><code>psql -d ufcl_production -c "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT 20;"</code></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>8. Pilot Exit Criteria</h2>
+<div class="card">
+  <p>The pilot is considered successful and ready for Stage 3 full rollout when:</p>
+  <ul>
+    <li>Zero CRITICAL bugs remain open</li>
+    <li>Zero MAJOR bugs remain open</li>
+    <li>All 9 pilot users have submitted at least 3 days of real records</li>
+    <li>Offline sync has been tested on at least 2 devices</li>
+    <li>Server has been running continuously for at least 7 days with PM2 restart count = 0</li>
+    <li>CEO signs off on pilot completion</li>
+  </ul>
+
+  <h3>Pilot decision (to be filled after Week 2)</h3>
+  <table style="width:auto">
+    <tr><th>Decision</th><th>Condition</th></tr>
+    <tr><td>Proceed to full rollout (Stage 3)</td><td>All exit criteria met</td></tr>
+    <tr><td>Release v1.0.1 patch first</td><td>Open CRITICAL or MAJOR bugs — fix, re-pilot for 3 days</td></tr>
+    <tr><td>Extend pilot 1 more week</td><td>Not enough usage data collected</td></tr>
+  </table>
+
+  <div style="margin-top:12px;font-size:13px">
+    <strong>Pilot sign-off date:</strong> __________________ &nbsp;&nbsp;
+    <strong>Decision:</strong> __________________ &nbsp;&nbsp;
+    <strong>Signed:</strong> __________________
+  </div>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Pilot Deployment Plan &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>
