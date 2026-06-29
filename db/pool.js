@@ -34,5 +34,5 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000
 });
 
-module.exports = { pool };
+module.exports = { pool, closePool: () => pool.end() };
 

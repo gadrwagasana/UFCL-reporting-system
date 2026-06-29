@@ -51,10 +51,13 @@ function setupAutoUpdater() {
   });
 }
 
+const { closePool } = require('../db/pool');
 const auth = require('../db/services/auth');
 const data = require('../db/services/data');
 
 let mainWindow;
+let _jobQueueTimer = null;
+let _isQuitting = false;
 
 // ── Server-side session store ─────────────────────────────────────────────────
 // Maps webContents.id → authenticated userId (string).
@@ -184,6 +187,29 @@ app.whenReady().then(async () => {
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
+});
+
+// Graceful shutdown — runs before every quit() and before quitAndInstall().
+// Stops all background timers, waits for the pool to drain, then exits cleanly
+// so the installer can replace the .exe without a "please close manually" prompt.
+app.on('before-quit', async (e) => {
+  e.preventDefault(); // block all app.quit() paths; only app.exit() bypasses this
+  if (_isQuitting) return;
+  _isQuitting = true;
+
+  // 1. Stop intervals — no new ticks will fire after this point
+  if (_jobQueueTimer) { clearInterval(_jobQueueTimer); _jobQueueTimer = null; }
+  data.stopJobProcessor();
+  data.stopScheduler();
+
+  // 2. Drain the pg pool — waits for any in-flight queries then closes all
+  //    server-side connections (8 s hard cap to avoid blocking the installer)
+  try {
+    await Promise.race([closePool(), new Promise(r => setTimeout(r, 8_000))]);
+  } catch { /* pool already closed or never opened */ }
+
+  // 3. Exit without re-triggering before-quit
+  app.exit(0);
 });
 
 // ── Public handlers (no session required) ────────────────────────────────────
@@ -601,7 +627,7 @@ app.whenReady().then(async () => {
   // High-frequency job-queue drain — every 2 minutes
   // Handles notification retries, audit replays, and escalation jobs
   // with low latency independent of the 15-minute scheduler.
-  setInterval(() => data.processWorkflowJobs(), 2 * 60 * 1_000);
+  _jobQueueTimer = setInterval(() => data.processWorkflowJobs(), 2 * 60 * 1_000);
 
   // Phase 8 Part 2 — Internal Scheduler (15-minute interval)
   // Runs: BI scan · security scan · workflow scan ·

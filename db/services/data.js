@@ -5454,12 +5454,18 @@ const JOB_DISPATCH = {
 
 // Guard against re-entrant concurrent calls (single-instance desktop app).
 let _jobProcessorRunning = false;
+// Set to true during graceful shutdown so no new ticks begin.
+let _jobProcessorStopped = false;
+
+function stopJobProcessor() {
+  _jobProcessorStopped = true;
+}
 
 // Main job processor. Called by setInterval in electron/main.js every 2 minutes.
 // Claims up to 20 runnable jobs atomically via SKIP LOCKED, executes handlers,
 // marks done or reschedules failed jobs with exponential backoff.
 async function processWorkflowJobs() {
-  if (_jobProcessorRunning) return;
+  if (_jobProcessorRunning || _jobProcessorStopped) return;
   _jobProcessorRunning = true;
   try {
     // Atomically claim runnable jobs (SKIP LOCKED prevents duplicate processing)
@@ -7195,6 +7201,8 @@ module.exports = {
   automationHistory:    getAutomationLog,
   // Phase 8 Part 2 — Internal Scheduler
   startScheduler,
+  stopScheduler,
+  stopJobProcessor,
   // Phase 9 — Enterprise Performance Management
   performanceDashboard,
   performanceKPIs,
@@ -9017,6 +9025,14 @@ function startScheduler() {
   _schedulerTick(); // fire immediately; don't await (non-blocking)
   _schedulerTimer = setInterval(_schedulerTick, INTERVAL_MS);
   console.log('[scheduler] Started — 15-minute interval');
+}
+
+function stopScheduler() {
+  if (_schedulerTimer !== null) {
+    clearInterval(_schedulerTimer);
+    _schedulerTimer = null;
+    console.log('[scheduler] Stopped');
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
