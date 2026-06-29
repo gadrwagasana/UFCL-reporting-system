@@ -15,7 +15,7 @@ import { MachineFuelStackScreenProps } from '../../navigation/types';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { Colors, Spacing, Typography, Radius } from '../../theme';
 
-const FUEL_TYPES = ['Diesel', 'Petrol', 'Other'];
+const FUEL_TYPES = ['Diesel', 'Petroleum/Essence', 'Petrol', 'Chain Oil', 'Engine Oil'];
 
 type Props = MachineFuelStackScreenProps<'MachineFuelCreate'>;
 

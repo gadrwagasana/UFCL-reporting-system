@@ -15,7 +15,11 @@ export type UserRole =
   | 'harvesting-leader'
   | 'sawmill-leader'
   | 'poles-leader'
-  | 'vat-leader';
+  | 'vat-leader'
+  | 'harvesting-supervisor'
+  | 'sawmill-supervisor'
+  | 'poles-supervisor'
+  | 'vat-supervisor';
 
 // Shape returned by GET /api/auth/me and POST /api/auth/login
 export interface User {
@@ -59,6 +63,10 @@ export const WORKSHOP_RESTRICTED_ROLES: UserRole[] = [
   'sawmill-leader',
   'poles-leader',
   'vat-leader',
+  'harvesting-supervisor',
+  'sawmill-supervisor',
+  'poles-supervisor',
+  'vat-supervisor',
 ];
 
 // Roles that see all workshops (cross-workshop)

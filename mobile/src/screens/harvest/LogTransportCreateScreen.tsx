@@ -32,6 +32,7 @@ export function LogTransportCreateScreen() {
   const [tractorPlate,  setTractorPlate]  = useState('');
   const [loggersNumber, setLoggersNumber] = useState('');
   const [comptId,       setComptId]       = useState('');
+  const [subName,       setSubName]       = useState('');
   const [notes,         setNotes]         = useState('');
   const [submitting,    setSubmitting]    = useState(false);
 
@@ -45,20 +46,15 @@ export function LogTransportCreateScreen() {
     if (!qty || isNaN(qtyNum) || qtyNum <= 0) {
       Alert.alert('Required', 'Quantity must be a positive number.'); return;
     }
-    if (!tractorPlate.trim()) {
-      Alert.alert('Required', 'Vehicle (tractor plate) is required.'); return;
-    }
-    if (!loggersNumber.trim()) {
-      Alert.alert('Required', 'Driver name is required.'); return;
-    }
 
     const payload = {
       transport_date:  transportDate,
       qty_transported: qtyNum,
-      tractor_plate:   tractorPlate.trim(),
-      loggers_number:  loggersNumber.trim(),
-      ...(comptId     && { compt_id: Number(comptId) }),
-      ...(notes.trim() && { notes: notes.trim() }),
+      ...(tractorPlate.trim()  && { tractor_plate:  tractorPlate.trim() }),
+      ...(loggersNumber.trim() && { loggers_number: loggersNumber.trim() }),
+      ...(comptId              && { compt_id: Number(comptId) }),
+      ...(subName              && { sub_name: subName }),
+      ...(notes.trim()         && { notes: notes.trim() }),
     };
 
     setSubmitting(true);
@@ -114,15 +110,13 @@ export function LogTransportCreateScreen() {
             onChangeText={setTractorPlate}
             placeholder="e.g. RAB 123A"
             autoCapitalize="characters"
-            required
           />
 
           <FormInput
-            label="Driver Name"
+            label="Logger Machine / Number"
             value={loggersNumber}
             onChangeText={setLoggersNumber}
-            placeholder="Driver's name"
-            required
+            placeholder="Optional"
           />
         </View>
 
@@ -132,7 +126,12 @@ export function LogTransportCreateScreen() {
           <FormSelect
             label="Compartment"
             value={comptId}
-            onChange={(v) => setComptId(String(v))}
+            onChange={(v) => {
+              const id = String(v);
+              setComptId(id);
+              const found = (comptData?.rows ?? []).find((c) => String(c.id) === id);
+              setSubName(found?.sub_name ?? '');
+            }}
             options={[{ label: '— None —', value: '' }, ...compartmentOptions]}
             placeholder="Select compartment"
           />

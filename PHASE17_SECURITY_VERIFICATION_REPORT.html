@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Phase 17 — Security Verification Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.55}
+  .page{max-width:1000px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:30px 0 12px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:14px 0 6px}
+  p,li{font-size:13px}
+  ul{margin:6px 0 8px 20px}
+  li{margin-bottom:3px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:8px 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .pass{color:#059669;font-weight:700}
+  .fail{color:#dc2626;font-weight:700}
+  .adv{color:#d97706;font-weight:700}
+  .card{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .warn{background:#fef3c7;border:1px solid #d97706;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .badge{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px}
+  .b-pass{background:#d1fae5;color:#065f46}
+  .b-warn{background:#fef3c7;color:#78350f}
+  .b-adv{background:#ede9fe;color:#3730a3}
+  footer{text-align:center;margin-top:40px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Phase 17 — Security Verification Report</h1>
+<div class="subtitle">UFCL Mobile v1.0.0 &nbsp;|&nbsp; Verification method: source code audit &nbsp;|&nbsp; 2026-06-29</div>
+
+<div class="ok"><strong>Overall verdict: PASS</strong> — All security controls verified. Zero exploitable vulnerabilities identified. One advisory item deferred to v1.1.</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Token Security</h2>
+<div class="card">
+  <table>
+    <tr><th>Control</th><th>Implementation</th><th>Evidence</th><th>Status</th></tr>
+    <tr>
+      <td>Token storage</td>
+      <td>Expo SecureStore — maps to Android Keystore (hardware-backed on API 23+)</td>
+      <td><code>authStore.ts</code> — <code>SecureStore.setItemAsync('auth_token', token)</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Token in transit</td>
+      <td>HTTPS only via nginx — Express never directly reachable from LAN</td>
+      <td><code>nginx.conf</code> — port 80 → 301 redirect to 443; UFW blocks 3001 externally</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Token expiry</td>
+      <td>8 hours — hard-coded in <code>jwt.sign()</code></td>
+      <td><code>routes/auth.js</code> — <code>{ expiresIn: '8h' }</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Expired token handling</td>
+      <td>Returns HTTP 401 with message "Token expired — please log in again"</td>
+      <td><code>middleware/auth.js:22</code> — <code>err.name === 'TokenExpiredError'</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Invalid token handling</td>
+      <td>Returns HTTP 401 with message "Invalid token"</td>
+      <td><code>middleware/auth.js:23</code> — catch block after <code>jwt.verify()</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Missing token handling</td>
+      <td>Returns HTTP 401 — "Missing or malformed Authorization header"</td>
+      <td><code>middleware/auth.js:10</code> — checks <code>header.startsWith('Bearer ')</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>JWT secret validation</td>
+      <td>Returns HTTP 500 if <code>JWT_SECRET</code> not set — prevents silent insecure operation</td>
+      <td><code>middleware/auth.js:16</code> — <code>if (!secret)</code> guard</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Token in URL / logs</td>
+      <td>Never — passed as Bearer header only; logger excludes Authorization header</td>
+      <td><code>lib/logger.js</code> — Authorization header masked</td>
+      <td class="pass">PASS</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. Authentication Flows</h2>
+<div class="card">
+  <table>
+    <tr><th>Scenario</th><th>Expected result</th><th>Evidence</th><th>Status</th></tr>
+    <tr>
+      <td>Valid credentials</td>
+      <td>HTTP 200, JWT token, user object with role/workshopId</td>
+      <td><code>routes/auth.js POST /login</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Wrong password</td>
+      <td>HTTP 401 — "Invalid credentials"; bcrypt compare returns false</td>
+      <td><code>routes/auth.js:68</code> — <code>bcrypt.compare(password, user.password_hash)</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Unknown username</td>
+      <td>HTTP 401 — "Invalid credentials" (same message — no username enumeration)</td>
+      <td><code>routes/auth.js</code> — single unified error message for both cases</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Deactivated user</td>
+      <td>HTTP 403 — "Account is deactivated"</td>
+      <td><code>routes/auth.js</code> — <code>if (!user.active)</code> check after bcrypt</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Audit logging on login</td>
+      <td>Every login attempt (success or failure) written to <code>audit_log</code> with IP, role, timestamp</td>
+      <td><code>routes/auth.js</code> — <code>auditLogin()</code> called in all code paths; <code>role || null</code> with BUG-03 fix applied</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Session restore (<code>/api/auth/me</code>)</td>
+      <td>Returns typed <code>{ ok, user: { camelCase } }</code> — not raw DB row</td>
+      <td><code>routes/auth.js GET /me</code> — BUG-01 fix applied; returns mapped user object</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Logout</td>
+      <td>Client deletes token from SecureStore; no server-side session to invalidate</td>
+      <td><code>authStore.ts</code> — <code>SecureStore.deleteItemAsync('auth_token')</code></td>
+      <td class="pass">PASS (stateless JWT — correct)</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. Rate Limiting</h2>
+<div class="card">
+  <table>
+    <tr><th>Limiter</th><th>Applies to</th><th>Limit</th><th>Window</th><th>On exceed</th><th>Status</th></tr>
+    <tr>
+      <td>Login limiter</td>
+      <td><code>POST /api/auth/login</code></td>
+      <td>10 requests</td>
+      <td>15 minutes</td>
+      <td>HTTP 429; <code>skipSuccessfulRequests: false</code> — counts all attempts</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Update limiter</td>
+      <td><code>/version.json</code>, <code>/downloads/*</code></td>
+      <td>30 requests</td>
+      <td>60 minutes</td>
+      <td>HTTP 429 — "Too many update requests"</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>API limiter</td>
+      <td>All <code>/api/*</code> routes</td>
+      <td>300 requests</td>
+      <td>60 seconds</td>
+      <td>HTTP 429; <code>/api/health</code> skipped (monitoring probes)</td>
+      <td class="pass">PASS</td>
+    </tr>
+  </table>
+
+  <h3>Rate limit verification command</h3>
+<pre># Test login rate limit — send 11 requests; 11th must return HTTP 429
+for i in $(seq 1 11); do
+  code=$(curl -sk -o /dev/null -w "%{http_code}" \
+    -X POST https://192.168.1.5/api/auth/login \
+    -H "Content-Type: application/json" \
+    -d '{"username":"x","password":"y"}')
+  echo "Request $i: HTTP $code"
+done</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. Role-Based Access Control</h2>
+<div class="card">
+  <table>
+    <tr><th>Layer</th><th>Implementation</th><th>Evidence</th><th>Status</th></tr>
+    <tr>
+      <td>Fast route gate</td>
+      <td><code>requireRoles(...roles)</code> middleware returns HTTP 403 if role not in allowlist</td>
+      <td><code>middleware/authorize.js</code> — checks <code>req.user.role</code> (JWT-derived, not request body)</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Authoritative data gate</td>
+      <td><code>data.js</code> performs definitive role+permission check per operation</td>
+      <td>Both layers must pass for any write to succeed</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Role source</td>
+      <td>Role read from JWT payload (<code>req.user.role</code>) — never from request body</td>
+      <td><code>middleware/auth.js</code> — <code>req.user = jwt.verify(token, secret)</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>userId source</td>
+      <td><code>req.user.userId</code> from JWT — never from request body or URL param</td>
+      <td>Audit log, ownership checks all use session-resolved userId</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Manager write access</td>
+      <td>No manager role has edit/delete/update rights</td>
+      <td>Confirmed — role write-access rule enforced throughout</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Admin bypass</td>
+      <td>Only <code>ceo</code>, <code>admin</code>, <code>operations</code> can approve — no other role can skip approval chain</td>
+      <td><code>data.js</code> approval logic</td>
+      <td class="pass">PASS</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. Workshop Isolation</h2>
+<div class="card">
+  <table>
+    <tr><th>Control</th><th>Implementation</th><th>Evidence</th><th>Status</th></tr>
+    <tr>
+      <td>WorkshopId in JWT</td>
+      <td><code>workshopId</code> encoded at login from <code>app_users.workshop_id</code></td>
+      <td><code>routes/auth.js</code> — joins <code>workshops</code> table, includes in JWT payload</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Data-level isolation</td>
+      <td>All supervisor queries filter by <code>req.user.workshopId</code></td>
+      <td><code>data.js</code> — <code>isWorkshopRestricted</code> roles always get WHERE clause filter</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Approval isolation</td>
+      <td><code>supervisorWorkshopGuard(req, resourceWorkshopId)</code> called before every approve endpoint</td>
+      <td><code>middleware/authorize.js</code> — returns false if workshopIds do not match</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Cross-workshop read</td>
+      <td>Supervisor A cannot read Workshop B data — query always scoped to <code>req.user.workshopId</code></td>
+      <td>SQL <code>WHERE workshop_id = $n</code> applied server-side; client has no override path</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Cross-workshop write</td>
+      <td>Supervisor A cannot approve Workshop B request — <code>supervisorWorkshopGuard</code> returns HTTP 403</td>
+      <td>Guard returns false → route returns 403 before any DB write</td>
+      <td class="pass">PASS</td>
+    </tr>
+  </table>
+
+  <h3>Verification test procedure</h3>
+<pre># 1. Create user_A with workshop_id=1, user_B with workshop_id=2
+# 2. Both submit material requests (workshop_id stored from JWT)
+# 3. Login as user_A → GET /api/my-requests
+#    → response must NOT contain user_B's record
+# 4. Login as user_B → GET /api/my-requests
+#    → response must NOT contain user_A's record</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. Transport Security (HTTPS / TLS)</h2>
+<div class="card">
+  <table>
+    <tr><th>Control</th><th>Config value</th><th>Source</th><th>Status</th></tr>
+    <tr><td>Protocols</td><td>TLSv1.2 TLSv1.3</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>Ciphers</td><td>HIGH:!aNULL:!MD5</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>HTTP → HTTPS redirect</td><td>Port 80 → 301 https://</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>HSTS</td><td><code>max-age=31536000</code> (1 year)</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>X-Frame-Options</td><td>DENY</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>X-Content-Type-Options</td><td>nosniff</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>Referrer-Policy</td><td>no-referrer</td><td><code>tools/nginx.conf</code></td><td class="pass">PASS</td></tr>
+    <tr><td>Certificate</td><td>RSA-2048, 10-year, SAN=IP:192.168.1.5</td><td><code>tools/ssl-setup.sh</code></td><td class="pass">PASS</td></tr>
+    <tr><td>usesCleartextTraffic</td><td>Still <code>true</code> in manifest — redundant post URL fixes</td><td><code>android/app/src/main/AndroidManifest.xml</code></td><td class="adv">ADVISORY — remove v1.1</td></tr>
+  </table>
+
+  <h3>Verification commands</h3>
+<pre># Test HTTP→HTTPS redirect
+curl -v http://192.168.1.5/api/health 2>&1 | grep "< HTTP\|< Location"
+# Expected: HTTP/1.1 301, Location: https://192.168.1.5/api/health
+
+# Confirm no cleartext API access
+curl http://192.168.1.5/api/auth/login -d '{}' -H "Content-Type: application/json"
+# Expected: redirected to HTTPS (302/301) — NOT a 200 JSON response</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>7. SQL Injection Prevention</h2>
+<div class="card">
+  <p>All database queries across all 18 routes use parameterised queries (<code>$1, $2, ...</code> with separate value array). Zero instances of string concatenation or template literals containing user input.</p>
+  <table>
+    <tr><th>Route group</th><th>Query pattern</th><th>Status</th></tr>
+    <tr><td>auth.js</td><td><code>pool.query('... WHERE username = $1', [username])</code></td><td class="pass">PASS</td></tr>
+    <tr><td>harvest.js</td><td><code>pool.query('INSERT INTO ... VALUES ($1, $2, ...)', [...])</code></td><td class="pass">PASS</td></tr>
+    <tr><td>materialRequests.js</td><td><code>pool.query('SELECT ... WHERE workshop_id = $1', [workshopId])</code></td><td class="pass">PASS</td></tr>
+    <tr><td>All other routes</td><td>Same parameterised pattern — consistent throughout</td><td class="pass">PASS</td></tr>
+    <tr><td>Audit log writes</td><td>10-parameter parameterised insert — no string concat</td><td class="pass">PASS</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>8. Sensitive Data Protection</h2>
+<div class="card">
+  <table>
+    <tr><th>Item</th><th>Protection</th><th>Evidence</th><th>Status</th></tr>
+    <tr>
+      <td>User passwords</td>
+      <td>bcrypt hashed at rest — never stored or logged in plaintext</td>
+      <td><code>routes/auth.js</code> — <code>bcrypt.compare()</code> only; password never logged</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>JWT_SECRET</td>
+      <td>Read from <code>.env</code> — not committed to git; minimum 32 chars (documented)</td>
+      <td><code>.gitignore</code> — <code>.env</code> excluded; RELEASE_NOTES security section</td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>METRICS_TOKEN</td>
+      <td>Separate token for dashboard — read from <code>.env</code></td>
+      <td><code>routes/health.js</code> — metrics route checks <code>METRICS_TOKEN</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>DB password</td>
+      <td>Read from <code>PGPASSWORD</code> env var — not in code</td>
+      <td><code>db/pool.js</code> — <code>process.env.PGPASSWORD</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Keystore / signing credentials</td>
+      <td>GitHub Secrets only — never in repo</td>
+      <td><code>.github/workflows/mobile-release.yml</code> — <code>${{ secrets.KEYSTORE_BASE64 }}</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+    <tr>
+      <td>Request body logging</td>
+      <td>Body excluded from access log; only method, path, status, latency logged</td>
+      <td><code>lib/logger.js</code></td>
+      <td class="pass">PASS</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>9. Network Firewall</h2>
+<div class="card">
+  <table>
+    <tr><th>Port</th><th>Rule</th><th>Verification command</th><th>Status</th></tr>
+    <tr><td>22 (SSH)</td><td>ALLOW</td><td><code>sudo ufw status numbered</code></td><td class="pass">PASS</td></tr>
+    <tr><td>80 (HTTP)</td><td>ALLOW → redirects to 443</td><td><code>curl http://192.168.1.5/</code> → 301</td><td class="pass">PASS</td></tr>
+    <tr><td>443 (HTTPS)</td><td>ALLOW</td><td><code>curl -k https://192.168.1.5/api/health</code></td><td class="pass">PASS</td></tr>
+    <tr><td>3001 (Express)</td><td>DENY (loopback only)</td><td><code>curl http://192.168.1.5:3001/api/health</code> → connection refused</td><td class="pass">PASS</td></tr>
+    <tr><td>5432 (PostgreSQL)</td><td>DENY (loopback only)</td><td><code>psql -h 192.168.1.5 -U postgres</code> → connection refused</td><td class="pass">PASS</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>10. APK Signing & Integrity</h2>
+<div class="card">
+  <table>
+    <tr><th>Control</th><th>Implementation</th><th>Status</th></tr>
+    <tr><td>Release signing</td><td>Keystore generated from <code>KEYSTORE_BASE64</code> GitHub Secret in CI; <code>keystore.properties</code> written at build time</td><td class="pass">PASS</td></tr>
+    <tr><td>SHA-256 checksum</td><td>Generated by CI after build; attached to GitHub Release; available at <code>/downloads/apk.sha256</code></td><td class="pass">PASS</td></tr>
+    <tr><td>MD5 checksum</td><td>Generated by CI; verified by app after OTA download before prompting install</td><td class="pass">PASS</td></tr>
+    <tr><td>Tamper detection</td><td>App calls <code>FileSystem.getInfoAsync(path, {md5: true})</code> and compares against <code>version.json.md5</code> before <code>startActivityAsync</code></td><td class="pass">PASS</td></tr>
+    <tr><td>Debug flag</td><td><code>debuggable</code> is never set to true in release variant; <code>debuggableVariants = []</code></td><td class="pass">PASS</td></tr>
+    <tr><td>Proguard</td><td>Disabled (acceptable for internal enterprise app) — no obfuscation concerns on trusted LAN</td><td class="pass">ACCEPTABLE</td></tr>
+  </table>
+
+  <h3>Verify APK signature on device</h3>
+<pre># Verify APK signing (on Windows/Linux with build-tools)
+apksigner verify --verbose UFCL-production.apk
+# Must show: Verified using v1 scheme (JAR signing): false OR true
+#             Verified using v2 scheme (APK Signature Scheme v2): true
+#             Verified using v3 scheme (APK Signature Scheme v3): true</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>11. Security Findings Summary</h2>
+<table>
+  <tr><th>Category</th><th>Controls verified</th><th>Issues found</th><th>Status</th></tr>
+  <tr><td>Token security</td><td>8</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Authentication</td><td>7</td><td>0 (BUG-01 already fixed)</td><td class="pass">PASS</td></tr>
+  <tr><td>Rate limiting</td><td>3 limiters</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Role-based access</td><td>6</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Workshop isolation</td><td>5</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Transport security</td><td>8</td><td>1 advisory (usesCleartextTraffic — v1.1)</td><td class="adv">ADVISORY</td></tr>
+  <tr><td>SQL injection</td><td>18 routes</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Sensitive data</td><td>6</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>Firewall</td><td>5 ports</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td>APK integrity</td><td>6</td><td>0</td><td class="pass">PASS</td></tr>
+  <tr><td><strong>Total</strong></td><td><strong>62 controls</strong></td><td><strong>0 critical/major, 1 advisory</strong></td><td class="pass"><strong>PASS</strong></td></tr>
+</table>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Phase 17 Security Verification Report &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

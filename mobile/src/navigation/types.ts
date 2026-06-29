@@ -52,7 +52,6 @@ export type SupervisorTabParamList = {
   TodayDashboard: undefined;
   MaterialRequest: undefined;
   CasualLabour:   undefined;
-  VehicleFuel:    undefined;
   MyRequests:     undefined;
   Profile:        undefined;
 };
@@ -82,6 +81,7 @@ export type PolesTabParamList = {
   PolesPurchase:   undefined;
   PolesDelivery:   undefined;
   PolesQC:         undefined;
+  MaterialRequest: undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -94,6 +94,33 @@ export type VatTabParamList = {
   CasualLabour:    undefined;
   MyRequests:      undefined;
   Profile:         undefined;
+};
+
+// ─── Harvest Supervisor tabs ──────────────────────────────────────────────────
+export type HarvestSupervisorTabParamList = {
+  HarvestList:      undefined;
+  LogTransportList: undefined;
+  Profile:          undefined;
+};
+
+// ─── Sawmill Supervisor tabs ──────────────────────────────────────────────────
+export type SawmillSupervisorTabParamList = {
+  SawmillList: undefined;
+  Profile:     undefined;
+};
+
+// ─── Poles Supervisor tabs ────────────────────────────────────────────────────
+export type PolesSupervisorTabParamList = {
+  PolesList:    undefined;
+  PolesDelivery: undefined;
+  Profile:      undefined;
+};
+
+// ─── VAT Supervisor tabs ──────────────────────────────────────────────────────
+export type VatSupervisorTabParamList = {
+  VatInbound: undefined;
+  VatEntries: undefined;
+  Profile:    undefined;
 };
 
 // ─── Mechanician tabs ────────────────────────────────────────────────────────
@@ -114,6 +141,7 @@ export type OperationsTabParamList = {
 // ─── Logistics tabs ──────────────────────────────────────────────────────────
 export type LogisticsTabParamList = {
   DeliveryList:    undefined;
+  VehicleFuel:     undefined;
   MyRequests:      undefined;
 };
 
@@ -127,6 +155,12 @@ export type SalesTabParamList = {
 export type StorekeeperTabParamList = {
   MaterialReview:  undefined;
   MyRequests:      undefined;
+};
+
+// ─── Finance tabs ─────────────────────────────────────────────────────────────
+export type FinanceTabParamList = {
+  Overview:    undefined;
+  MyRequests:  undefined;
 };
 
 // ─── Convenience screen prop types ───────────────────────────────────────────
@@ -235,12 +269,13 @@ export type VatEntriesStackScreenProps<T extends keyof VatEntriesStackParamList>
 
 // ─── Delivery stack (Logistics) ───────────────────────────────────────────────
 export type DeliveryStackParamList = {
-  DeliveriesList: undefined;
-  DeliveryDetail: { order: DeliveryOrder };
-  DeliveryStatus: { order: DeliveryOrder };
-  PODList:        undefined;
-  PODCapture:     { order: DeliveryOrder };
-  PODDetail:      { order: DeliveryOrder };
+  DeliveriesList:  undefined;
+  DeliveryCreate:  undefined;
+  DeliveryDetail:  { order: DeliveryOrder };
+  DeliveryStatus:  { order: DeliveryOrder };
+  PODList:         undefined;
+  PODCapture:      { order: DeliveryOrder };
+  PODDetail:       { order: DeliveryOrder };
 };
 
 export type DeliveryStackScreenProps<T extends keyof DeliveryStackParamList> =

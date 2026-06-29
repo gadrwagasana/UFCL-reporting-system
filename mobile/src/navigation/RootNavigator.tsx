@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { hideAsync as hideSplashScreen } from 'expo-splash-screen';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuthStore } from '../stores/authStore';
 import { RootStackParamList } from './types';
@@ -12,6 +13,12 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 export function RootNavigator() {
   const isLoading       = useAuthStore((s) => s.isLoading);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    if (!isLoading) {
+      hideSplashScreen().catch(() => {});
+    }
+  }, [isLoading]);
 
   return (
     <Stack.Navigator screenOptions={{ headerShown: false, animation: 'fade' }}>

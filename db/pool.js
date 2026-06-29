@@ -2,11 +2,18 @@ const { Pool } = require('pg');
 const path = require('path');
 const dotenv = require('dotenv');
 
-// app.isPackaged = true when running as installed .exe/.app, false on npm start
-const { app } = require('electron');
-const envPath = app.isPackaged
-  ? path.join(process.resourcesPath, '.env')  // installed: resources/.env
-  : path.join(__dirname, '..', '.env');         // dev (Mac/Windows npm start): project root
+// Detect Electron vs plain Node (Express mobile API, tests, migration scripts)
+let envPath;
+try {
+  const { app } = require('electron');
+  // app.isPackaged = true in installed .exe/.app, false on npm start
+  envPath = app.isPackaged
+    ? path.join(process.resourcesPath, '.env')  // installed: resources/.env
+    : path.join(__dirname, '..', '.env');         // dev (npm start): project root
+} catch {
+  // Not in an Electron context — use the project root .env
+  envPath = path.join(__dirname, '..', '.env');
+}
 
 dotenv.config({ path: envPath });
 

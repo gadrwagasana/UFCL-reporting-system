@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>UFCL Mobile v1.0.0 — Post-Release Checklist</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.6}
+  .page{max-width:880px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:30px 0 12px;display:flex;align-items:center;gap:10px}
+  .phase-tag{background:#1a3c5e;color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px}
+  p,li{font-size:13px}
+  ul{margin:6px 0 8px 22px}
+  li{margin-bottom:3px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:8px 0 10px;white-space:pre}
+  .item{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,.06);display:flex;gap:14px;align-items:flex-start}
+  .cb{width:20px;height:20px;border:2px solid #1a3c5e;border-radius:4px;flex-shrink:0;margin-top:1px}
+  .item-body{flex:1}
+  .item-title{font-weight:700;font-size:13px;margin-bottom:3px}
+  .item-meta{font-size:12px;color:#666}
+  .note{background:#fef9e7;border:1px solid #f0c040;border-radius:6px;padding:10px 14px;font-size:13px;margin:8px 0}
+  .warn{background:#fde8e8;border:1px solid #dc2626;border-radius:6px;padding:10px 14px;font-size:13px;margin:8px 0}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:10px 14px;font-size:13px;margin:8px 0}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 12px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .sign{background:#fff;border-radius:8px;padding:20px;border:2px solid #1a3c5e;margin-top:24px}
+  .sign-row{display:flex;gap:32px;margin-top:14px}
+  .sign-field{flex:1;border-bottom:1px solid #333;padding-bottom:2px;margin-bottom:4px}
+  .sign-label{font-size:11px;color:#666}
+  footer{text-align:center;margin-top:48px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>UFCL Mobile v1.0.0 — Post-Release Checklist</h1>
+<div class="subtitle">Execute after production approval. Complete every section in order. &nbsp;|&nbsp; 2026-06-29</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">A</span> Git Tag Creation</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">A-01. Confirm working tree is clean</div>
+    <div class="item-meta">No uncommitted changes should be present before tagging</div>
+<pre>git status
+# Expected: nothing to commit, working tree clean
+# If files are modified: commit them first with a brief message</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">A-02. Create annotated release tag</div>
+    <div class="item-meta">Use annotated tag (not lightweight) so the tagger and date are recorded</div>
+<pre>git tag -a v1.0.0 -m "UFCL Mobile v1.0.0 — Initial production release
+
+- 15 production modules across 12 departments
+- Offline-first with Zustand queue + sync
+- JWT auth, SecureStore, workshop isolation
+- OTA auto-update via HTTPS
+- 92/100 production readiness score"</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">A-03. Verify tag was created</div>
+<pre>git tag -l "v1.0.0"      # should print: v1.0.0
+git show v1.0.0          # should show tag metadata and commit</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">A-04. Push tag to remote</div>
+    <div class="item-meta">Do not push until production approval is confirmed — tag is permanent</div>
+<pre>git push origin v1.0.0</pre>
+    <div class="warn">Do NOT use <code>git push --tags</code> — this pushes all local tags including any unreviewed ones. Push only <code>v1.0.0</code> explicitly.</div>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">A-05. Verify tag is visible on GitHub</div>
+    <div class="item-meta">GitHub → Releases → Tags tab should show v1.0.0</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">B</span> GitHub Release Publication</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">B-01. Trigger the release workflow</div>
+    <div class="item-meta">Go to GitHub → Actions → "Mobile — Build &amp; Release APK" → Run workflow</div>
+    <ul>
+      <li><strong>Version name override:</strong> <code>1.0.0</code></li>
+      <li><strong>Force mandatory update:</strong> <code>false</code> (first release — no previous version to update from)</li>
+      <li><strong>Release notes:</strong> <code>Initial production release,15 modules,12 departments,OTA auto-update</code></li>
+    </ul>
+    <div class="note">Alternatively: push a commit touching <code>mobile/**</code> to <code>master</code> to auto-trigger. The workflow reads <code>version_name</code> from <code>mobile/package.json</code> when no override is given.</div>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">B-02. Monitor the CI run (~8 minutes)</div>
+    <div class="item-meta">All 14 steps should pass. Watch for failures in step 5 (keystore decode), step 8 (Gradle build), step 13 (SSH deploy)</div>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">B-03. Verify GitHub Release was created</div>
+    <ul>
+      <li>GitHub → Releases should show "UFCL Mobile v1.0.0"</li>
+      <li>Release assets: <code>UFCL-production-1.0.0.apk</code>, <code>version.json</code>, <code>apk.sha256</code>, <code>apk.md5</code></li>
+      <li>Release is marked as "Latest release"</li>
+    </ul>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">B-04. Update GitHub Release description</div>
+    <div class="item-meta">Edit the auto-generated description and paste the full GitHub Release text (see below)</div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">C</span> APK Deployment to Production Server</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">C-01. Confirm APK is on the server (CI deploys automatically)</div>
+<pre>ssh $DEPLOY_USER@192.168.1.5
+ls -lh /opt/ufcl-api/updates/
+# Expected:
+#   UFCL-production.apk   (signed release APK)
+#   version.json          (update metadata)
+#   apk.sha256            (checksum)
+#   apk.md5               (checksum)</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">C-02. Verify version.json content</div>
+<pre>curl -k https://192.168.1.5/version.json | jq .
+# Must show:
+#   "version": "1.0.0"
+#   "apkUrl": "https://192.168.1.5/downloads/UFCL-production.apk"
+#   "mandatory": false</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">C-03. Verify APK download over HTTPS</div>
+<pre>curl -kI https://192.168.1.5/downloads/UFCL-production.apk
+# Expected: HTTP/2 200, content-type: application/vnd.android.package-archive
+# content-length: should be > 20 MB</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">C-04. Cross-check APK SHA-256 against GitHub Release</div>
+<pre>curl -k https://192.168.1.5/downloads/apk.sha256
+# Must match the sha256 shown in the GitHub Release artifacts</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">D</span> Auto-Update Verification</h2>
+
+<div class="note">For v1.0.0 (first release), there is no previous version to update from. These steps verify the update infrastructure is ready for v1.0.1+. Use a debug build with a lower versionCode to simulate an "older" version.</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">D-01. Install a lower-versionCode build on a test device</div>
+    <div class="item-meta">Install a dev/debug build that has a versionCode lower than the CI-built v1.0.0</div>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">D-02. Open the app and wait ~5 seconds</div>
+    <div class="item-meta">The update checker fires 3 seconds after launch. Verify the update modal appears.</div>
+    <ul>
+      <li>Modal shows: version number, release notes, <strong>Update Now</strong> and <strong>Later</strong> buttons</li>
+      <li>"Later" dismisses the modal (non-mandatory update)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">D-03. Tap "Update Now" and verify download</div>
+    <ul>
+      <li>Progress bar appears</li>
+      <li>Download completes (file size matches server)</li>
+      <li>MD5 check passes silently</li>
+      <li><strong>Install Now</strong> button appears</li>
+    </ul>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">D-04. Tap "Install Now" and complete installation</div>
+    <ul>
+      <li>Android installer launches</li>
+      <li>Install completes, app relaunches at v1.0.0</li>
+      <li>No further update modal (already on latest)</li>
+    </ul>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">D-05. Test resume download (simulate interrupted download)</div>
+    <ul>
+      <li>Start download → enable airplane mode mid-download</li>
+      <li>Disable airplane mode → tap Retry</li>
+      <li>Download resumes from where it stopped (HTTP Range request)</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">E</span> Database Backup Verification</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">E-01. Run a manual backup immediately after go-live</div>
+<pre>cd /opt/ufcl-api
+PGPASSWORD="$(grep PGPASSWORD .env | cut -d= -f2)" bash tools/backup.sh
+# Should log: "====== Backup complete ======"</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">E-02. Verify backup file was created and is readable</div>
+<pre>ls -lh /opt/ufcl-backups/daily/
+gzip --test /opt/ufcl-backups/daily/db-$(date +%Y-%m-%d).sql.gz
+echo $?   # must be 0</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">E-03. Confirm cron job is active</div>
+<pre>crontab -l | grep backup
+# Expected: 0 2 * * * PGPASSWORD=... /opt/ufcl-api/tools/backup.sh</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">F</span> Production Monitoring Verification</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">F-01. Verify all health endpoints</div>
+<pre>curl -k https://192.168.1.5/api/health | jq '{ok,status,uptime}'
+curl -k https://192.168.1.5/api/ready  | jq '{ok,db}'
+curl -k -H "Authorization: Bearer $METRICS_TOKEN" \
+     https://192.168.1.5/api/metrics | jq '{ok,uptime_seconds,active_sessions}'</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">F-02. Load monitoring dashboard</div>
+    <div class="item-meta">Browser: <code>https://192.168.1.5/dashboard.html</code> — enter server URL and METRICS_TOKEN</div>
+    <ul>
+      <li>Active sessions counter visible</li>
+      <li>Request rate: 0 (no users yet)</li>
+      <li>Memory usage: &lt; 100 MB (no load yet)</li>
+      <li>Uptime: matches PM2 start time</li>
+    </ul>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">F-03. Test auto-start after server reboot</div>
+<pre>sudo reboot
+# Wait ~60 seconds after boot, then:
+pm2 status                                       # mobile-api: online
+curl -k https://192.168.1.5/api/health | jq .ok  # true
+curl -k https://192.168.1.5/version.json | jq .version  # "1.0.0"</pre>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">G</span> First-Week Support Plan</h2>
+
+<table>
+  <tr><th>Day</th><th>Action</th><th>Owner</th></tr>
+  <tr>
+    <td><strong>Day 1 (Go-live)</strong></td>
+    <td>
+      IT present on-site during first logins<br>
+      Assist all users with credential entry and TLS cert installation<br>
+      Monitor <code>pm2 logs mobile-api --lines 50</code> in real time<br>
+      Respond to any login failures immediately
+    </td>
+    <td>IT Lead</td>
+  </tr>
+  <tr>
+    <td><strong>Days 1–3</strong></td>
+    <td>
+      Check error log every 4 hours:<br>
+      <code>grep '"level":"error"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | jq .</code><br>
+      Check PM2 status twice daily<br>
+      Confirm daily backup ran at 02:00
+    </td>
+    <td>IT Lead</td>
+  </tr>
+  <tr>
+    <td><strong>Day 3</strong></td>
+    <td>
+      First offline sync test: take one device to airplane mode, submit a harvest entry, reconnect and verify sync<br>
+      Confirm My Requests shows submitted entry with correct status
+    </td>
+    <td>IT Lead + Harvesting Leader</td>
+  </tr>
+  <tr>
+    <td><strong>Day 5</strong></td>
+    <td>
+      Review all open user issues collected during week 1<br>
+      Classify: PATCH fix (v1.0.1) vs deferred to v1.1<br>
+      Confirm audit log is capturing all write actions
+    </td>
+    <td>IT Lead</td>
+  </tr>
+  <tr>
+    <td><strong>Day 7</strong></td>
+    <td>
+      Weekly backup verified (Monday cron creates weekly snapshot)<br>
+      Metrics dashboard review: request counts, error rate, active sessions, memory<br>
+      End-of-week status report to CEO / operations
+    </td>
+    <td>IT Lead</td>
+  </tr>
+</table>
+
+<h3>Escalation contacts</h3>
+<table>
+  <tr><th>Issue</th><th>First contact</th><th>Escalation</th></tr>
+  <tr><td>User cannot log in</td><td>IT Lead — check user account status in DB</td><td>Developer — check JWT_SECRET / API connectivity</td></tr>
+  <tr><td>API not responding</td><td>IT Lead — <code>pm2 status</code>, <code>pm2 restart mobile-api</code></td><td>Developer — check logs, DB connectivity, disk space</td></tr>
+  <tr><td>Data not syncing from offline</td><td>IT Lead — check <code>pm2 logs mobile-api</code> for sync errors</td><td>Developer — review offline queue state on device</td></tr>
+  <tr><td>Wrong data shown</td><td>IT Lead — verify user role and workshopId in DB</td><td>Developer — query audit_log for the affected entity</td></tr>
+  <tr><td>Server disk full</td><td>IT Lead — clean <code>/opt/ufcl-backups/daily/</code> (oldest first)</td><td>Consider BACKUP_DIR on external mount</td></tr>
+</table>
+
+<h3 style="margin-top:14px">Issue classification for v1.0.1 patch</h3>
+<table>
+  <tr><th>Severity</th><th>Example</th><th>Response time</th></tr>
+  <tr><td><strong>CRITICAL</strong> — data loss, login failure, crash</td><td>App crashes on login, data not saved</td><td>Fix within 24h; deploy v1.0.1</td></tr>
+  <tr><td><strong>MAJOR</strong> — workflow blocked</td><td>Cannot submit harvest entry</td><td>Fix within 3 days; deploy v1.0.1</td></tr>
+  <tr><td><strong>MINOR</strong> — cosmetic, UX</td><td>Wrong icon, label typo</td><td>Batch into next release</td></tr>
+</table>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<h2><span class="phase-tag">H</span> Archive</h2>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">H-01. Create local release archive</div>
+<pre>bash tools/release.sh 1.0.0
+# Creates: archive/v1.0.0/ with source, DB snapshot, APK copy, all docs
+# Review the printed git tag and gh release commands</pre>
+  </div>
+</div>
+
+<div class="item">
+  <div class="cb"></div>
+  <div class="item-body">
+    <div class="item-title">H-02. Store archive in a safe location</div>
+    <ul>
+      <li>Copy <code>archive/v1.0.0/</code> to an external drive or NAS</li>
+      <li>Retain at minimum 3 copies: server backup, IT workstation, off-site</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════ -->
+<div class="sign">
+  <strong style="font-size:14px;color:#1a3c5e">Post-Release Sign-Off</strong>
+  <p style="font-size:12px;color:#666;margin-top:6px">All checklist sections A–H completed and verified.</p>
+  <div class="sign-row">
+    <div style="flex:1">
+      <div class="sign-field">&nbsp;</div>
+      <div class="sign-label">IT Lead &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Date: __________</div>
+    </div>
+    <div style="flex:1">
+      <div class="sign-field">&nbsp;</div>
+      <div class="sign-label">CEO / Operations &nbsp;&nbsp;&nbsp; Date: __________</div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:20px;font-size:14px;font-weight:700;color:#1a3c5e;letter-spacing:.5px">
+    UFCL Mobile v1.0.0 — POST-RELEASE COMPLETE
+  </div>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Post-Release Checklist &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

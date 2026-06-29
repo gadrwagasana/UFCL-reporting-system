@@ -24,17 +24,22 @@ export function SawmillProductionCreateScreen() {
   const { createEntry }       = useSawmillCreate();
   const { isOnline, enqueue } = useOfflineStore();
 
-  const [prodDate,      setProdDate]      = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [machine,       setMachine]       = useState('');
-  const [productSize,   setProductSize]   = useState('');
-  const [kilnDried,     setKilnDried]     = useState('');
-  const [ccaTreated,    setCcaTreated]    = useState('');
-  const [untreated,     setUntreated]     = useState('');
-  const [waste,         setWaste]         = useState('');
-  const [logsReceived,  setLogsReceived]  = useState('');
-  const [downtimeHours, setDowntimeHours] = useState('');
-  const [remarks,       setRemarks]       = useState('');
-  const [submitting,    setSubmitting]    = useState(false);
+  const [prodDate,       setProdDate]       = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [supervisor,     setSupervisor]     = useState('');
+  const [operators,      setOperators]      = useState('');
+  const [machine,        setMachine]        = useState('');
+  const [productSize,    setProductSize]    = useState('');
+  const [kilnDried,      setKilnDried]      = useState('');
+  const [ccaTreated,     setCcaTreated]     = useState('');
+  const [untreated,      setUntreated]      = useState('');
+  const [waste,          setWaste]          = useState('');
+  const [polesUnits,     setPolesUnits]     = useState('');
+  const [polesWaste,     setPolesWaste]     = useState('');
+  const [logsReceived,   setLogsReceived]   = useState('');
+  const [downtimeHours,  setDowntimeHours]  = useState('');
+  const [downtimeReason, setDowntimeReason] = useState('');
+  const [remarks,        setRemarks]        = useState('');
+  const [submitting,     setSubmitting]     = useState(false);
 
   const totalTimber =
     (Number(kilnDried) || 0) + (Number(ccaTreated) || 0) + (Number(untreated) || 0);
@@ -47,15 +52,20 @@ export function SawmillProductionCreateScreen() {
 
     const payload = {
       date: prodDate,    // API field is `date`, NOT `log_date`
-      ...(machine.trim()       && { machine: machine.trim() }),
-      ...(productSize.trim()   && { product_size: productSize.trim() }),
+      ...(supervisor.trim()    && { supervisor:          supervisor.trim() }),
+      ...(operators.trim()     && { operators:           operators.trim() }),
+      ...(machine.trim()       && { machine:             machine.trim() }),
+      ...(productSize.trim()   && { product_size:        productSize.trim() }),
       ...(kilnDried            && { timber_kiln_dried:   Number(kilnDried) }),
       ...(ccaTreated           && { timber_cca_treated:  Number(ccaTreated) }),
       ...(untreated            && { timber_untreated:    Number(untreated) }),
       ...(waste                && { timber_waste:        Number(waste) }),
+      ...(polesUnits           && { poles_units:         Number(polesUnits) }),
+      ...(polesWaste           && { poles_waste:         Number(polesWaste) }),
       ...(logsReceived         && { logs_received:       Number(logsReceived) }),
       ...(downtimeHours        && { downtime_hours:      Number(downtimeHours) }),
-      ...(remarks.trim()       && { remarks: remarks.trim() }),
+      ...(downtimeReason.trim() && { downtime_reason:   downtimeReason.trim() }),
+      ...(remarks.trim()       && { remarks:             remarks.trim() }),
     };
 
     setSubmitting(true);
@@ -90,6 +100,20 @@ export function SawmillProductionCreateScreen() {
             value={prodDate}
             onChange={setProdDate}
             maxDate={new Date()}
+          />
+
+          <FormInput
+            label="Supervisor"
+            value={supervisor}
+            onChangeText={setSupervisor}
+            placeholder="Supervisor's name"
+          />
+
+          <FormInput
+            label="Operators"
+            value={operators}
+            onChangeText={setOperators}
+            placeholder="e.g. John Doe, Jane Smith"
           />
 
           <FormInput
@@ -156,6 +180,31 @@ export function SawmillProductionCreateScreen() {
         </View>
 
         <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Poles Produced (units)</Text>
+
+          <View style={styles.row}>
+            <View style={styles.col}>
+              <FormInput
+                label="Poles Units"
+                value={polesUnits}
+                onChangeText={setPolesUnits}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+            </View>
+            <View style={styles.col}>
+              <FormInput
+                label="Poles Waste"
+                value={polesWaste}
+                onChangeText={setPolesWaste}
+                placeholder="0"
+                keyboardType="numeric"
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
           <Text style={styles.sectionTitle}>Other (optional)</Text>
 
           <FormInput
@@ -174,6 +223,17 @@ export function SawmillProductionCreateScreen() {
             placeholder="0"
             keyboardType="numeric"
           />
+
+          {(Number(downtimeHours) || 0) > 0 && (
+            <FormInput
+              label="Downtime Reason"
+              value={downtimeReason}
+              onChangeText={setDowntimeReason}
+              placeholder="Describe reason for downtime"
+              multiline
+              numberOfLines={2}
+            />
+          )}
 
           <FormInput
             label="Remarks"

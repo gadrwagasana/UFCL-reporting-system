@@ -107,7 +107,7 @@ export function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.version}>UFCL Mobile v1.0</Text>
+          <Text style={styles.version}>UFCL Mobile v1.0.0</Text>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

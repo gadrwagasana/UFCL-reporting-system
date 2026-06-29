@@ -84,7 +84,10 @@ export function DeliveriesListScreen() {
       <AppHeader
         title="Deliveries"
         dark
-        actions={[{ icon: 'clipboard-outline', onPress: () => navigation.navigate('PODList') }]}
+        actions={[
+          { icon: 'add-outline',       onPress: () => navigation.navigate('DeliveryCreate') },
+          { icon: 'clipboard-outline', onPress: () => navigation.navigate('PODList') },
+        ]}
       />
 
       {isError ? (

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Phase 17 — Production Baseline Snapshot</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.55}
+  .page{max-width:1000px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:30px 0 12px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:14px 0 6px}
+  p,li{font-size:13px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:8px 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .card{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .stamp{background:#1a3c5e;color:#fff;border-radius:8px;padding:14px 18px;margin-bottom:20px;font-size:13px;display:flex;gap:32px;flex-wrap:wrap}
+  .stamp-item{display:flex;flex-direction:column;gap:2px}
+  .stamp-label{font-size:11px;color:#93c5fd;font-weight:600}
+  .stamp-value{font-size:14px;font-weight:700;color:#fff}
+  footer{text-align:center;margin-top:40px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Phase 17 — Production Baseline Snapshot</h1>
+<div class="subtitle">UFCL Mobile v1.0.0 &nbsp;|&nbsp; System state at time of v1.0.0 release &nbsp;|&nbsp; 2026-06-29</div>
+
+<div class="stamp">
+  <div class="stamp-item"><span class="stamp-label">Version</span><span class="stamp-value">1.0.0</span></div>
+  <div class="stamp-item"><span class="stamp-label">Git tag</span><span class="stamp-value">v1.0.0</span></div>
+  <div class="stamp-item"><span class="stamp-label">versionCode</span><span class="stamp-value">35</span></div>
+  <div class="stamp-item"><span class="stamp-label">Date</span><span class="stamp-value">2026-06-29</span></div>
+  <div class="stamp-item"><span class="stamp-label">Production server</span><span class="stamp-value">192.168.1.5</span></div>
+  <div class="stamp-item"><span class="stamp-label">Readiness score</span><span class="stamp-value">92 / 100</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Software Versions</h2>
+<div class="card">
+  <table>
+    <tr><th>Component</th><th>Version</th><th>Source</th></tr>
+    <tr><td>UFCL Mobile App</td><td>1.0.0 (versionCode: 35)</td><td><code>mobile/package.json</code></td></tr>
+    <tr><td>UFCL Mobile API</td><td>1.0.0</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>Expo SDK</td><td>51</td><td><code>mobile/package.json</code></td></tr>
+    <tr><td>React Native</td><td>0.74.5</td><td>Expo SDK 51 baseline</td></tr>
+    <tr><td>Node.js (runtime)</td><td>22.x</td><td><code>.github/workflows/mobile-release.yml</code></td></tr>
+    <tr><td>Express</td><td>4.18.2</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>jsonwebtoken</td><td>9.0.2</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>bcryptjs</td><td>3.0.2</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>express-rate-limit</td><td>8.5.2</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>helmet</td><td>8.2.0</td><td><code>mobile-api/package.json</code></td></tr>
+    <tr><td>PostgreSQL</td><td>14+ (required)</td><td>DEPLOYMENT_GUIDE.html §1</td></tr>
+    <tr><td>Android (minimum)</td><td>10 (API 29)</td><td><code>android/app/build.gradle</code></td></tr>
+    <tr><td>Java (build time)</td><td>17 (Temurin)</td><td><code>.github/workflows/mobile-release.yml</code></td></tr>
+    <tr><td>Gradle</td><td>8.x</td><td><code>android/gradle/wrapper/gradle-wrapper.properties</code></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. APK Identity</h2>
+<div class="card">
+  <table>
+    <tr><th>Field</th><th>Value</th></tr>
+    <tr><td>Application ID</td><td><code>com.ufcl.mobile</code></td></tr>
+    <tr><td>Version Name</td><td><code>1.0.0</code></td></tr>
+    <tr><td>Version Code</td><td><code>35</code></td></tr>
+    <tr><td>App name (launcher)</td><td>UFCL</td></tr>
+    <tr><td>Namespace (R class)</td><td><code>com.ufcl.mobile.dev</code> (valid — differs from applicationId by design)</td></tr>
+    <tr><td>Min SDK</td><td>29 (Android 10)</td></tr>
+    <tr><td>Target SDK</td><td>34 (Android 14)</td></tr>
+    <tr><td>JS Engine</td><td>Hermes</td></tr>
+    <tr><td>Proguard</td><td>Disabled</td></tr>
+    <tr><td>Signing scheme</td><td>APK Signature Scheme v2/v3 (release keystore)</td></tr>
+    <tr><td>SHA-256</td><td><em>Generated by CI — see GitHub Release v1.0.0 assets</em></td></tr>
+    <tr><td>MD5</td><td><em>Generated by CI — see GitHub Release v1.0.0 assets</em></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. Configuration Baseline</h2>
+<div class="card">
+  <h3>API configuration (.env at baseline)</h3>
+  <table>
+    <tr><th>Variable</th><th>Value at v1.0.0</th></tr>
+    <tr><td><code>NODE_ENV</code></td><td>production</td></tr>
+    <tr><td><code>APP_ENV</code></td><td>production</td></tr>
+    <tr><td><code>PORT</code></td><td>3001</td></tr>
+    <tr><td><code>API_BIND_HOST</code></td><td>127.0.0.1</td></tr>
+    <tr><td><code>API_BEHIND_PROXY</code></td><td>true</td></tr>
+    <tr><td><code>JWT_SECRET</code></td><td><em>32+ char random hex — generated at deploy, not committed</em></td></tr>
+    <tr><td><code>JWT_EXPIRY</code></td><td>8h</td></tr>
+    <tr><td><code>PGHOST</code></td><td>localhost</td></tr>
+    <tr><td><code>PGPORT</code></td><td>5432</td></tr>
+    <tr><td><code>PGDATABASE</code></td><td>ufcl_production</td></tr>
+    <tr><td><code>PGUSER</code></td><td>ufcl_app</td></tr>
+    <tr><td><code>METRICS_TOKEN</code></td><td><em>Random token — generated at deploy, not committed</em></td></tr>
+    <tr><td><code>UPDATES_DIR</code></td><td>/opt/ufcl-api/updates</td></tr>
+    <tr><td><code>LOG_DIR</code></td><td>/opt/ufcl-api/logs</td></tr>
+  </table>
+
+  <h3>Rate limits at baseline</h3>
+  <table>
+    <tr><th>Limiter</th><th>Route</th><th>Limit</th><th>Window</th></tr>
+    <tr><td>Login</td><td>POST /api/auth/login</td><td>10 requests</td><td>15 minutes</td></tr>
+    <tr><td>API</td><td>All /api/* (except /api/health)</td><td>300 requests</td><td>60 seconds</td></tr>
+    <tr><td>Updates</td><td>/version.json, /downloads/*</td><td>30 requests</td><td>60 minutes</td></tr>
+  </table>
+
+  <h3>DB pool at baseline</h3>
+  <table>
+    <tr><th>Parameter</th><th>Value</th></tr>
+    <tr><td>max</td><td>20</td></tr>
+    <tr><td>idleTimeoutMillis</td><td>30 000</td></tr>
+    <tr><td>connectionTimeoutMillis</td><td>5 000</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. All Registered API Routes</h2>
+<div class="card">
+  <table>
+    <tr><th>Route prefix</th><th>Auth required</th><th>Role gate</th><th>Status</th></tr>
+    <tr><td><code>POST /api/auth/login</code></td><td>No</td><td>None (public)</td><td>Active</td></tr>
+    <tr><td><code>GET /api/auth/me</code></td><td>Yes</td><td>Any authenticated role</td><td>Active</td></tr>
+    <tr><td><code>GET /api/health</code></td><td>No</td><td>None</td><td>Active</td></tr>
+    <tr><td><code>GET /api/ready</code></td><td>No</td><td>None</td><td>Active</td></tr>
+    <tr><td><code>GET /api/metrics</code></td><td>METRICS_TOKEN or localhost</td><td>Token gate</td><td>Active</td></tr>
+    <tr><td><code>/api/harvest/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/log-transport/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/sawmill/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/poles/*</code></td><td>Yes</td><td>requireRoles + data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/vat/*</code></td><td>Yes</td><td>requireRoles + data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/deliveries/*</code></td><td>Yes</td><td>requireRoles(logistics,admin) + data.js</td><td>Active</td></tr>
+    <tr><td><code>GET /api/fuel/vehicle</code></td><td>Yes</td><td>requireRoles(logistics,admin)</td><td>Active</td></tr>
+    <tr><td><code>POST /api/fuel/vehicle</code></td><td>Yes</td><td>requireRoles(logistics,admin)</td><td>Active</td></tr>
+    <tr><td><code>/api/fuel/machine/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/machine-logs/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/material-requests/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/casual-labour/*</code></td><td>Yes</td><td>data.js</td><td>Active</td></tr>
+    <tr><td><code>/api/ceo/*</code></td><td>Yes</td><td>requireRoles(ceo,admin,operations)</td><td>Active</td></tr>
+    <tr><td><code>/api/my-requests/*</code></td><td>Yes</td><td>Any authenticated (own records)</td><td>Active</td></tr>
+    <tr><td><code>/api/meta/*</code></td><td>Yes</td><td>Any authenticated</td><td>Active</td></tr>
+    <tr><td><code>GET /version.json</code></td><td>No</td><td>Update limiter only</td><td>Active</td></tr>
+    <tr><td><code>GET /downloads/UFCL-production.apk</code></td><td>No</td><td>Update limiter only</td><td>Active</td></tr>
+    <tr><td><code>GET /downloads/apk.sha256</code></td><td>No</td><td>Update limiter only</td><td>Active</td></tr>
+    <tr><td><code>GET /downloads/apk.md5</code></td><td>No</td><td>Update limiter only</td><td>Active</td></tr>
+    <tr><td><code>/api/stock-transfers/*</code></td><td>Yes</td><td>—</td><td><strong>STUB (501)</strong> — Phase 2</td></tr>
+    <tr><td><code>/api/dispatch/*</code></td><td>Yes</td><td>—</td><td><strong>STUB (501)</strong> — Phase 2</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. Role Baseline</h2>
+<div class="card">
+  <table>
+    <tr><th>Role</th><th>Navigator</th><th>Workshop-scoped?</th><th>Can approve?</th></tr>
+    <tr><td>ceo</td><td>CeoNavigator</td><td>No</td><td>Yes (all)</td></tr>
+    <tr><td>admin</td><td>CeoNavigator</td><td>No</td><td>Yes (all)</td></tr>
+    <tr><td>operations</td><td>CeoNavigator</td><td>No</td><td>Yes (limited)</td></tr>
+    <tr><td>supervisor</td><td>SupervisorNavigator</td><td>Yes</td><td>Yes (own workshop)</td></tr>
+    <tr><td>harvesting-leader</td><td>HarvestNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>harvesting-supervisor</td><td>HarvestSupervisorNavigator</td><td>Yes</td><td>View only</td></tr>
+    <tr><td>sawmill-leader</td><td>SawmillNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>sawmill-supervisor</td><td>SawmillSupervisorNavigator</td><td>Yes</td><td>View only</td></tr>
+    <tr><td>poles-leader</td><td>PolesNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>poles-supervisor</td><td>PolesSupervisorNavigator</td><td>Yes</td><td>View only</td></tr>
+    <tr><td>vat-leader</td><td>VatNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>vat-supervisor</td><td>VatSupervisorNavigator</td><td>Yes</td><td>View only</td></tr>
+    <tr><td>logistics</td><td>LogisticsNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>logistics-officer</td><td>LogisticsNavigator</td><td>No</td><td>No</td></tr>
+    <tr><td>mechanician</td><td>MechanicianNavigator</td><td>No</td><td>No</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. Database Schema Baseline (table list)</h2>
+<div class="card">
+  <p>All tables created by <code>db/migrate.js</code>. This is the authoritative table list for v1.0.0.</p>
+<pre># Verify on server:
+sudo -u postgres psql -d ufcl_production -c \
+  "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename;"</pre>
+  <table>
+    <tr><th>Table</th><th>Purpose</th></tr>
+    <tr><td>app_users</td><td>User accounts: username, password_hash, role, workshop_id, active</td></tr>
+    <tr><td>audit_log</td><td>Every login attempt and write action — not modifiable via API</td></tr>
+    <tr><td>casual_labour_requests</td><td>Casual labour request entries</td></tr>
+    <tr><td>deliveries</td><td>Delivery orders and status</td></tr>
+    <tr><td>delivery_pod</td><td>Proof of Delivery records</td></tr>
+    <tr><td>fuel_machine</td><td>Machine fuel issuance records</td></tr>
+    <tr><td>fuel_vehicle</td><td>Vehicle fuel fill-up records</td></tr>
+    <tr><td>harvest_entries</td><td>Daily harvest records (compartment, species, volume)</td></tr>
+    <tr><td>log_transport</td><td>Log transport entries</td></tr>
+    <tr><td>machine_daily_logs</td><td>Machine activity logs (hours, operator, category)</td></tr>
+    <tr><td>material_requests</td><td>Material request entries with approval state</td></tr>
+    <tr><td>poles_delivery</td><td>Poles delivery records</td></tr>
+    <tr><td>poles_entries</td><td>Poles production entries</td></tr>
+    <tr><td>poles_purchases</td><td>Poles purchase orders with VAT</td></tr>
+    <tr><td>poles_qc</td><td>Poles QC entries</td></tr>
+    <tr><td>sawmill_entries</td><td>Sawmill daily production records</td></tr>
+    <tr><td>vat_inbound</td><td>VAT inbound stock transfers</td></tr>
+    <tr><td>vat_processed</td><td>VAT processed batches</td></tr>
+    <tr><td>workshops</td><td>Workshop registry (id, name)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>7. Infrastructure Baseline</h2>
+<div class="card">
+  <table>
+    <tr><th>Component</th><th>Config at v1.0.0</th></tr>
+    <tr><td>Server LAN IP</td><td>192.168.1.5</td></tr>
+    <tr><td>nginx TLS protocols</td><td>TLSv1.2 TLSv1.3</td></tr>
+    <tr><td>TLS certificate</td><td>Self-signed, RSA-2048, 10-year, SAN=IP:192.168.1.5</td></tr>
+    <tr><td>API process manager</td><td>PM2 fork mode, 1 instance</td></tr>
+    <tr><td>PM2 memory restart</td><td>512 MB</td></tr>
+    <tr><td>PM2 max restarts</td><td>10</td></tr>
+    <tr><td>Backup schedule</td><td>Daily 02:00, weekly Monday, monthly 1st</td></tr>
+    <tr><td>Backup retention</td><td>7d / 4w / 12m</td></tr>
+    <tr><td>Log rotation</td><td>Daily app logs (30d), weekly PM2 (8w)</td></tr>
+    <tr><td>Firewall (UFW)</td><td>Allow 22/80/443; deny 3001/5432</td></tr>
+    <tr><td>HSTS</td><td>max-age=31536000 (1 year)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>8. Open Items Baseline (v1.1 backlog)</h2>
+<div class="card">
+  <table>
+    <tr><th>ID</th><th>Description</th><th>Risk</th></tr>
+    <tr><td>V11-01</td><td>Remove <code>android:usesCleartextTraffic=true</code></td><td>Advisory only — all URLs are HTTPS</td></tr>
+    <tr><td>V11-02</td><td>Profile tab for Mechanic role</td><td>UX gap — no security impact</td></tr>
+    <tr><td>V11-03</td><td>Gate CI releases on version tags only</td><td>Operational noise — no security impact</td></tr>
+    <tr><td>V11-04</td><td><code>.env.template</code> in repository</td><td>IT convenience — no security impact</td></tr>
+    <tr><td>V11-05</td><td><code>/api/meta/vehicles</code> dedicated endpoint</td><td>Performance minor — current workaround works</td></tr>
+    <tr><td>V11-06</td><td>Pin <code>CasualLabourRequest.labour_items</code> TypeScript type</td><td>Type safety — low risk in practice</td></tr>
+    <tr><td>V11-07</td><td>Unit tests for auth flows and data.js permissions</td><td>Regression safety — no current functional gap</td></tr>
+    <tr><td>V11-08</td><td>logistics-officer sees Vehicle Fuel tab but gets 403</td><td>UX gap — backend correctly denies, no security issue</td></tr>
+  </table>
+  <p style="margin-top:8px">None of the above block production operation. All 8 deferred to v1.1.0.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>9. Documentation Baseline</h2>
+<div class="card">
+  <table>
+    <tr><th>Document</th><th>Status at v1.0.0</th></tr>
+    <tr><td>UFCL_USER_MANUAL.html</td><td>Complete — all 12 roles documented</td></tr>
+    <tr><td>UFCL_ADMIN_MANUAL.html</td><td>Complete — all IT operations covered</td></tr>
+    <tr><td>DEPLOYMENT_GUIDE.html</td><td>Complete — 9 phases, step-by-step</td></tr>
+    <tr><td>UFCL_UAT_PHASE13.html</td><td>Complete — all 9 departments, sign-off block</td></tr>
+    <tr><td>RELEASE_NOTES_v1.0.0.md</td><td>Complete</td></tr>
+    <tr><td>CHANGELOG.md</td><td>Complete — full history, all 10 fixes</td></tr>
+    <tr><td>VERSION_HISTORY.md</td><td>Complete — versioning policy established</td></tr>
+    <tr><td>LAUNCH_CHECKLIST.md</td><td>Complete — 47 items</td></tr>
+    <tr><td>POST_RELEASE_CHECKLIST.html</td><td>Complete — 8 sections</td></tr>
+    <tr><td>PRODUCTION_ACCEPTANCE_REPORT.html</td><td>Complete — 92/100, signed</td></tr>
+    <tr><td>PRODUCTION_READINESS_REPORT.html</td><td>Complete — technical audit</td></tr>
+    <tr><td>RELEASE_ARCHIVE_MANIFEST.html</td><td>Complete — all 20 deliverables listed</td></tr>
+    <tr><td>PHASE17_PRODUCTION_VALIDATION_REPORT.html</td><td>Complete — see this phase</td></tr>
+    <tr><td>PHASE17_FINAL_ACCEPTANCE_CERTIFICATE.html</td><td>Complete — see this phase</td></tr>
+  </table>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Phase 17 Production Baseline Snapshot &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

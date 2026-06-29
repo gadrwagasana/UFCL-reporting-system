@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>UFCL Mobile v1.0.0 — Deployment Guide</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.6}
+  .page{max-width:960px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:32px}
+  h2{font-size:16px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:6px;margin:36px 0 14px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:18px 0 6px}
+  p{margin-bottom:8px;font-size:13px}
+  ul,ol{margin:6px 0 12px 22px;font-size:13px}
+  li{margin-bottom:4px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:12px 16px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:10px 0 16px;white-space:pre}
+  .step{background:#fff;border-radius:8px;padding:16px 18px;margin-bottom:14px;border-left:4px solid #1a3c5e;box-shadow:0 1px 3px rgba(0,0,0,.07)}
+  .step-num{display:inline-block;background:#1a3c5e;color:#fff;font-size:11px;font-weight:700;padding:1px 7px;border-radius:10px;margin-bottom:8px}
+  .step h3{margin-top:0}
+  .note{background:#fef9e7;border:1px solid #f0c040;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .warn{background:#fde8e8;border:1px solid #dc2626;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  .info{background:#e0f2fe;border:1px solid #0284c7;border-radius:6px;padding:10px 14px;font-size:13px;margin:10px 0}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 16px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .toc{background:#fff;border-radius:8px;padding:16px 20px;border:1px solid #d0daea;margin-bottom:28px}
+  .toc ol{margin-left:18px}
+  .toc li{margin-bottom:3px;font-size:13px}
+  .phase{background:#1a3c5e;color:#fff;padding:8px 16px;border-radius:6px;font-size:14px;font-weight:700;margin:28px 0 16px;display:flex;align-items:center;gap:10px}
+  .phase-num{background:#fff;color:#1a3c5e;font-size:12px;padding:2px 8px;border-radius:10px;font-weight:700}
+  footer{text-align:center;margin-top:48px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>UFCL Mobile v1.0.0 — Deployment Guide</h1>
+<div class="subtitle">IT Operations Reference &nbsp;|&nbsp; Production Deployment &nbsp;|&nbsp; 2026-06-29</div>
+
+<div class="toc">
+  <strong style="font-size:13px;color:#1a3c5e">Contents</strong>
+  <ol style="margin-top:8px">
+    <li>Prerequisites &amp; Secrets</li>
+    <li>Server Deployment</li>
+    <li>APK Build &amp; Release (GitHub Actions)</li>
+    <li>Version Publishing</li>
+    <li>PM2 Restart &amp; Health Verification</li>
+    <li>Backup Verification</li>
+    <li>Rollback Procedure</li>
+    <li>User Installation — Initial (Sideload)</li>
+    <li>User Installation — App Update (OTA)</li>
+    <li>Post-Deployment Monitoring</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">0</span>Prerequisites &amp; Secrets</div>
+
+<div class="step">
+  <span class="step-num">BEFORE YOU START</span>
+  <h3>GitHub Secrets required (Settings → Secrets and variables → Actions)</h3>
+  <table>
+    <tr><th>Secret name</th><th>Value</th></tr>
+    <tr><td><code>KEYSTORE_BASE64</code></td><td>Base64-encoded release keystore file (<code>base64 ufcl-release.jks</code>)</td></tr>
+    <tr><td><code>KEYSTORE_PASSWORD</code></td><td>Store password for the keystore</td></tr>
+    <tr><td><code>KEY_ALIAS</code></td><td>Key alias inside the keystore</td></tr>
+    <tr><td><code>KEY_PASSWORD</code></td><td>Key password</td></tr>
+    <tr><td><code>DEPLOY_SSH_KEY</code></td><td>Private SSH key for the deploy user on 192.168.1.5</td></tr>
+    <tr><td><code>DEPLOY_USER</code></td><td>SSH username on 192.168.1.5 (e.g. <code>ubuntu</code>)</td></tr>
+    <tr><td><code>DEPLOY_PATH</code></td><td>Absolute path to the updates folder (e.g. <code>/opt/ufcl-api/updates</code>)</td></tr>
+  </table>
+  <p>Verify all 7 secrets are present and non-empty before triggering a build.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">1</span>Server Deployment</div>
+
+<div class="step">
+  <span class="step-num">STEP 1</span>
+  <h3>Clone repository and install API dependencies</h3>
+<pre>git clone https://github.com/gadrwagasana/UFCL-reporting-system.git /opt/ufcl-api
+cd /opt/ufcl-api/mobile-api
+npm install --production</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 2</span>
+  <h3>Create production .env file</h3>
+<pre>cat > /opt/ufcl-api/.env &lt;&lt;'ENV'
+PGHOST=localhost
+PGPORT=5432
+PGDATABASE=ufcl_production
+PGUSER=postgres
+PGPASSWORD=your_db_password_here
+
+JWT_SECRET=$(openssl rand -hex 32)
+
+MOBILE_API_PORT=3001
+API_BIND_HOST=127.0.0.1
+API_BEHIND_PROXY=true
+METRICS_TOKEN=$(openssl rand -hex 24)
+LOG_DIR=/opt/ufcl-api/logs
+
+UPDATES_DIR=/opt/ufcl-api/updates
+ENV</pre>
+  <div class="warn">Generate JWT_SECRET and METRICS_TOKEN with <code>openssl rand -hex 32</code> — do not reuse values from other environments.</div>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 3</span>
+  <h3>Run database migrations</h3>
+<pre>cd /opt/ufcl-api
+node db/migrate.js
+# Verify: all tables created
+psql -U postgres -d ufcl_production -c "\dt" | wc -l</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 4</span>
+  <h3>Generate TLS certificate</h3>
+<pre>sudo bash /opt/ufcl-api/tools/ssl-setup.sh
+# Output: /etc/ssl/ufcl/server.crt and server.key
+# Validity: 10 years (self-signed, SAN = IP:192.168.1.5)</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 5</span>
+  <h3>Deploy nginx configuration</h3>
+<pre>sudo cp /opt/ufcl-api/tools/nginx.conf /etc/nginx/sites-available/ufcl-mobile
+sudo ln -sf /etc/nginx/sites-available/ufcl-mobile /etc/nginx/sites-enabled/
+# Remove default site if present
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 6</span>
+  <h3>Configure firewall</h3>
+<pre>sudo bash /opt/ufcl-api/tools/firewall-setup.sh
+# Resulting policy:
+#   ALLOW  22/tcp   SSH
+#   ALLOW  80/tcp   HTTP → HTTPS redirect
+#   ALLOW  443/tcp  HTTPS (nginx)
+#   DENY   3001/tcp Express direct
+#   DENY   5432/tcp PostgreSQL direct</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 7</span>
+  <h3>Create log and backup directories</h3>
+<pre>mkdir -p /opt/ufcl-api/logs /opt/ufcl-api/updates
+mkdir -p /opt/ufcl-backups/{daily,weekly,monthly}</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 8</span>
+  <h3>Start API with PM2</h3>
+<pre>cd /opt/ufcl-api/mobile-api
+pm2 start ecosystem.config.js --env production
+pm2 save
+pm2 startup  # follow the printed command to enable auto-start on reboot</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 9</span>
+  <h3>Install backup cron jobs</h3>
+<pre>sudo bash /opt/ufcl-api/tools/cron-setup.sh
+# Verify:
+crontab -l | grep backup   # should print the 02:00 cron line</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 10</span>
+  <h3>Verify server is working</h3>
+<pre># From any machine on the LAN:
+curl -k https://192.168.1.5/api/health | jq '{ok,status,uptime}'
+curl -k https://192.168.1.5/api/ready  | jq '{ok,db}'
+
+# Confirm Express is NOT reachable directly:
+curl http://192.168.1.5:3001/api/health   # must time out or connection refused</pre>
+  <div class="ok">Expected: <code>{"ok":true,"status":"healthy","uptime":...}</code> from health endpoint.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">2</span>APK Build &amp; Release — GitHub Actions</div>
+
+<div class="step">
+  <span class="step-num">OPTION A — Tag trigger (recommended for v1.0.0)</span>
+  <h3>Tag the release and push</h3>
+<pre>git tag v1.0.0
+git push origin v1.0.0</pre>
+  <div class="note">The workflow triggers on push to <code>master</code> with changes in <code>mobile/**</code>. For a dedicated release tag, trigger manually (Option B) or push a commit that modifies mobile/ then immediately deploy.</div>
+</div>
+
+<div class="step">
+  <span class="step-num">OPTION B — Manual workflow dispatch</span>
+  <h3>Trigger release via GitHub UI</h3>
+  <ol>
+    <li>Go to <strong>GitHub → Actions → Mobile — Build &amp; Release APK</strong></li>
+    <li>Click <strong>Run workflow</strong></li>
+    <li>Fill in:
+      <ul>
+        <li><strong>Version name override:</strong> <code>1.0.0</code></li>
+        <li><strong>Force mandatory update:</strong> <code>false</code> (first release — no previous version to update from)</li>
+        <li><strong>Release notes:</strong> <code>Initial production release</code></li>
+      </ul>
+    </li>
+    <li>Click <strong>Run workflow</strong></li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">WHAT THE CI DOES</span>
+  <h3>Automated build steps (14 steps, ~8 minutes)</h3>
+  <table>
+    <tr><th>Step</th><th>Action</th></tr>
+    <tr><td>1–4</td><td>Checkout, Java 17, Node 22, npm ci</td></tr>
+    <tr><td>5–6</td><td>Decode keystore from secret; write keystore.properties</td></tr>
+    <tr><td>7</td><td>Resolve version: <code>VERSION_NAME</code> from input or package.json; <code>VERSION_CODE</code> = git commit count</td></tr>
+    <tr><td>8</td><td>Gradle assembleRelease with <code>APP_PACKAGE_ID=com.ufcl.mobile</code>, <code>EXPO_PUBLIC_API_URL=https://192.168.1.5</code></td></tr>
+    <tr><td>9</td><td>Locate and rename APK to <code>UFCL-production-1.0.0.apk</code></td></tr>
+    <tr><td>10</td><td>Compute SHA-256 and MD5 checksums</td></tr>
+    <tr><td>11</td><td>Generate version.json (GitHub CDN URL) and version-server.json (LAN HTTPS URL)</td></tr>
+    <tr><td>12</td><td>Create GitHub Release with APK, version.json, checksums attached</td></tr>
+    <tr><td>13</td><td>SCP APK + checksums to 192.168.1.5; SSH to write version.json atomically</td></tr>
+    <tr><td>14</td><td>Upload artifact (30-day retention)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">3</span>Version Publishing Verification</div>
+
+<div class="step">
+  <span class="step-num">STEP 11</span>
+  <h3>Verify version.json is live on the company server</h3>
+<pre>curl -k https://192.168.1.5/version.json | jq '{version,versionCode,apkUrl}'
+# Expected:
+# {
+#   "version": "1.0.0",
+#   "versionCode": &lt;git-commit-count&gt;,
+#   "apkUrl": "https://192.168.1.5/downloads/UFCL-production.apk"
+# }</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 12</span>
+  <h3>Verify APK download is accessible</h3>
+<pre>curl -kI https://192.168.1.5/downloads/UFCL-production.apk
+# Expected:
+# HTTP/2 200
+# content-type: application/vnd.android.package-archive
+# content-length: &lt;size in bytes&gt;
+# accept-ranges: bytes</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 13</span>
+  <h3>Verify checksums</h3>
+<pre>curl -k https://192.168.1.5/downloads/apk.sha256
+curl -k https://192.168.1.5/downloads/apk.md5
+# Cross-check with values in the GitHub Release page</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">4</span>PM2 Restart &amp; Health Verification</div>
+
+<div class="step">
+  <span class="step-num">STEP 14</span>
+  <h3>Zero-downtime reload after any server-side change</h3>
+<pre>cd /opt/ufcl-api/mobile-api
+pm2 reload ecosystem.config.js --env production
+pm2 status   # Status should be "online", restarts=0 for new process</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 15</span>
+  <h3>Verify monitoring dashboard</h3>
+  <ol>
+    <li>Open <code>https://192.168.1.5/dashboard.html</code> in a browser</li>
+    <li>Enter server URL: <code>https://192.168.1.5</code></li>
+    <li>Enter METRICS_TOKEN from <code>/opt/ufcl-api/.env</code></li>
+    <li>Verify: active_sessions, requests_total, uptime, memory all display</li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 16</span>
+  <h3>Verify auto-start after server reboot</h3>
+<pre>sudo reboot
+# After reboot, wait ~60 seconds, then:
+pm2 status                                          # mobile-api: online
+curl -k https://192.168.1.5/api/health | jq .ok    # true</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">5</span>Backup Verification</div>
+
+<div class="step">
+  <span class="step-num">STEP 17</span>
+  <h3>Run a manual backup and verify output</h3>
+<pre>cd /opt/ufcl-api
+PGPASSWORD="$(grep PGPASSWORD .env | cut -d= -f2)" bash tools/backup.sh
+
+# Verify backup was created:
+ls -lh /opt/ufcl-backups/daily/
+# Should see: db-2026-06-29.sql.gz, config-2026-06-29.tar.gz</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP 18</span>
+  <h3>Verify cron is scheduled</h3>
+<pre>crontab -l | grep backup
+# Expected: 0 2 * * * PGPASSWORD=... /opt/ufcl-api/tools/backup.sh</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">6</span>Rollback Procedure</div>
+
+<div class="step">
+  <span class="step-num">API ROLLBACK</span>
+  <h3>Roll back the API to a previous version</h3>
+<pre>cd /opt/ufcl-api
+git log --oneline -10                    # identify the target commit
+git checkout &lt;commit-hash&gt;
+cd mobile-api && npm install --production
+pm2 reload ecosystem.config.js --env production
+curl -k https://192.168.1.5/api/health | jq .ok</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">DATABASE ROLLBACK</span>
+  <h3>Restore database from backup</h3>
+<pre># Drop and recreate (destructive — confirm before running)
+psql -U postgres -c "DROP DATABASE IF EXISTS ufcl_production;"
+psql -U postgres -c "CREATE DATABASE ufcl_production;"
+
+# Restore
+gunzip -c /opt/ufcl-backups/daily/db-2026-06-29.sql.gz \
+  | psql -U postgres -d ufcl_production
+
+# Verify row counts
+psql -U postgres -d ufcl_production -c "
+  SELECT table_name, pg_total_relation_size(table_name::text) AS size
+  FROM information_schema.tables
+  WHERE table_schema='public' ORDER BY size DESC LIMIT 10;"</pre>
+  <div class="warn">Restore operation replaces all data. Confirm with CEO / operations before proceeding.</div>
+</div>
+
+<div class="step">
+  <span class="step-num">APK ROLLBACK</span>
+  <h3>Revert the OTA update to a previous APK version</h3>
+<pre># From the GitHub Release page, download the previous version's APK + checksums
+# Then on the server:
+cd /opt/ufcl-api/updates
+cp UFCL-production.apk UFCL-production.apk.bak    # backup current
+
+# Upload previous APK to server and update version.json:
+# Set versionCode to the PREVIOUS version's code so devices see a "downgrade"
+# (or set mandatory:true to force re-install)
+# Edit version.json manually:
+node -e "
+  const fs=require('fs');
+  const v=JSON.parse(fs.readFileSync('version.json'));
+  v.version='0.9.x';     // previous version name
+  v.versionCode=NNN;      // previous version code (must be LOWER than current)
+  v.mandatory=true;
+  fs.writeFileSync('version.json', JSON.stringify(v,null,2));
+  console.log('Rolled back version.json to', v.version);
+"</pre>
+  <div class="note">Android does not allow installing an older <code>versionCode</code> over a newer one without uninstalling first. To force a rollback, devices must uninstall the app and re-sideload the older APK.</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">7</span>User Installation — Initial (Sideload)</div>
+
+<div class="step">
+  <span class="step-num">PREREQUISITES — EACH DEVICE</span>
+  <h3>Install TLS certificate (one-time per device)</h3>
+  <ol>
+    <li>On the server: <code>sudo cat /etc/ssl/ufcl/server.crt</code></li>
+    <li>Copy <code>server.crt</code> to the Android device (USB or shared folder)</li>
+    <li>On the device: <strong>Settings → Security → Encryption &amp; credentials → Install a certificate → CA certificate</strong></li>
+    <li>Select <code>server.crt</code> and accept the prompt</li>
+    <li>The device now trusts the UFCL server's HTTPS certificate</li>
+  </ol>
+  <div class="note">This step is required once per device. Without it, the app can still connect but the update checker may show certificate errors.</div>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP A — ENABLE UNKNOWN SOURCES</span>
+  <h3>Allow installation of non-Play Store apps</h3>
+  <ol>
+    <li>Settings → Apps → Special app access → Install unknown apps</li>
+    <li>Select the file manager or browser you will use to open the APK</li>
+    <li>Toggle <strong>Allow from this source</strong> ON</li>
+    <li>After installation, disable this setting again for security</li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP B — INSTALL APK</span>
+  <h3>Install UFCL-production.apk</h3>
+  <ol>
+    <li>Download <code>UFCL-production.apk</code> from:
+      <ul>
+        <li>Company server: <code>https://192.168.1.5/downloads/UFCL-production.apk</code></li>
+        <li>Or copy from USB flash drive</li>
+        <li>Or scan the QR code distributed by IT</li>
+      </ul>
+    </li>
+    <li>Tap the downloaded file → <strong>Install</strong></li>
+    <li>Accept permissions prompt</li>
+    <li>Wait for installation to complete → <strong>Open</strong></li>
+  </ol>
+</div>
+
+<div class="step">
+  <span class="step-num">STEP C — VERIFY INSTALLATION</span>
+  <h3>Post-install checks</h3>
+  <table>
+    <tr><th>Check</th><th>Expected result</th></tr>
+    <tr><td>App icon on home screen</td><td>UFCL icon with label "UFCL"</td></tr>
+    <tr><td>Splash screen</td><td>Navy background, UFCL logo, no crash</td></tr>
+    <tr><td>Login screen</td><td>Username / password fields, version "UFCL Mobile v1.0.0"</td></tr>
+    <tr><td>Login with valid credentials</td><td>Navigates to role home screen</td></tr>
+    <tr><td>Logout → re-login</td><td>Works correctly</td></tr>
+    <tr><td>Session restore (close &amp; reopen)</td><td>Stays logged in, re-validates token</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">8</span>User Installation — App Update (OTA)</div>
+
+<div class="step">
+  <span class="step-num">HOW IT WORKS</span>
+  <h3>Automatic update detection</h3>
+  <p>After a new APK is deployed to the server (via CI), the app checks for updates:</p>
+  <ul>
+    <li>3 seconds after launch</li>
+    <li>Every 4 hours while the app is running</li>
+    <li>When the app returns to foreground after being backgrounded for 10+ minutes</li>
+  </ul>
+  <p>If a new <code>versionCode</code> is found at <code>https://192.168.1.5/version.json</code>, a modal appears.</p>
+</div>
+
+<div class="step">
+  <span class="step-num">USER EXPERIENCE</span>
+  <h3>Update modal behaviour</h3>
+  <table>
+    <tr><th>Scenario</th><th>Behaviour</th></tr>
+    <tr><td>Non-mandatory update</td><td>Modal shows "Update Available". User can tap <strong>Update Now</strong> or <strong>Later</strong>. "Later" dismisses until next restart.</td></tr>
+    <tr><td>Mandatory update</td><td>Modal shows "Required Update". No dismiss button. User must update.</td></tr>
+    <tr><td>Download in progress</td><td>Progress bar shown. Download is resumable if interrupted.</td></tr>
+    <tr><td>Download complete</td><td>MD5 checksum verified. <strong>Install Now</strong> button prompts Android installer.</td></tr>
+    <tr><td>Checksum mismatch</td><td>Error shown: "File integrity check failed. Please retry."</td></tr>
+    <tr><td>Server unreachable</td><td>Silent fail — app opens normally, no error shown.</td></tr>
+  </table>
+</div>
+
+<div class="step">
+  <span class="step-num">IT: PUSH A MANDATORY UPDATE</span>
+  <h3>Force-update all devices</h3>
+  <ol>
+    <li>Trigger the CI workflow with <strong>Force mandatory update: true</strong></li>
+    <li>All devices currently running the app will show the mandatory modal at next check</li>
+    <li>Devices not running the app will see the modal at next launch</li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="phase"><span class="phase-num">9</span>Post-Deployment Monitoring</div>
+
+<div class="step">
+  <span class="step-num">DAILY</span>
+  <h3>Daily operations checklist</h3>
+<pre># 1. Check API health
+curl -k https://192.168.1.5/api/health | jq .
+
+# 2. Check PM2 status
+pm2 status
+
+# 3. Check error log
+grep '"level":"error"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | jq . | head -20
+
+# 4. Confirm backup ran
+tail -5 /opt/ufcl-backups/backup.log
+
+# 5. Check disk
+df -h / /opt</pre>
+</div>
+
+<div class="step">
+  <span class="step-num">ALERTS</span>
+  <h3>Action thresholds from monitoring dashboard</h3>
+  <table>
+    <tr><th>Metric</th><th>Warning</th><th>Critical</th></tr>
+    <tr><td>Memory (RSS)</td><td>&gt; 300 MB</td><td>&gt; 450 MB → pm2 restart</td></tr>
+    <tr><td>Error rate</td><td>&gt; 5/min</td><td>&gt; 20/min → investigate</td></tr>
+    <tr><td>Active sessions</td><td>&gt; 80</td><td>&gt; 100 → review rate limits</td></tr>
+    <tr><td>Disk (backups)</td><td>&gt; 70%</td><td>&gt; 85% → extend retention</td></tr>
+  </table>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Deployment Guide &mdash; IT Operations Reference &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

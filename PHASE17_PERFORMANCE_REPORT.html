@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Phase 17 — Performance Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.55}
+  .page{max-width:1000px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:30px 0 12px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:14px 0 6px}
+  p,li{font-size:13px}
+  ul{margin:6px 0 8px 20px}
+  li{margin-bottom:3px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:8px 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .pass{color:#059669;font-weight:700}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .note{background:#fef9e7;border:1px solid #f0c040;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .card{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  .metric{display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #f0f4f8}
+  .metric:last-child{border-bottom:none}
+  .metric-name{flex:1;font-size:13px}
+  .metric-target{background:#e0f2fe;color:#075985;font-size:12px;font-weight:700;padding:2px 8px;border-radius:8px;min-width:90px;text-align:center}
+  .metric-actual{background:#fafbfd;border:1px solid #d0daea;font-size:12px;padding:2px 8px;border-radius:8px;min-width:90px;text-align:center;color:#555}
+  footer{text-align:center;margin-top:40px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Phase 17 — Performance Report</h1>
+<div class="subtitle">UFCL Mobile v1.0.0 &nbsp;|&nbsp; Design analysis (source) + IT measurement procedures &nbsp;|&nbsp; 2026-06-29</div>
+
+<div class="ok"><strong>Design-level analysis: PASS</strong> — All architectural decisions support the expected load and usage patterns for a 60-100 concurrent user deployment on a LAN. Physical measurements must be taken by IT on actual hardware.</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Performance Targets</h2>
+<div class="card">
+  <table>
+    <tr><th>Metric</th><th>Target</th><th>Basis</th></tr>
+    <tr><td>Cold startup (first launch)</td><td>&lt; 5 seconds</td><td>Hermes JS engine, no heavy initial network call; splash screen shown immediately</td></tr>
+    <tr><td>Warm startup (background → foreground)</td><td>&lt; 2 seconds</td><td>Session restore from SecureStore cache, React Query cache hit</td></tr>
+    <tr><td>Login API response</td><td>&lt; 500 ms</td><td>Single DB query + bcrypt.compare (12 rounds)</td></tr>
+    <tr><td>List render (≤ 100 items)</td><td>&lt; 200 ms</td><td>FlatList virtualisation, no nested scroll</td></tr>
+    <tr><td>Create record (online)</td><td>&lt; 1 second end-to-end</td><td>Single INSERT + audit log INSERT + response</td></tr>
+    <tr><td>Offline queue sync (10 items)</td><td>&lt; 30 seconds</td><td>Serial processing, 1 request/item</td></tr>
+    <tr><td>API p95 response time</td><td>&lt; 300 ms</td><td>LAN latency &lt; 1 ms, single-table queries</td></tr>
+    <tr><td>API memory (idle)</td><td>&lt; 100 MB</td><td>Fork mode single process, no workers</td></tr>
+    <tr><td>API memory (loaded)</td><td>&lt; 300 MB</td><td>PM2 restart threshold 512 MB gives headroom</td></tr>
+    <tr><td>APK size</td><td>&lt; 80 MB</td><td>No large bundled assets; Hermes bytecode replaces large JS bundle</td></tr>
+    <tr><td>Concurrent users</td><td>60–100</td><td>Pool max 20 (queries short, connections released quickly)</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. Mobile App — Design Analysis</h2>
+
+<div class="card">
+  <h3>Startup path</h3>
+  <ul>
+    <li><strong>Splash screen:</strong> Renders natively before JS bundle loads — no blank screen</li>
+    <li><strong>Session restore:</strong> <code>SecureStore.getItemAsync</code> is async but fast (hardware keystore read)</li>
+    <li><strong>Token revalidation:</strong> <code>/api/auth/me</code> fires once on startup; React Query caches result for <code>staleTime=5min</code> in App.tsx</li>
+    <li><strong>Navigator mount:</strong> Lazy-loaded stacks — only the initial tab's screen is rendered on load</li>
+  </ul>
+
+  <h3>List rendering</h3>
+  <ul>
+    <li>All lists use <code>FlatList</code> with <code>keyExtractor</code> — virtual rendering, off-screen items not mounted</li>
+    <li>Pull-to-refresh via React Query <code>refetch()</code></li>
+    <li>Empty state and loading skeleton rendered before data arrives</li>
+    <li>No nested FlatList structures</li>
+  </ul>
+
+  <h3>Network efficiency</h3>
+  <ul>
+    <li>React Query: <code>staleTime=2min</code> on list queries, <code>10min</code> on meta (vehicles, users) — avoids redundant requests</li>
+    <li><code>gcTime=24h</code> — cached data survives background kills; displayed instantly on next foreground</li>
+    <li>Single Axios instance with <code>baseURL=https://192.168.1.5</code> — no DNS lookup on each request</li>
+    <li>Bearer token attached via Axios interceptor — not re-read from SecureStore per request</li>
+  </ul>
+
+  <h3>Offline queue efficiency</h3>
+  <ul>
+    <li>Serial processing (one item at a time) — avoids DB connection exhaustion on sync</li>
+    <li>UUID v4 IDs generated client-side — server does <code>INSERT ... ON CONFLICT DO NOTHING</code> (idempotent)</li>
+    <li>MAX_RETRIES=3 — prevents infinite retry loop on permanently failed items</li>
+    <li>Zustand store persisted to AsyncStorage — survives process kill</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. Backend API — Design Analysis</h2>
+
+<div class="card">
+  <h3>Database connection pool</h3>
+  <ul>
+    <li><code>max: 20</code> connections — adequate for 60–100 concurrent users (queries are short; connections returned immediately after query)</li>
+    <li><code>idleTimeoutMillis: 30000</code> — idle connections released after 30s, reducing PostgreSQL resource usage</li>
+    <li><code>connectionTimeoutMillis: 5000</code> — requests fail fast (5s) rather than hanging indefinitely</li>
+  </ul>
+
+  <h3>Query complexity</h3>
+  <ul>
+    <li>All queries are single-table or simple 2-table JOINs — no expensive multi-join aggregations</li>
+    <li>Indexes on primary keys and foreign keys (PostgreSQL default)</li>
+    <li>All list endpoints include <code>LIMIT</code> clauses — no unbounded result sets</li>
+    <li>Parameterised queries reuse prepared statement plans</li>
+  </ul>
+
+  <h3>PM2 process model</h3>
+  <ul>
+    <li>Fork mode (single process) — appropriate for I/O-bound Express server; cluster mode not needed at this scale</li>
+    <li><code>max_memory_restart: 512M</code> — Node.js heap limit; typical idle usage &lt; 100 MB</li>
+    <li>Graceful shutdown on SIGTERM — in-flight requests complete before process exits</li>
+  </ul>
+
+  <h3>nginx tuning</h3>
+  <ul>
+    <li><code>proxy_read_timeout 300s</code> on <code>/downloads/</code> — allows large APK download without timeout</li>
+    <li><code>proxy_read_timeout 30s</code> on API routes — fast fail for hung upstream</li>
+    <li>gzip enabled — reduces API response size ~60–70% for JSON payloads</li>
+    <li>HTTP Range requests supported on APK download — enables resumable OTA</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. Load Profile for v1.0.0</h2>
+<div class="card">
+  <table>
+    <tr><th>Workload type</th><th>Expected pattern</th><th>Peak concurrent users</th><th>DB connections needed</th></tr>
+    <tr><td>Morning shift start (07:00–07:30)</td><td>All users login, pull latest data</td><td>~50</td><td>~15 (login queries short)</td></tr>
+    <tr><td>Data entry (throughout day)</td><td>Periodic submits, list refreshes</td><td>~20 active at once</td><td>~5–8</td></tr>
+    <tr><td>CEO approval check (morning)</td><td>CEO polls approvals list</td><td>~1</td><td>~1</td></tr>
+    <tr><td>Offline sync event</td><td>Field team reconnects — batch sync</td><td>~10 syncing simultaneously</td><td>~10 (serial per device)</td></tr>
+    <tr><td>OTA update rollout</td><td>All devices check version.json</td><td>~50 (served by nginx, low Express load)</td><td>0 (static files)</td></tr>
+  </table>
+  <p style="margin-top:8px">Maximum realistic DB connection demand: ~18 (within pool max of 20). No scaling changes needed for this user base.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. IT Measurement Procedures</h2>
+<div class="card">
+  <div class="note">Run these measurements after first go-live day to establish baseline numbers. Results feed into the Production Baseline Report.</div>
+
+  <h3>Cold startup time</h3>
+<pre># On device: kill app from recent apps (full kill)
+# Start stopwatch → tap app icon → stop when list screen is loaded
+# Target: &lt; 5 seconds
+# Record: __________ seconds</pre>
+
+  <h3>Warm startup time</h3>
+<pre># Press home button (background app)
+# Wait 10 seconds
+# Start stopwatch → tap app icon → stop when list screen is visible
+# Target: &lt; 2 seconds
+# Record: __________ seconds</pre>
+
+  <h3>API latency (from server)</h3>
+<pre>TOKEN="eyJ..."  # valid JWT
+time curl -sk -H "Authorization: Bearer $TOKEN" \
+     https://192.168.1.5/api/harvest | jq '.data | length'
+# Run 5 times, record average
+# Target p95: &lt; 300 ms</pre>
+
+  <h3>API memory (at rest)</h3>
+<pre>pm2 list
+# Column "mem" shows current heap usage
+# Target idle: &lt; 100 MB
+# Alert if > 300 MB sustained
+# Record: __________ MB</pre>
+
+  <h3>APK file size</h3>
+<pre>ls -lh /opt/ufcl-api/updates/UFCL-production.apk
+# Target: &lt; 80 MB
+# Record: __________ MB</pre>
+
+  <h3>Offline sync speed</h3>
+<pre># Queue 5 records while offline
+# Reconnect and time until queue empties
+# Target: &lt; 30 seconds for 5 items
+# Record: __________ seconds</pre>
+
+  <h3>API response time (metrics endpoint)</h3>
+<pre>curl -sk -H "Authorization: Bearer $METRICS_TOKEN" \
+     https://192.168.1.5/api/metrics | jq '{avg_ms: .response_ms.avg, p95_ms: .response_ms.p95}'
+# Target: avg &lt; 100ms, p95 &lt; 300ms</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. Performance Baselines (to be filled in after go-live)</h2>
+<div class="card">
+  <table>
+    <tr><th>Metric</th><th>Target</th><th>Measured (Day 1)</th><th>Measured (Day 7)</th></tr>
+    <tr><td>Cold startup</td><td>&lt; 5 s</td><td>_____ s</td><td>_____ s</td></tr>
+    <tr><td>Warm startup</td><td>&lt; 2 s</td><td>_____ s</td><td>_____ s</td></tr>
+    <tr><td>Login API latency</td><td>&lt; 500 ms</td><td>_____ ms</td><td>_____ ms</td></tr>
+    <tr><td>List load (harvest, 50 items)</td><td>&lt; 200 ms</td><td>_____ ms</td><td>_____ ms</td></tr>
+    <tr><td>Create record (online)</td><td>&lt; 1 s</td><td>_____ s</td><td>_____ s</td></tr>
+    <tr><td>Offline sync (5 items)</td><td>&lt; 30 s</td><td>_____ s</td><td>_____ s</td></tr>
+    <tr><td>API p95 response time</td><td>&lt; 300 ms</td><td>_____ ms</td><td>_____ ms</td></tr>
+    <tr><td>API memory (idle)</td><td>&lt; 100 MB</td><td>_____ MB</td><td>_____ MB</td></tr>
+    <tr><td>API memory (peak)</td><td>&lt; 300 MB</td><td>_____ MB</td><td>_____ MB</td></tr>
+    <tr><td>APK size</td><td>&lt; 80 MB</td><td>_____ MB</td><td>—</td></tr>
+    <tr><td>Active DB connections (peak)</td><td>&lt; 18</td><td>_____</td><td>_____</td></tr>
+  </table>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Phase 17 Performance Report &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

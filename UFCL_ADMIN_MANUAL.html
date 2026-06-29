@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UFCL Mobile — IT Administrator Manual v1.0.0</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f8fafc; color: #1e293b; font-size: 14px; line-height: 1.65; }
+
+.page-header { background: linear-gradient(135deg,#0f172a,#1e3a5f);
+  color:#fff; padding:30px 40px; }
+.page-header h1 { font-size:24px; font-weight:700; }
+.page-header p  { color:#94a3b8; margin-top:4px; }
+.meta-row { display:flex; gap:12px; margin-top:12px; flex-wrap:wrap; }
+.meta-chip { background:rgba(255,255,255,.12); padding:3px 12px;
+  border-radius:20px; font-size:11px; font-weight:700; }
+
+.nav { background:#0f172a; display:flex; gap:0; overflow-x:auto;
+  position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+.nav a { color:#94a3b8; text-decoration:none; padding:11px 16px; font-size:12px;
+  font-weight:600; white-space:nowrap; border-bottom:3px solid transparent; display:block; }
+.nav a:hover { color:#fff; border-bottom-color:#60a5fa; }
+
+.container { max-width:960px; margin:0 auto; padding:32px 20px; }
+
+h2 { font-size:20px; color:#0f172a; margin:32px 0 12px;
+  padding-bottom:8px; border-bottom:2px solid #e2e8f0; }
+h3 { font-size:15px; font-weight:700; color:#1e3a5f; margin:18px 0 8px; }
+h4 { font-size:13px; font-weight:700; color:#64748b; margin:14px 0 5px;
+  text-transform:uppercase; letter-spacing:.05em; }
+p  { margin-bottom:10px; color:#334155; }
+ol, ul { padding-left:20px; margin-bottom:10px; }
+ol li, ul li { margin-bottom:5px; color:#334155; }
+
+code { font-family: 'Courier New', monospace; background:#f1f5f9;
+  border-radius:4px; padding:1px 6px; font-size:12px; color:#0f172a; }
+
+pre { background:#0f172a; color:#e2e8f0; border-radius:8px;
+  padding:16px 18px; font-size:12px; line-height:1.7; margin:10px 0;
+  overflow-x:auto; font-family:'Courier New', monospace; }
+pre .c { color:#64748b; }
+
+.box-info  { background:#eff6ff; border-left:4px solid #3b82f6; border-radius:0 8px 8px 0;
+  padding:12px 14px; margin:10px 0; font-size:13px; color:#1e40af; }
+.box-warn  { background:#fffbeb; border-left:4px solid #d97706; border-radius:0 8px 8px 0;
+  padding:12px 14px; margin:10px 0; font-size:13px; color:#92400e; }
+.box-danger{ background:#fef2f2; border-left:4px solid #dc2626; border-radius:0 8px 8px 0;
+  padding:12px 14px; margin:10px 0; font-size:13px; color:#991b1b; }
+.box-ok    { background:#f0fdf4; border-left:4px solid #16a34a; border-radius:0 8px 8px 0;
+  padding:12px 14px; margin:10px 0; font-size:13px; color:#14532d; }
+
+table { width:100%; border-collapse:collapse; font-size:12px; margin:10px 0; }
+th { text-align:left; padding:7px 12px; background:#f1f5f9;
+  font-weight:700; font-size:11px; color:#64748b; text-transform:uppercase;
+  letter-spacing:.05em; border-bottom:2px solid #e2e8f0; }
+td { padding:7px 12px; border-bottom:1px solid #f8fafc; }
+tr:last-child td { border-bottom:none; }
+
+.section-card { background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+  margin-bottom:24px; overflow:hidden; }
+.section-card-head { background:#f8fafc; padding:12px 18px;
+  border-bottom:1px solid #e2e8f0; font-weight:700; font-size:14px; }
+.section-card-body { padding:16px 18px; }
+
+@media print { .nav { display:none; } }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>UFCL Mobile — IT Administrator Manual</h1>
+  <p>For the system administrator and IT officer only. Version 1.0.0 · June 2026.</p>
+  <div class="meta-row">
+    <span class="meta-chip">Server: 192.168.1.5</span>
+    <span class="meta-chip">API port (internal): 3001</span>
+    <span class="meta-chip">HTTPS port: 443</span>
+    <span class="meta-chip">OS: Ubuntu 20.04+ LTS</span>
+    <span class="meta-chip">CONFIDENTIAL</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="#arch">Architecture</a>
+  <a href="#users">User Management</a>
+  <a href="#server">Server Ops</a>
+  <a href="#backup">Backups</a>
+  <a href="#monitoring">Monitoring</a>
+  <a href="#apk">APK</a>
+  <a href="#logs">Logs</a>
+  <a href="#roles">Role Reference</a>
+  <a href="#env">Environment</a>
+  <a href="#dr">Disaster Recovery</a>
+</div>
+
+<div class="container">
+
+<!-- ── Architecture ───────────────────────────────────────────────────────── -->
+<h2 id="arch">1. System Architecture</h2>
+
+<div class="section-card">
+  <div class="section-card-head">Component Overview</div>
+  <div class="section-card-body">
+    <table>
+      <thead><tr><th>Component</th><th>Technology</th><th>Location</th></tr></thead>
+      <tbody>
+        <tr><td>Database</td><td>PostgreSQL 14+</td><td>localhost:5432</td></tr>
+        <tr><td>API server</td><td>Node.js 22 + Express.js (PM2)</td><td>127.0.0.1:3001</td></tr>
+        <tr><td>Reverse proxy</td><td>Nginx</td><td>0.0.0.0:80, 0.0.0.0:443</td></tr>
+        <tr><td>TLS certificate</td><td>Self-signed RSA-2048, 10 years</td><td>/etc/ssl/ufcl/</td></tr>
+        <tr><td>Firewall</td><td>UFW</td><td>Allows: 22, 80, 443 only</td></tr>
+        <tr><td>Mobile app</td><td>React Native (Expo bare workflow)</td><td>Android devices on LAN</td></tr>
+        <tr><td>Desktop app</td><td>Electron</td><td>Windows PCs, same API</td></tr>
+        <tr><td>Backups</td><td>pg_dump + cron</td><td>/opt/ufcl-backups/</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<h3>Request flow</h3>
+<pre>Android device → WiFi → nginx :443 (TLS) → Express :3001 → PostgreSQL</pre>
+
+<div class="box-danger">The Express API (port 3001) must NEVER be directly reachable from devices.
+All traffic must go through Nginx on port 443. UFW blocks port 3001 externally.
+Verify: <code>curl http://192.168.1.5:3001/api/health</code> must fail from any device.</div>
+
+<!-- ── User Management ─────────────────────────────────────────────────────── -->
+<h2 id="users">2. User Management</h2>
+
+<h3>Creating a new user</h3>
+<pre>
+<span class="c"># Connect to the database</span>
+psql -U postgres -d ufcl_production
+
+<span class="c"># Insert user (replace values, never reuse passwords)</span>
+INSERT INTO users (username, password_hash, role, workshop_id, active)
+VALUES (
+  'jane.sawmill',
+  crypt('TemporaryPass123', gen_salt('bf', 12)),
+  'sawmill-leader',
+  NULL,
+  true
+);
+</pre>
+
+<div class="box-warn">Always use <code>crypt()</code> with bcrypt (bf). Never store plain-text passwords.
+The <code>pgcrypto</code> extension must be enabled: <code>CREATE EXTENSION IF NOT EXISTS pgcrypto;</code></div>
+
+<h3>Disabling a user (e.g. staff departure)</h3>
+<pre>
+UPDATE users SET active = false WHERE username = 'jane.sawmill';
+<span class="c">-- Do NOT delete users — audit_log references their user_id</span>
+</pre>
+
+<h3>Resetting a password</h3>
+<pre>
+UPDATE users
+SET password_hash = crypt('NewTemp999', gen_salt('bf', 12))
+WHERE username = 'jane.sawmill';
+<span class="c">-- Tell the user to change it on first login via Profile → Change Password</span>
+</pre>
+
+<h3>Role assignments</h3>
+<p>See Section 8 (Role Reference) for the full list of valid role values.</p>
+
+<h3>Workshop assignment</h3>
+<p>For roles that are workshop-restricted (<code>harvesting-supervisor</code>, <code>supervisor</code>), the
+<code>workshop_id</code> column must be set to the correct workshop ID. Check valid IDs:</p>
+<pre>SELECT id, name FROM workshops ORDER BY id;</pre>
+
+<div class="box-danger">Workshop isolation is a security boundary. A supervisor assigned to Workshop A
+must NEVER be able to see Workshop B data. Always verify workshop_id is correct before activating a supervisor account.</div>
+
+<!-- ── Server Operations ──────────────────────────────────────────────────── -->
+<h2 id="server">3. Server Operations</h2>
+
+<h3>PM2 — API process management</h3>
+<pre>
+pm2 status                        <span class="c"># check API is online</span>
+pm2 restart mobile-api            <span class="c"># restart after config change</span>
+pm2 stop mobile-api               <span class="c"># stop (will not auto-restart)</span>
+pm2 start ecosystem.config.js --env production  <span class="c"># start fresh</span>
+pm2 logs mobile-api --lines 50    <span class="c"># recent logs</span>
+pm2 monit                         <span class="c"># live resource monitor</span>
+</pre>
+
+<h3>Nginx</h3>
+<pre>
+sudo nginx -t                     <span class="c"># test config before reload</span>
+sudo systemctl reload nginx       <span class="c"># reload (zero-downtime)</span>
+sudo systemctl restart nginx      <span class="c"># full restart (brief downtime)</span>
+sudo systemctl status nginx       <span class="c"># check status</span>
+sudo tail -50 /var/log/nginx/error.log  <span class="c"># errors</span>
+</pre>
+
+<h3>PostgreSQL</h3>
+<pre>
+sudo systemctl status postgresql  <span class="c"># check running</span>
+sudo -u postgres psql             <span class="c"># open psql as postgres</span>
+psql -U postgres -d ufcl_production   <span class="c"># connect to database</span>
+sudo tail -50 /var/log/postgresql/postgresql-*.log  <span class="c"># DB logs</span>
+</pre>
+
+<h3>Updating the API after a code change</h3>
+<pre>
+cd /opt/ufcl-api
+git pull origin master
+cd mobile-api && npm install --production
+cd /opt/ufcl-api/mobile-api
+pm2 restart mobile-api
+pm2 logs mobile-api --lines 20   <span class="c"># verify no startup errors</span>
+</pre>
+
+<h3>Running database migrations</h3>
+<pre>
+cd /opt/ufcl-api
+node db/migrate.js
+<span class="c"># Always backup before running migrations:</span>
+<span class="c"># PGPASSWORD='...' pg_dump -U postgres ufcl_production | gzip > pre-migrate-backup.sql.gz</span>
+</pre>
+
+<!-- ── Backups ─────────────────────────────────────────────────────────────── -->
+<h2 id="backup">4. Backup &amp; Restore</h2>
+
+<h3>Backup schedule</h3>
+<table>
+  <thead><tr><th>Frequency</th><th>Retention</th><th>Location</th></tr></thead>
+  <tbody>
+    <tr><td>Daily (02:00)</td><td>30 days</td><td>/opt/ufcl-backups/daily/</td></tr>
+    <tr><td>Weekly (Sunday 03:00)</td><td>8 weeks</td><td>/opt/ufcl-backups/weekly/</td></tr>
+    <tr><td>Monthly (1st 04:00)</td><td>12 months</td><td>/opt/ufcl-backups/monthly/</td></tr>
+  </tbody>
+</table>
+
+<h3>Run a manual backup</h3>
+<pre>
+PGPASSWORD="your-db-password" bash /opt/ufcl-api/tools/backup.sh
+tail -5 /opt/ufcl-backups/backup.log
+ls -lh /opt/ufcl-backups/daily/
+</pre>
+
+<h3>Restore from backup</h3>
+<pre>
+<span class="c"># 1. Stop the API</span>
+pm2 stop mobile-api
+
+<span class="c"># 2. Drop and recreate the database (DESTRUCTIVE)</span>
+psql -U postgres -c "DROP DATABASE ufcl_production;"
+psql -U postgres -c "CREATE DATABASE ufcl_production;"
+psql -U postgres -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;" ufcl_production
+
+<span class="c"># 3. Restore from the chosen backup file</span>
+BACKUP_FILE="/opt/ufcl-backups/daily/ufcl-20260629_020001.sql.gz"
+gunzip -c "$BACKUP_FILE" | psql -U postgres -d ufcl_production
+
+<span class="c"># 4. Restart the API</span>
+pm2 start mobile-api
+</pre>
+
+<div class="box-danger">Step 2 is irreversible. Confirm the backup file is readable before dropping the database:
+<code>gunzip -t "$BACKUP_FILE" &amp;&amp; echo "OK"</code></div>
+
+<h3>Verify a backup is readable</h3>
+<pre>
+gunzip -t /opt/ufcl-backups/daily/ufcl-20260629_020001.sql.gz &amp;&amp; echo "Backup is valid"
+</pre>
+
+<!-- ── Monitoring ─────────────────────────────────────────────────────────── -->
+<h2 id="monitoring">5. Monitoring</h2>
+
+<h3>Dashboard</h3>
+<p>Open <code>https://192.168.1.5/dashboard.html</code> in a browser.
+Enter the server URL (<code>https://192.168.1.5</code>) and the <code>METRICS_TOKEN</code> from <code>.env</code>.
+The dashboard auto-refreshes every 30 seconds. It shows:</p>
+<ul>
+  <li>Uptime, active sessions, total requests</li>
+  <li>Response time (average and p95)</li>
+  <li>Heap memory used</li>
+  <li>Database latency</li>
+  <li>Auth failure count, rate limit hits</li>
+  <li>Last 10 slow requests (&gt;500 ms)</li>
+  <li>Current APK version</li>
+</ul>
+
+<h3>Health check endpoints</h3>
+<pre>
+<span class="c"># Liveness — API is running</span>
+curl -k https://192.168.1.5/api/health
+
+<span class="c"># Readiness — database is reachable</span>
+curl -k https://192.168.1.5/api/ready
+
+<span class="c"># Metrics — token required</span>
+curl -k -H "Authorization: Bearer $METRICS_TOKEN" https://192.168.1.5/api/metrics | jq .
+</pre>
+
+<h3>Alert thresholds</h3>
+<table>
+  <thead><tr><th>Metric</th><th>Warning</th><th>Critical</th><th>Action</th></tr></thead>
+  <tbody>
+    <tr><td>response_ms.avg</td><td>&gt; 500ms</td><td>&gt; 2000ms</td><td>Check DB query load; check PM2 logs</td></tr>
+    <tr><td>heap_used_mb</td><td>&gt; 384 MB</td><td>&gt; 480 MB</td><td>PM2 will restart at 512 MB — check for memory leak</td></tr>
+    <tr><td>db.latency_ms</td><td>&gt; 100ms</td><td>&gt; 500ms</td><td>Check PostgreSQL autovacuum, EXPLAIN ANALYZE slow queries</td></tr>
+    <tr><td>auth_invalid_token</td><td>&gt; 10/hour</td><td>&gt; 50/hour</td><td>May indicate brute-force or stale APK sessions — check logs</td></tr>
+    <tr><td>rate_limit_hits</td><td>&gt; 20/hour</td><td>&gt; 100/hour</td><td>Check if a device is looping requests — check audit_log</td></tr>
+  </tbody>
+</table>
+
+<!-- ── APK Distribution ───────────────────────────────────────────────────── -->
+<h2 id="apk">6. APK Build &amp; Distribution</h2>
+
+<h3>Building the release APK</h3>
+<pre>
+cd /path/to/repo/mobile/android
+
+<span class="c"># Set version (increment versionCode each release)</span>
+export VERSION_CODE=2
+export VERSION_NAME=1.0.1
+
+./gradlew assembleRelease
+
+<span class="c"># Output: app/build/outputs/apk/release/app-release.apk</span>
+<span class="c"># Must be signed with the UFCL release keystore</span>
+</pre>
+
+<div class="box-danger">The release keystore file must be kept secure. If the keystore is lost, the APK cannot be updated (Android will refuse to install a new APK signed with a different key over the old one). Store the keystore in archive/v1.0.0/ and in a secure offline location.</div>
+
+<h3>Deploying a new APK to the server</h3>
+<pre>
+<span class="c"># Copy new APK to the downloads directory</span>
+sudo cp app-release-v1.0.1.apk /opt/ufcl-api/public/downloads/UFCL-production.apk
+
+<span class="c"># Update version.json</span>
+echo '{"version":"1.0.1","versionCode":2}' \
+  | sudo tee /opt/ufcl-api/public/downloads/version.json
+
+<span class="c"># Verify download endpoint</span>
+curl -kI https://192.168.1.5/downloads/UFCL-production.apk
+</pre>
+
+<h3>Installing on Android devices</h3>
+<ol>
+  <li>On the device: Settings → Security → Allow unknown sources (or "Install unknown apps" for the browser)</li>
+  <li>Open the device browser → navigate to <code>https://192.168.1.5/downloads/UFCL-production.apk</code></li>
+  <li>Download and install. Accept the TLS warning (self-signed certificate).</li>
+  <li>Alternatively: generate a QR code for the APK URL using any QR generator and display it on a notice board.</li>
+</ol>
+
+<h3>Distribute the TLS certificate to devices</h3>
+<pre>
+<span class="c"># The certificate file for device installation:</span>
+/etc/ssl/ufcl/server.crt
+
+<span class="c"># Transfer to device via USB or LAN file share, then:</span>
+<span class="c"># Android Settings → Security → Install a certificate → CA Certificate → select server.crt</span>
+</pre>
+
+<!-- ── Logs ────────────────────────────────────────────────────────────────── -->
+<h2 id="logs">7. Log Management</h2>
+
+<h3>Log locations</h3>
+<table>
+  <thead><tr><th>Log</th><th>Path</th><th>Rotation</th></tr></thead>
+  <tbody>
+    <tr><td>API application</td><td>/opt/ufcl-api/logs/app-YYYY-MM-DD.log</td><td>Daily, keep 30 days</td></tr>
+    <tr><td>PM2 stdout</td><td>/opt/ufcl-api/logs/pm2-out.log</td><td>Weekly, keep 8 weeks</td></tr>
+    <tr><td>PM2 stderr</td><td>/opt/ufcl-api/logs/pm2-error.log</td><td>Weekly, keep 8 weeks</td></tr>
+    <tr><td>Nginx access</td><td>/var/log/nginx/access.log</td><td>Nginx default</td></tr>
+    <tr><td>Nginx errors</td><td>/var/log/nginx/error.log</td><td>Nginx default</td></tr>
+    <tr><td>Backup</td><td>/opt/ufcl-backups/backup.log</td><td>Monthly, keep 12 months</td></tr>
+  </tbody>
+</table>
+
+<h3>Useful log commands</h3>
+<pre>
+<span class="c"># All error-level events today</span>
+grep '"level":"error"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | jq .
+
+<span class="c"># All login failures in the last hour</span>
+grep '"event":"login_failed"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | tail -20
+
+<span class="c"># Slow requests</span>
+grep '"duration_ms"' /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log \
+  | jq 'select(.duration_ms > 500)' | head -20
+
+<span class="c"># Live tail</span>
+tail -f /opt/ufcl-api/logs/app-$(date +%Y-%m-%d).log | jq .
+</pre>
+
+<h3>Audit log (database)</h3>
+<pre>
+<span class="c"># All logins today</span>
+psql -U postgres -d ufcl_production -c \
+  "SELECT username, role, event, ip, created_at
+   FROM audit_log
+   WHERE created_at::date = CURRENT_DATE
+   ORDER BY created_at DESC LIMIT 50;"
+
+<span class="c"># Failed logins in last 24 hours</span>
+psql -U postgres -d ufcl_production -c \
+  "SELECT username, ip, created_at FROM audit_log
+   WHERE event = 'login_failed'
+   AND created_at > NOW() - INTERVAL '24 hours'
+   ORDER BY created_at DESC;"
+</pre>
+
+<!-- ── Role Reference ──────────────────────────────────────────────────────── -->
+<h2 id="roles">8. Role Reference</h2>
+
+<table>
+  <thead><tr><th>Database role value</th><th>Department</th><th>Write access</th><th>Workshop-scoped</th></tr></thead>
+  <tbody>
+    <tr><td><code>admin</code></td><td>IT / Admin</td><td>Full</td><td>No</td></tr>
+    <tr><td><code>ceo</code></td><td>CEO</td><td>Approve/reject all</td><td>No</td></tr>
+    <tr><td><code>operations</code></td><td>Operations</td><td>Approve requests</td><td>No</td></tr>
+    <tr><td><code>harvesting-leader</code></td><td>Harvest</td><td>Create harvest, log transport, requests</td><td>No</td></tr>
+    <tr><td><code>harvesting-supervisor</code></td><td>Harvest</td><td>None (view only)</td><td><strong>Yes</strong></td></tr>
+    <tr><td><code>sawmill-leader</code></td><td>Sawmill</td><td>Create production entries, requests</td><td>No</td></tr>
+    <tr><td><code>sawmill-supervisor</code></td><td>Sawmill</td><td>None (view only)</td><td>No</td></tr>
+    <tr><td><code>poles-leader</code></td><td>Poles</td><td>Create production, purchases, deliveries, QC</td><td>No</td></tr>
+    <tr><td><code>poles-supervisor</code></td><td>Poles</td><td>None (view only)</td><td>No</td></tr>
+    <tr><td><code>vat-supervisor</code></td><td>VAT / Treatment</td><td>Intake, batch recording</td><td>No</td></tr>
+    <tr><td><code>logistics</code></td><td>Logistics</td><td>Deliveries, POD, vehicle fuel</td><td>No</td></tr>
+    <tr><td><code>mechanician</code></td><td>Workshop</td><td>Machine fuel, machine logs</td><td>No</td></tr>
+    <tr><td><code>supervisor</code></td><td>Workshop supervisor</td><td>Requests, labour (own workshop)</td><td><strong>Yes</strong></td></tr>
+    <tr><td><code>storekeeper</code></td><td>Stores</td><td>Approve material requests</td><td>No</td></tr>
+    <tr><td><code>finance</code></td><td>Finance</td><td>None (view only)</td><td>No</td></tr>
+    <tr><td><code>sales</code></td><td>Sales</td><td>None (view only)</td><td>No</td></tr>
+  </tbody>
+</table>
+
+<div class="box-danger">NEVER add write permissions to a supervisor-level role without explicit written approval from the CEO.
+This is a documented security policy. See the role write-access rule in the project documentation.</div>
+
+<!-- ── Environment ────────────────────────────────────────────────────────── -->
+<h2 id="env">9. Environment Variables</h2>
+<p>Stored in <code>/opt/ufcl-api/.env</code>. This file must not be committed to git.
+Back it up separately (encrypted or on a secure USB drive).</p>
+
+<table>
+  <thead><tr><th>Variable</th><th>Description</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td><code>PGHOST</code></td><td>Database host</td><td>localhost</td></tr>
+    <tr><td><code>PGPORT</code></td><td>Database port</td><td>5432</td></tr>
+    <tr><td><code>PGDATABASE</code></td><td>Database name</td><td>ufcl_production</td></tr>
+    <tr><td><code>PGUSER</code></td><td>Database user</td><td>postgres</td></tr>
+    <tr><td><code>PGPASSWORD</code></td><td>Database password</td><td>(strong, random)</td></tr>
+    <tr><td><code>JWT_SECRET</code></td><td>Token signing secret — min 32 chars</td><td>openssl rand -hex 32</td></tr>
+    <tr><td><code>JWT_EXPIRES_IN</code></td><td>Token lifetime</td><td>24h</td></tr>
+    <tr><td><code>MOBILE_API_PORT</code></td><td>Express listen port</td><td>3001</td></tr>
+    <tr><td><code>API_BIND_HOST</code></td><td>Express bind address — never 0.0.0.0</td><td>127.0.0.1</td></tr>
+    <tr><td><code>API_BEHIND_PROXY</code></td><td>Trust X-Forwarded-For from Nginx</td><td>true</td></tr>
+    <tr><td><code>METRICS_TOKEN</code></td><td>Dashboard auth token (separate from JWT)</td><td>openssl rand -hex 32</td></tr>
+    <tr><td><code>NODE_ENV</code></td><td>Environment</td><td>production</td></tr>
+    <tr><td><code>LOG_DIR</code></td><td>Log file directory</td><td>/opt/ufcl-api/logs</td></tr>
+  </tbody>
+</table>
+
+<h3>Rotating the JWT secret</h3>
+<pre>
+<span class="c"># Generate new secret</span>
+NEW_SECRET=$(openssl rand -hex 32)
+echo "JWT_SECRET=$NEW_SECRET"
+
+<span class="c"># Update .env, then restart the API</span>
+<span class="c"># WARNING: All existing sessions are immediately invalidated.</span>
+<span class="c"># All users will need to log in again.</span>
+<span class="c"># Schedule this during off-hours.</span>
+pm2 restart mobile-api
+</pre>
+
+<!-- ── Disaster Recovery ───────────────────────────────────────────────────── -->
+<h2 id="dr">10. Disaster Recovery</h2>
+
+<div class="section-card">
+  <div class="section-card-head">Scenario: API is down (PM2 crashed)</div>
+  <div class="section-card-body">
+<pre>pm2 status
+pm2 logs mobile-api --lines 50   <span class="c"># find the error</span>
+pm2 start mobile-api              <span class="c"># restart</span>
+pm2 save</pre>
+    <p>If PM2 itself is not running: <code>pm2 resurrect</code></p>
+  </div>
+</div>
+
+<div class="section-card">
+  <div class="section-card-head">Scenario: Server rebooted (after power cut)</div>
+  <div class="section-card-body">
+    <p>If PM2 startup was configured (<code>pm2 startup && pm2 save</code>), the API restarts automatically.
+    Verify: <code>pm2 status</code>. If not running: <code>pm2 resurrect</code> then <code>pm2 status</code>.</p>
+    <p>Verify Nginx: <code>sudo systemctl status nginx</code>. Should be "active (running)".</p>
+    <p>Verify PostgreSQL: <code>sudo systemctl status postgresql</code>. Should be "active (running)".</p>
+  </div>
+</div>
+
+<div class="section-card">
+  <div class="section-card-head">Scenario: Database corrupted or deleted</div>
+  <div class="section-card-body">
+    <ol>
+      <li>Stop API: <code>pm2 stop mobile-api</code></li>
+      <li>Find the most recent valid backup: <code>ls -lt /opt/ufcl-backups/daily/ | head -5</code></li>
+      <li>Verify it: <code>gunzip -t /opt/ufcl-backups/daily/ufcl-&lt;timestamp&gt;.sql.gz</code></li>
+      <li>Recreate DB: <code>psql -U postgres -c "DROP DATABASE IF EXISTS ufcl_production; CREATE DATABASE ufcl_production;"</code></li>
+      <li>Restore: <code>gunzip -c /opt/ufcl-backups/daily/ufcl-&lt;timestamp&gt;.sql.gz | psql -U postgres -d ufcl_production</code></li>
+      <li>Start API: <code>pm2 start mobile-api</code></li>
+      <li>Verify: <code>curl -k https://192.168.1.5/api/ready | jq '{ok, db}'</code></li>
+    </ol>
+    <div class="box-warn">Any data entered after the backup timestamp will be lost. Inform users of the data gap.</div>
+  </div>
+</div>
+
+<div class="section-card">
+  <div class="section-card-head">Scenario: TLS certificate expired</div>
+  <div class="section-card-body">
+<pre><span class="c"># Check expiry</span>
+openssl x509 -in /etc/ssl/ufcl/server.crt -noout -dates
+
+<span class="c"># Renew (re-run the setup script)</span>
+sudo bash /opt/ufcl-api/tools/ssl-setup.sh
+sudo systemctl reload nginx
+
+<span class="c"># Re-distribute the new server.crt to all Android devices</span></pre>
+  </div>
+</div>
+
+<div class="section-card">
+  <div class="section-card-head">Scenario: Disk full</div>
+  <div class="section-card-body">
+<pre>df -h /                      <span class="c"># check disk usage</span>
+du -sh /opt/ufcl-backups/*   <span class="c"># check backup size</span>
+du -sh /opt/ufcl-api/logs/*  <span class="c"># check log size</span>
+
+<span class="c"># Emergency: force logrotate to free space now</span>
+sudo logrotate -f /etc/logrotate.d/ufcl
+
+<span class="c"># Remove backups older than 35 days if still low on disk</span>
+find /opt/ufcl-backups/daily -mtime +35 -name "*.sql.gz" -delete</pre>
+  </div>
+</div>
+
+<div class="section-card">
+  <div class="section-card-head">Rollback to a previous APK version</div>
+  <div class="section-card-body">
+    <p>Previous APKs are stored in <code>archive/vX.Y.Z/apk/</code>. To roll back:</p>
+<pre>sudo cp archive/v1.0.0/apk/UFCL-mobile-v1.0.0.apk \
+     /opt/ufcl-api/public/downloads/UFCL-production.apk
+echo '{"version":"1.0.0","versionCode":1}' \
+  | sudo tee /opt/ufcl-api/public/downloads/version.json</pre>
+    <p>Users with the newer version installed will need to uninstall and reinstall the older APK manually (Android does not allow downgrading in-place).</p>
+  </div>
+</div>
+
+<div class="box-ok" style="margin-top:24px;">
+  For further assistance or escalation: contact the development team.
+  All configuration files are in <code>/opt/ufcl-api/tools/</code>.
+  All infrastructure scripts are documented in <code>SERVER_MAINTENANCE.md</code>.
+</div>
+
+</div><!-- /container -->
+</body>
+</html>

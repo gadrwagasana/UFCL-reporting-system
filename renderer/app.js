@@ -7,6 +7,17 @@ const STORAGE = {
   pages: []
 };
 
+const _NOTIF = { filters: {}, page: 0 };
+let _pollTimer      = null;
+let _searchTimer    = null;
+let _secGovLastLoad = 0;
+let _execLastLoad   = 0;
+let _execData       = null;
+let _biLastLoad     = 0;
+let _biData         = null;
+let _autoLastLoad   = 0;
+let _epmLastLoad    = 0;
+
 // Workshop & Stock filter — null = all workshops, number = specific warehouse id
 let WORKSHOP_FILTER = null;
 
@@ -106,68 +117,75 @@ function prependWorkshopBanner(containerEl, workshops, onRefresh) {
 }
 
 const NAV = [
-  // ── Overview ──────────────────────────────────────────────────────
-  { id: 'dashboard',          icon: 'ti-layout-dashboard',   label: 'Dashboard',            sec: 'Overview'        },
-  { id: 'ceo',                icon: 'ti-crown',              label: 'CEO Overview',         sec: 'Overview'        },
+  // ── Home ──────────────────────────────────────────────────────────
+  { id: 'dashboard',           icon: 'ti-layout-dashboard',   label: 'Dashboard',              sec: 'Home'                      },
 
-  // ── Production ────────────────────────────────────────────────────
-  { id: 'daily-harvest',      icon: 'ti-axe',                label: 'Harvesting Daily',     sec: 'Production'      },
-  { id: 'daily-timber',       icon: 'ti-trees',              label: 'Timber Daily',         sec: 'Production'      },
-  { id: 'daily-poles',        icon: 'ti-align-center',       label: 'Poles Daily',          sec: 'Production'      },
-  { id: 'value-added-timber', icon: 'ti-certificate',        label: 'Value-Added Timber',   sec: 'Production'      },
-  { id: 'machine-logs',       icon: 'ti-engine',             label: 'Machine Daily Logs',   sec: 'Production'      },
+  // ── Intelligence & Performance ────────────────────────────────────
+  { id: 'ceo',                 icon: 'ti-crown',              label: 'CEO Overview',           sec: 'Intelligence & Performance' },
+  { id: 'executive',           icon: 'ti-chart-dots-3',       label: 'Executive Analytics',    sec: 'Intelligence & Performance' },
+  { id: 'bi',                  icon: 'ti-chart-line',         label: 'Business Intelligence',  sec: 'Intelligence & Performance' },
+  { id: 'epm',                 icon: 'ti-chart-radar',        label: 'Enterprise Performance', sec: 'Intelligence & Performance' },
 
-  // ── Forestry ──────────────────────────────────────────────────────
-  { id: 'timber-inventory',   icon: 'ti-database',           label: 'Timber Inventory',     sec: 'Forestry'        },
-  { id: 'compartments',       icon: 'ti-map-pin',            label: 'Compartments',         sec: 'Forestry'        },
-  { id: 'log-transport',      icon: 'ti-truck-loading',      label: 'Log Transport',        sec: 'Forestry'        },
+  // ── Operations ────────────────────────────────────────────────────
+  { id: 'daily-harvest',       icon: 'ti-axe',                label: 'Daily Harvest',          sec: 'Operations'                },
+  { id: 'daily-timber',        icon: 'ti-trees',              label: 'Daily Timber',           sec: 'Operations'                },
+  { id: 'daily-poles',         icon: 'ti-align-center',       label: 'Daily Poles',            sec: 'Operations'                },
+  { id: 'value-added-timber',  icon: 'ti-certificate',        label: 'Value-Added Timber',     sec: 'Operations'                },
+  { id: 'machine-logs',        icon: 'ti-engine',             label: 'Machine Daily Logs',     sec: 'Operations'                },
 
-  // ── Labour ────────────────────────────────────────────────────────
-  { id: 'casual-requests',    icon: 'ti-clipboard',          label: 'Labour Requests',      sec: 'Labour'          },
-  { id: 'casuals',            icon: 'ti-user-check',         label: 'Casuals',              sec: 'Labour'          },
+  // ── Forest Management ─────────────────────────────────────────────
+  { id: 'compartments',        icon: 'ti-map-2',              label: 'Compartments',           sec: 'Forest Management'         },
+  { id: 'log-transport',       icon: 'ti-truck-loading',      label: 'Log Transport',          sec: 'Forest Management'         },
+  { id: 'timber-inventory',    icon: 'ti-database',           label: 'Timber Inventory',       sec: 'Forest Management'         },
 
-  // ── Workshop & Stock ──────────────────────────────────────────────
-  { id: 'workshop-overview',   icon: 'ti-layout-dashboard',   label: 'Workshop Overview',    sec: 'Workshop & Stock' },
-  { id: 'warehouses',         icon: 'ti-building-warehouse', label: 'Workshops',            sec: 'Workshop & Stock' },
-  { id: 'stock-items',        icon: 'ti-package',            label: 'Stock Catalog',        sec: 'Workshop & Stock' },
-  { id: 'inventory',          icon: 'ti-stack',              label: 'Inventory',            sec: 'Workshop & Stock' },
-  { id: 'stock-movements',    icon: 'ti-arrows-exchange',    label: 'Stock Movements',      sec: 'Workshop & Stock' },
-  { id: 'stock-transfers',    icon: 'ti-arrows-right-left',  label: 'Stock Transfers',       sec: 'Workshop & Stock' },
-  { id: 'material-requests',  icon: 'ti-clipboard-list',     label: 'Material Requests',    sec: 'Workshop & Stock' },
+  // ── Workshop & Inventory ──────────────────────────────────────────
+  { id: 'workshop-overview',   icon: 'ti-building-factory',   label: 'Workshop Overview',      sec: 'Workshop & Inventory'      },
+  { id: 'warehouses',          icon: 'ti-building-warehouse', label: 'Workshops',              sec: 'Workshop & Inventory'      },
+  { id: 'stock-items',         icon: 'ti-package',            label: 'Stock Catalog',          sec: 'Workshop & Inventory'      },
+  { id: 'inventory',           icon: 'ti-stack',              label: 'Stock Levels',           sec: 'Workshop & Inventory'      },
+  { id: 'stock-movements',     icon: 'ti-arrows-exchange',    label: 'Stock Movements',        sec: 'Workshop & Inventory'      },
+  { id: 'stock-transfers',     icon: 'ti-arrows-right-left',  label: 'Stock Transfers',        sec: 'Workshop & Inventory'      },
+  { id: 'material-requests',   icon: 'ti-clipboard-list',     label: 'Material Requests',      sec: 'Workshop & Inventory'      },
 
-  // ── Fleet & Machines ──────────────────────────────────────────────
-  { id: 'machines',           icon: 'ti-settings-2',         label: 'Machine Registry',     sec: 'Fleet & Machines' },
-  { id: 'machine-fuel',       icon: 'ti-droplet',            label: 'Fuel Logs',            sec: 'Fleet & Machines' },
-  { id: 'vehicles',           icon: 'ti-truck',              label: 'Vehicle Fleet',        sec: 'Fleet & Machines' },
+  // ── Fleet & Equipment ─────────────────────────────────────────────
+  { id: 'machines',            icon: 'ti-settings-2',         label: 'Machine Registry',       sec: 'Fleet & Equipment'         },
+  { id: 'machine-fuel',        icon: 'ti-fuel',               label: 'Fuel Logs',              sec: 'Fleet & Equipment'         },
+  { id: 'vehicles',            icon: 'ti-truck',              label: 'Vehicle Fleet',          sec: 'Fleet & Equipment'         },
 
-  // ── Logistics ─────────────────────────────────────────────────────
-  { id: 'logistics-dashboard',icon: 'ti-chart-pie-2',        label: 'Logistics Dashboard',  sec: 'Logistics'       },
-  { id: 'deliveries',         icon: 'ti-truck-delivery',     label: 'Delivery Orders',      sec: 'Logistics'       },
-  { id: 'dispatch',           icon: 'ti-send',               label: 'Dispatch',             sec: 'Logistics'       },
-  { id: 'transport',          icon: 'ti-building',           label: 'Transport Carriers',   sec: 'Logistics'       },
-  { id: 'transport-jobs',    icon: 'ti-truck-loading',      label: 'Transport Jobs',       sec: 'Logistics'       },
+  // ── Human Resources ───────────────────────────────────────────────
+  { id: 'casual-requests',     icon: 'ti-clipboard',          label: 'Labour Requests',        sec: 'Human Resources'           },
+  { id: 'casuals',             icon: 'ti-user-check',         label: 'Casual Workers',         sec: 'Human Resources'           },
 
   // ── Commercial ────────────────────────────────────────────────────
-  { id: 'sales',              icon: 'ti-shopping-cart',      label: 'Sales Orders',         sec: 'Commercial'      },
-  { id: 'customers',          icon: 'ti-users',              label: 'Customers',            sec: 'Commercial'      },
-  { id: 'products',           icon: 'ti-tag',                label: 'Product Catalog',      sec: 'Commercial'      },
-  { id: 'logistics',          icon: 'ti-box',                label: 'Legacy Logistics',     sec: 'Commercial'      },
+  { id: 'sales',               icon: 'ti-shopping-cart',      label: 'Sales Orders',           sec: 'Commercial'                },
+  { id: 'customers',           icon: 'ti-address-book',       label: 'Customers',              sec: 'Commercial'                },
+  { id: 'products',            icon: 'ti-tag',                label: 'Product Catalog',        sec: 'Commercial'                },
 
-  // ── Reports & Analytics ───────────────────────────────────────────
-  { id: 'weekly-cost',        icon: 'ti-cash',               label: 'Weekly Cost Report',   sec: 'Reports'         },
-  { id: 'weekly-perf',        icon: 'ti-chart-bar',          label: 'Weekly Performance',   sec: 'Reports'         },
-  { id: 'monthly',            icon: 'ti-report-analytics',   label: 'Monthly Dashboard',    sec: 'Reports'         },
-  { id: 'kpi',                icon: 'ti-target',             label: 'KPI Scorecard',        sec: 'Reports'         },
-  { id: 'machine-kpi',        icon: 'ti-chart-line',         label: 'KPI Performance',      sec: 'Reports'         },
-  { id: 'sage',               icon: 'ti-calculator',         label: 'Sage Reconciliation',  sec: 'Reports'         },
+  // ── Logistics ─────────────────────────────────────────────────────
+  { id: 'logistics-dashboard', icon: 'ti-chart-pie-2',        label: 'Logistics Dashboard',    sec: 'Logistics'                 },
+  { id: 'deliveries',          icon: 'ti-truck-delivery',     label: 'Delivery Orders',        sec: 'Logistics'                 },
+  { id: 'dispatch',            icon: 'ti-send',               label: 'Dispatch',               sec: 'Logistics'                 },
+  { id: 'transport',           icon: 'ti-building',           label: 'Transport Carriers',     sec: 'Logistics'                 },
+  { id: 'transport-jobs',      icon: 'ti-route',              label: 'Transport Jobs',         sec: 'Logistics'                 },
+  { id: 'logistics',           icon: 'ti-box',                label: 'Legacy Logistics',       sec: 'Logistics'                 },
 
-  // ── System ────────────────────────────────────────────────────────
-  { id: 'users',              icon: 'ti-users',              label: 'Users',                sec: 'System'          },
-  { id: 'changes',            icon: 'ti-git-pull-request',   label: 'Change Requests',      sec: 'System'          },
-  { id: 'notifications',      icon: 'ti-bell',               label: 'Notifications',        sec: 'System'          },
-  { id: 'audit',              icon: 'ti-shield-check',       label: 'Audit Trail',          sec: 'System'          },
-  { id: 'export',             icon: 'ti-file-export',        label: 'Exports',              sec: 'System'          },
-  { id: 'trash',              icon: 'ti-trash',              label: 'Trash',                sec: 'System'          },
+  // ── Reports & Finance ─────────────────────────────────────────────
+  { id: 'weekly-cost',         icon: 'ti-cash',               label: 'Weekly Cost Report',     sec: 'Reports & Finance'         },
+  { id: 'weekly-perf',         icon: 'ti-chart-bar',          label: 'Weekly Performance',     sec: 'Reports & Finance'         },
+  { id: 'monthly',             icon: 'ti-report-analytics',   label: 'Monthly Dashboard',      sec: 'Reports & Finance'         },
+  { id: 'kpi',                 icon: 'ti-target',             label: 'KPI Scorecard',          sec: 'Reports & Finance'         },
+  { id: 'machine-kpi',         icon: 'ti-gauge',              label: 'KPI Performance',        sec: 'Reports & Finance'         },
+  { id: 'sage',                icon: 'ti-calculator',         label: 'Sage Reconciliation',    sec: 'Reports & Finance'         },
+
+  // ── Administration ────────────────────────────────────────────────
+  { id: 'users',               icon: 'ti-user-cog',           label: 'User Management',        sec: 'Administration'            },
+  { id: 'notifications',       icon: 'ti-bell',               label: 'Notifications',          sec: 'Administration'            },
+  { id: 'changes',             icon: 'ti-git-pull-request',   label: 'Change Requests',        sec: 'Administration'            },
+  { id: 'secgov',              icon: 'ti-shield-lock',        label: 'Security & Governance',  sec: 'Administration'            },
+  { id: 'audit',               icon: 'ti-shield-check',       label: 'Audit Trail',            sec: 'Administration'            },
+  { id: 'automation',          icon: 'ti-robot',              label: 'Automation Center',      sec: 'Administration'            },
+  { id: 'export',              icon: 'ti-file-export',        label: 'Exports',                sec: 'Administration'            },
+  { id: 'trash',               icon: 'ti-trash',              label: 'Trash',                  sec: 'Administration'            },
 ];
 
 function $(id) {
@@ -305,7 +323,52 @@ function shortName(name) {
 function updateBadge() {
   const b = $('nbadge');
   if (!b) return;
-  b.style.display = STORAGE.unread > 0 ? 'block' : 'none';
+  if (STORAGE.unread > 0) {
+    b.style.display = 'flex';
+    b.textContent = STORAGE.unread > 99 ? '99+' : String(STORAGE.unread);
+  } else {
+    b.style.display = 'none';
+    b.textContent = '';
+  }
+}
+
+function startNotificationPoll() {
+  if (_pollTimer) return;
+  _pollTimer = setInterval(async () => {
+    try {
+      const r = await UFCL.notificationsPoll();
+      if (r?.ok && typeof r.unread === 'number' && r.unread !== STORAGE.unread) {
+        STORAGE.unread = r.unread;
+        updateBadge();
+      }
+      if (CURRENT_PAGE === 'notifications') {
+        const scrollEl = $('notif-scroll');
+        const top = scrollEl ? scrollEl.scrollTop : 0;
+        await _loadNotifItems();
+        const newScroll = $('notif-scroll');
+        if (newScroll) newScroll.scrollTop = top;
+      }
+      if (CURRENT_PAGE === 'secgov' && Date.now() - _secGovLastLoad >= 5 * 60_000) {
+        await renderSecGovDashboard();
+      }
+      if (CURRENT_PAGE === 'executive' && Date.now() - _execLastLoad >= 5 * 60_000) {
+        await renderExecutiveDashboard();
+      }
+      if (CURRENT_PAGE === 'bi' && Date.now() - _biLastLoad >= 5 * 60_000) {
+        await renderBI();
+      }
+      if (CURRENT_PAGE === 'automation' && Date.now() - _autoLastLoad >= 5 * 60_000) {
+        await renderAutomationCenter();
+      }
+      if (CURRENT_PAGE === 'epm' && Date.now() - _epmLastLoad >= 5 * 60_000) {
+        await renderEPM();
+      }
+    } catch (_) {}
+  }, 60_000);
+}
+
+function stopNotificationPoll() {
+  if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
 }
 
 function sectionsFromNav(list) {
@@ -662,6 +725,7 @@ async function bootstrap() {
   STORAGE.approved = res.approved || { monthly: false };
   STORAGE.unread = res.unreadNotifications || 0;
   updateBadge();
+  startNotificationPoll();
 
   $('uname2').textContent = res.user.name;
   $('urole').textContent = roleLabel(res.user.role);
@@ -707,8 +771,14 @@ async function showPage(id) {
       return renderKpi();
     case 'export':
       return renderExport();
+    case 'executive':
+      return renderExecutiveDashboard();
+    case 'bi':
+      return renderBI();
     case 'notifications':
       return renderNotifications();
+    case 'secgov':
+      return renderSecGovDashboard();
     case 'audit':
       return renderAudit();
     case 'changes':
@@ -767,6 +837,10 @@ async function showPage(id) {
       return renderCasuals();
     case 'trash':
       return renderTrash();
+    case 'automation':
+      return renderAutomationCenter();
+    case 'epm':
+      return renderEPM();
     default:
       return renderStub(id);
   }
@@ -3528,11 +3602,21 @@ async function renderExport() {
   };
 
   $('expAudit').onclick = async () => {
-    const res = await UFCL.auditList(STORAGE.user.id, 'All');
+    const res = await UFCL.auditList(STORAGE.user.id, {});
     if (!res.ok) return alert(res.error || 'Failed');
-    const csv = ['Time,User,Role,Action'];
+    const csv = ['Time,Full Name,Username,Role,Module,Action Type,Action,IP Address,Reason'];
     for (const r of res.rows || [])
-      csv.push(`"${r.time}","${r.user_name || ''}","${r.role}","${(r.action || '').replace(/"/g, '""')}"`);
+      csv.push([
+        `"${r.time}"`,
+        `"${r.full_name || r.user_name || ''}"`,
+        `"${r.username || ''}"`,
+        `"${r.role || ''}"`,
+        `"${r.module || ''}"`,
+        `"${r.action_type || ''}"`,
+        `"${(r.action || '').replace(/"/g, '""')}"`,
+        `"${r.ip_address || ''}"`,
+        `"${(r.reason || '').replace(/"/g, '""')}"`,
+      ].join(','));
     downloadCsv(csv.join('\n'), 'audit-trail.csv');
   };
 }
@@ -3703,82 +3787,1583 @@ async function renderLogistics() {
   await insertPendingPanel($('page-logistics'), ['logistics_item'], renderLogistics);
 }
 
-async function renderNotifications() {
-  const res = await UFCL.notificationsList(STORAGE.user.id);
-  if (!res.ok) return renderDenied('notifications', res.error);
-  STORAGE.unread = res.unread || 0;
-  updateBadge();
-  const rows = res.rows || [];
-  $('page-notifications').innerHTML = `
-    <div class="ptitle">Notifications</div>
-    <div class="psub">System alerts and approvals.</div>
-    <div class="npanel">
-      <div class="nhead"><span>All notifications</span><button id="markAll">Mark all as read</button></div>
-      ${rows
-        .map((n) => {
-          const dot = n.type === 'red' ? 'nd-red' : n.type === 'amber' ? 'nd-amber' : n.type === 'blue' ? 'nd-blue' : 'nd-green';
-          const directBadge = n.direct ? `<span style="font-size:10px;background:rgba(99,102,241,.12);color:#6366f1;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:6px;vertical-align:middle">For you</span>` : '';
-          return `<div class="nitem ${n.read ? '' : 'unread'}" id="nn-${n.id}">
-            <div class="ndot ${dot}"></div>
-            <div style="flex:1">
-              <div class="ntxt"><strong>${n.title}</strong>${directBadge}<div style="color:var(--t3);margin-top:2px">${n.body}</div></div>
-              <div class="ntime">${n.time}</div>
-            </div>
-            ${n.read ? '' : `<button class="bs1" style="padding:3px 9px;font-size:11px" data-mr="${n.id}">Mark read</button>`}
-          </div>`;
-        })
-        .join('')}
+// ── Phase 6F — Executive Analytics & Reporting ───────────────────────────────
+
+function _svgLine(rows, key, { h = 80, color = '#2E8B57', fill = true } = {}) {
+  const vals = rows.map(r => Number(r[key]) || 0);
+  if (!vals.length || Math.max(...vals) === 0)
+    return `<div style="height:${h}px;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:11px">No data</div>`;
+  const W = 300, pd = 6, max = Math.max(...vals);
+  const pts = vals.map((v, i) => {
+    const x = pd + (i / Math.max(vals.length - 1, 1)) * (W - pd * 2);
+    const y = h - pd - (v / max) * (h - pd * 2);
+    return [x.toFixed(1), y.toFixed(1)];
+  });
+  const line = 'M' + pts.map(p => p.join(',')).join(' L');
+  const area = `${line} L${pts.at(-1)[0]},${h - pd} L${pts[0][0]},${h - pd} Z`;
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block">
+    ${fill ? `<path d="${area}" fill="${color}" opacity=".1"/>` : ''}
+    <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+function _svgBar(rows, key, { h = 80, color = '#2E8B57' } = {}) {
+  const vals = rows.map(r => Number(r[key]) || 0);
+  if (!vals.length || Math.max(...vals) === 0)
+    return `<div style="height:${h}px;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:11px">No data</div>`;
+  const W = 300, pd = 4, gap = 3, max = Math.max(...vals);
+  const bw = Math.max(2, (W - pd * 2 - gap * (vals.length - 1)) / vals.length);
+  const bars = vals.map((v, i) => {
+    const x = pd + i * (bw + gap);
+    const bh = (v / max) * (h - pd * 2);
+    return `<rect x="${x.toFixed(1)}" y="${(h - pd - bh).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="${color}" rx="2"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block">${bars}</svg>`;
+}
+
+function _svgDualBar(rows, k1, k2, { h = 80, c1 = '#2E8B57', c2 = '#1D4ED8' } = {}) {
+  const v1 = rows.map(r => Number(r[k1]) || 0);
+  const v2 = rows.map(r => Number(r[k2]) || 0);
+  if (!v1.length || (Math.max(...v1) === 0 && Math.max(...v2) === 0))
+    return `<div style="height:${h}px;display:flex;align-items:center;justify-content:center;color:var(--t4);font-size:11px">No data</div>`;
+  const W = 300, pd = 4, gap = 4, max = Math.max(...v1, ...v2, 1);
+  const pair = (W - pd * 2 - gap * (v1.length - 1)) / v1.length;
+  const bw = Math.max(2, pair / 2 - 1);
+  const bars = v1.map((_, i) => {
+    const x1 = pd + i * (pair + gap);
+    const x2 = x1 + bw + 1;
+    const bh1 = (v1[i] / max) * (h - pd * 2);
+    const bh2 = (v2[i] / max) * (h - pd * 2);
+    return `<rect x="${x1.toFixed(1)}" y="${(h-pd-bh1).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh1.toFixed(1)}" fill="${c1}" rx="1.5"/>
+            <rect x="${x2.toFixed(1)}" y="${(h-pd-bh2).toFixed(1)}" width="${bw.toFixed(1)}" height="${bh2.toFixed(1)}" fill="${c2}" rx="1.5"/>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none" style="width:100%;height:${h}px;display:block">${bars}</svg>`;
+}
+
+function _fmtCur(n) {
+  n = Number(n) || 0;
+  if (n >= 1_000_000) return 'RWF ' + (n / 1_000_000).toFixed(1) + 'M';
+  if (n >= 1_000)     return 'RWF ' + (n / 1_000).toFixed(1) + 'K';
+  return 'RWF ' + Math.round(n).toLocaleString();
+}
+function _fmtN(n)   { return (Number(n) || 0).toLocaleString(); }
+function _pbar(pct, cls = '') {
+  return `<div class="ex-pbar-wrap"><div class="ex-pbar ${cls}" style="width:${Math.min(100, pct || 0)}%"></div></div>`;
+}
+function _clabels(rows, key, take = 5) {
+  const step = Math.max(1, Math.floor(rows.length / take));
+  return rows.filter((_, i) => i % step === 0 || i === rows.length - 1)
+    .map(r => `<span>${String(r[key]).slice(5)}</span>`).join('');
+}
+function _rankCls(i) {
+  return i === 0 ? 'ex-rank-1' : i === 1 ? 'ex-rank-2' : i === 2 ? 'ex-rank-3' : '';
+}
+
+async function exportExecCSV() {
+  if (!_execData) return;
+  const d = _execData;
+  const lines = [
+    ['UFCL Executive Analytics Report', new Date().toISOString()],
+    [],
+    ['KPI SUMMARY'],
+    ['Metric', 'Value'],
+    ['Revenue Today (RWF)',   d.kpi.revenueToday],
+    ['Revenue This Month (RWF)', d.kpi.revenueMonth],
+    ['Revenue This Year (RWF)',  d.kpi.revenueYear],
+    ['Pending Approvals',    d.kpi.pendingApprovals],
+    ['Failed Workflow Jobs', d.kpi.failedJobs],
+    ['Active Users (24h)',   d.kpi.activeUsersToday],
+    ['Deliveries Pending',   d.kpi.deliveriesPending],
+    ['Dispatch Pending',     d.kpi.dispatchPending],
+    [],
+    ['GOVERNANCE METRICS'],
+    ['Metric', 'Value'],
+    ['SLA Compliance (%)',       d.governance.slaCompliancePct],
+    ['Total Resolved (30d)',     d.governance.totalResolved30d],
+    ['Escalated Requests',       d.governance.escalatedCount],
+    ['Escalation Rate (%)',      d.governance.escalationRatePct],
+    ['Privileged Overrides (24h)', d.governance.privOverrides24h],
+    ['Failed Logins (24h)',      d.governance.failedLogins24h],
+    ['Audit Events (24h)',       d.governance.auditVolume24h],
+    [],
+    ['STOCK SUMMARY'],
+    ['Stock Movements (30d)', d.stock.movements30d],
+    ['Low Stock Items',       d.stock.lowStockItems],
+    ['Pending Transfers',     d.stock.pendingTransfers],
+    ['Pending Material Req.', d.stock.pendingMaterialReq],
+    [],
+    ['TOP MACHINES (30 days)'],
+    ['Code', 'Name', 'Hours Worked', 'Production', 'Fuel (L)', 'Efficiency %'],
+    ...(d.topMachines || []).map(m => [m.machine_code, m.name, m.hours_worked, m.production, m.fuel, m.efficiency_pct]),
+    [],
+    ['TOP DRIVERS (30 days)'],
+    ['Driver', 'Deliveries', 'Qty Accepted', 'Qty Rejected'],
+    ...(d.topDrivers || []).map(r => [r.driver_name, r.deliveries, r.qty_accepted, r.qty_rejected]),
+    [],
+    ['TOP COMPARTMENTS'],
+    ['Compartment', 'Species', 'Area (ha)', 'Trees Felled', 'Logs Produced'],
+    ...(d.topCompartments || []).map(r => [r.compt_name, r.species, r.area_ha, r.trees_felled, r.logs_produced]),
+    [],
+    ['MOST ACTIVE USERS (7 days)'],
+    ['Username', 'Full Name', 'Role', 'Actions', 'Last Active'],
+    ...(d.activeUsers || []).map(r => [r.username, r.full_name, r.role, r.actions, r.last_active]),
+    [],
+    ['SALES TREND (30 days)'],
+    ['Date', 'Amount (RWF)', 'Orders'],
+    ...(d.salesTrend || []).map(r => [r.day, r.amount, r.orders]),
+    [],
+    ['FUEL TREND (30 days)'],
+    ['Date', 'Liters'],
+    ...(d.fuelTrend || []).map(r => [r.day, r.liters]),
+    [],
+    ['HARVEST TREND (12 weeks)'],
+    ['Week', 'Trees', 'Logs'],
+    ...(d.harvestTrend || []).map(r => [r.week, r.trees, r.logs]),
+    [],
+    ['WORKSHOP PRODUCTION TREND (12 weeks)'],
+    ['Week', 'Timber', 'Poles'],
+    ...(d.workshopTrend || []).map(r => [r.week, r.timber, r.poles]),
+  ];
+  const csv = lines.map(row => row.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  const filename = `ufcl_executive_${new Date().toISOString().slice(0, 10)}.csv`;
+  const r = await UFCL.execExport(STORAGE.user.id, { csv, filename });
+  if (!r?.ok) console.warn('CSV export cancelled or failed');
+}
+
+async function renderExecutiveDashboard() {
+  _execLastLoad = Date.now();
+  const container = $('page-executive');
+  container.innerHTML = `<div class="ptitle">Executive Analytics</div><div class="psub">Loading…</div>`;
+
+  const res = await UFCL.execDashboard(STORAGE.user.id);
+  if (!res.ok) return renderDenied('executive', res.error);
+  _execData = res;
+
+  const { kpi, salesTrend, fuelTrend, harvestTrend, workshopTrend, approvalTrend,
+          topMachines, topDrivers, topCompartments, activeUsers,
+          stock, governance, notifications } = res;
+
+  const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  // ── KPI Cards ─────────────────────────────────────────────────────────────
+  const kpiCards = [
+    { val: _fmtCur(kpi.revenueToday),    lbl: 'Revenue Today',       sub: 'Sales orders created today',    cls: 'ex-kpi-green'  },
+    { val: _fmtCur(kpi.revenueMonth),    lbl: 'Revenue This Month',  sub: new Date().toLocaleString('default',{month:'long',year:'numeric'}), cls: '' },
+    { val: _fmtCur(kpi.revenueYear),     lbl: 'Revenue This Year',   sub: new Date().getFullYear(),         cls: '' },
+    { val: _fmtN(kpi.pendingApprovals),  lbl: 'Pending Approvals',   sub: 'Edits + deletions',             cls: kpi.pendingApprovals > 0 ? 'ex-kpi-amber' : '' },
+    { val: _fmtN(kpi.failedJobs),        lbl: 'Failed Jobs',         sub: 'Workflow engine failures',      cls: kpi.failedJobs > 0 ? 'ex-kpi-red' : '' },
+    { val: _fmtN(kpi.activeUsersToday),  lbl: 'Active Users',        sub: 'Unique users last 24h',         cls: 'ex-kpi-blue'   },
+    { val: _fmtN(kpi.deliveriesPending), lbl: 'Deliveries Pending',  sub: 'Awaiting dispatch / delivery',  cls: kpi.deliveriesPending > 0 ? 'ex-kpi-amber' : '' },
+    { val: _fmtN(kpi.dispatchPending),   lbl: 'Dispatch Pending',    sub: 'Dispatch requests awaiting',    cls: '' },
+  ].map(c => `
+    <div class="ex-kpi ${c.cls}">
+      <div class="ex-kpi-val">${c.val}</div>
+      <div class="ex-kpi-lbl">${c.lbl}</div>
+      <div class="ex-kpi-sub">${c.sub}</div>
+    </div>`).join('');
+
+  // ── Chart helpers: date label from first/last ──────────────────────────────
+  const slabels = salesTrend.length
+    ? `<span>${salesTrend[0]?.day?.slice(5) || ''}</span><span>${salesTrend.at(-1)?.day?.slice(5) || ''}</span>` : '';
+  const flabels = fuelTrend.length
+    ? `<span>${fuelTrend[0]?.day?.slice(5) || ''}</span><span>${fuelTrend.at(-1)?.day?.slice(5) || ''}</span>` : '';
+  const hlabels = harvestTrend.length
+    ? `<span>${harvestTrend[0]?.week?.slice(5) || ''}</span><span>${harvestTrend.at(-1)?.week?.slice(5) || ''}</span>` : '';
+  const wlabels = workshopTrend.length
+    ? `<span>${workshopTrend[0]?.week?.slice(5) || ''}</span><span>${workshopTrend.at(-1)?.week?.slice(5) || ''}</span>` : '';
+  const alabels = approvalTrend.length
+    ? `<span>${approvalTrend[0]?.week?.slice(5) || ''}</span><span>${approvalTrend.at(-1)?.week?.slice(5) || ''}</span>` : '';
+
+  // ── Machines table ─────────────────────────────────────────────────────────
+  const maxEff = Math.max(...(topMachines.map(m => Number(m.efficiency_pct) || 0)), 1);
+  const machineRows = topMachines.length ? topMachines.map((m, i) => `
+    <tr>
+      <td><span class="ex-rank ${_rankCls(i)}">${i + 1}</span></td>
+      <td><strong>${m.machine_code}</strong><br><span style="font-size:11px;color:var(--t3)">${m.name}</span></td>
+      <td>${Number(m.hours_worked).toFixed(1)}h</td>
+      <td>${Number(m.production).toFixed(1)} m³</td>
+      <td>${Number(m.fuel).toFixed(1)} L</td>
+      <td>
+        <span style="font-weight:700;color:var(--g-soft)">${Number(m.efficiency_pct).toFixed(1)}%</span>
+        ${_pbar(Number(m.efficiency_pct) / maxEff * 100)}
+      </td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:1rem">No machine data in last 30 days</td></tr>`;
+
+  // ── Drivers table ──────────────────────────────────────────────────────────
+  const maxDel = Math.max(...(topDrivers.map(d => Number(d.deliveries) || 0)), 1);
+  const driverRows = topDrivers.length ? topDrivers.map((d, i) => `
+    <tr>
+      <td><span class="ex-rank ${_rankCls(i)}">${i + 1}</span></td>
+      <td>${d.driver_name}</td>
+      <td>${d.deliveries}</td>
+      <td style="color:var(--g-soft);font-weight:600">${_fmtN(d.qty_accepted)}</td>
+      <td style="color:${d.qty_rejected > 0 ? 'var(--red)' : 'var(--t4)'}">${_fmtN(d.qty_rejected)}</td>
+      <td>${_pbar(Number(d.deliveries) / maxDel * 100)}</td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:1rem">No delivery data in last 30 days</td></tr>`;
+
+  // ── Compartments table ─────────────────────────────────────────────────────
+  const maxTrees = Math.max(...(topCompartments.map(c => Number(c.trees_felled) || 0)), 1);
+  const comptRows = topCompartments.length ? topCompartments.map((c, i) => `
+    <tr>
+      <td><span class="ex-rank ${_rankCls(i)}">${i + 1}</span></td>
+      <td><strong>${c.compt_name}</strong></td>
+      <td>${c.species}</td>
+      <td>${Number(c.area_ha).toFixed(1)} ha</td>
+      <td style="font-weight:600">${_fmtN(c.trees_felled)}</td>
+      <td>${_pbar(Number(c.trees_felled) / maxTrees * 100)}</td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:1rem">No harvest data</td></tr>`;
+
+  // ── Active users table ─────────────────────────────────────────────────────
+  const maxAct = Math.max(...(activeUsers.map(u => Number(u.actions) || 0)), 1);
+  const userRows = activeUsers.length ? activeUsers.map((u, i) => `
+    <tr>
+      <td><span class="ex-rank ${_rankCls(i)}">${i + 1}</span></td>
+      <td><strong>${u.full_name}</strong><br><span style="font-size:11px;color:var(--t4)">${u.username}</span></td>
+      <td><span class="ex-badge ex-badge-gray">${u.role}</span></td>
+      <td style="font-weight:700">${u.actions}</td>
+      <td style="font-size:11px;color:var(--t4);font-family:var(--fm)">${u.last_active || '—'}</td>
+      <td>${_pbar(Number(u.actions) / maxAct * 100)}</td>
+    </tr>`).join('') : `<tr><td colspan="6" style="text-align:center;color:var(--t4);padding:1rem">No activity in last 7 days</td></tr>`;
+
+  // ── Governance ─────────────────────────────────────────────────────────────
+  const slaCls  = governance.slaCompliancePct >= 90 ? 'ex-stat-v-green' : governance.slaCompliancePct >= 70 ? 'ex-stat-v-amber' : 'ex-stat-v-red';
+  const escCls  = governance.escalationRatePct > 20 ? 'ex-stat-v-red' : governance.escalationRatePct > 10 ? 'ex-stat-v-amber' : 'ex-stat-v-green';
+  const ovrdCls = governance.privOverrides24h > 0  ? 'ex-stat-v-red'   : 'ex-stat-v-green';
+  const failCls = governance.failedLogins24h  > 5  ? 'ex-stat-v-red'   : governance.failedLogins24h > 0 ? 'ex-stat-v-amber' : 'ex-stat-v-green';
+
+  container.innerHTML = `
+  <div class="ex-header">
+    <div>
+      <div class="ptitle" style="margin-bottom:2px">Executive Analytics</div>
+      <div class="ex-ts">Updated ${now} &nbsp;·&nbsp; Auto-refreshes every 5 minutes</div>
     </div>
-  `;
-  $('markAll').onclick = async () => {
+    <div class="ex-actions">
+      <button class="sbtn" id="exec-export-csv" title="Export to CSV"><i class="ti ti-table-export"></i> Export CSV</button>
+      <button class="sbtn" id="exec-export-pdf" title="Print / Save PDF"><i class="ti ti-printer"></i> Print PDF</button>
+      <button class="sbtn sbtn-primary" id="exec-refresh"><i class="ti ti-refresh"></i> Refresh</button>
+    </div>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="ex-grid8">${kpiCards}</div>
+
+  <!-- Charts Row 1: Sales + Fuel + Approval Time -->
+  <div class="ex-row3">
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-trending-up" style="color:var(--g-soft)"></i> Sales Trend</span>
+        <span class="ex-ph-s">Last 30 days</span>
+      </div>
+      <div class="ex-chart">${_svgLine(salesTrend, 'amount', { h: 80, color: '#2E8B57' })}</div>
+      <div class="ex-clabels" style="justify-content:space-between">${slabels}</div>
+    </div>
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-droplet" style="color:var(--amber)"></i> Fuel Consumption</span>
+        <span class="ex-ph-s">Last 30 days (litres)</span>
+      </div>
+      <div class="ex-chart">${_svgLine(fuelTrend, 'liters', { h: 80, color: '#D97706' })}</div>
+      <div class="ex-clabels" style="justify-content:space-between">${flabels}</div>
+    </div>
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-clock-check" style="color:var(--blue)"></i> Approval Processing Time</span>
+        <span class="ex-ph-s">Avg hours per week</span>
+      </div>
+      <div class="ex-chart">${_svgBar(approvalTrend, 'avg_hours', { h: 80, color: '#1D4ED8' })}</div>
+      <div class="ex-clabels" style="justify-content:space-between">${alabels}</div>
+    </div>
+  </div>
+
+  <!-- Charts Row 2: Harvest + Workshop Production -->
+  <div class="ex-row2">
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-trees" style="color:var(--g-soft)"></i> Harvest Production</span>
+        <span class="ex-ph-s">Trees felled per week — 12 weeks</span>
+      </div>
+      <div class="ex-chart">${_svgBar(harvestTrend, 'trees', { h: 80, color: '#2E8B57' })}</div>
+      <div class="ex-clabels" style="justify-content:space-between">${hlabels}</div>
+    </div>
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-building-factory" style="color:var(--blue)"></i> Workshop Production</span>
+        <span class="ex-ph-s">Timber &amp; Poles per week — 12 weeks</span>
+        <span class="ex-legend">
+          <span><span class="ex-legend-dot" style="background:#2E8B57"></span>Timber</span>
+          <span><span class="ex-legend-dot" style="background:#1D4ED8"></span>Poles</span>
+        </span>
+      </div>
+      <div class="ex-chart">${_svgDualBar(workshopTrend, 'timber', 'poles', { h: 80, c1: '#2E8B57', c2: '#1D4ED8' })}</div>
+      <div class="ex-clabels" style="justify-content:space-between">${wlabels}</div>
+    </div>
+  </div>
+
+  <!-- Tables Row 1: Top Machines + Top Drivers -->
+  <div class="ex-row2">
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-settings-2" style="color:var(--g-soft)"></i> Top Performing Machines</span>
+        <span class="ex-ph-s">Last 30 days by efficiency</span>
+      </div>
+      <table class="ex-tbl">
+        <thead><tr>
+          <th>#</th><th>Machine</th><th>Hours</th><th>Output</th><th>Fuel</th><th>Efficiency</th>
+        </tr></thead>
+        <tbody>${machineRows}</tbody>
+      </table>
+    </div>
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-truck-delivery" style="color:var(--blue)"></i> Top Performing Drivers</span>
+        <span class="ex-ph-s">Last 30 days by deliveries</span>
+      </div>
+      <table class="ex-tbl">
+        <thead><tr>
+          <th>#</th><th>Driver</th><th>Deliveries</th><th>Accepted</th><th>Rejected</th><th>Share</th>
+        </tr></thead>
+        <tbody>${driverRows}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tables Row 2: Top Compartments + Most Active Users -->
+  <div class="ex-row2">
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-map-pin" style="color:var(--amber)"></i> Top Compartments</span>
+        <span class="ex-ph-s">All-time harvest volume</span>
+      </div>
+      <table class="ex-tbl">
+        <thead><tr>
+          <th>#</th><th>Compartment</th><th>Species</th><th>Area</th><th>Trees</th><th>Share</th>
+        </tr></thead>
+        <tbody>${comptRows}</tbody>
+      </table>
+    </div>
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-users" style="color:var(--purple)"></i> Most Active Users</span>
+        <span class="ex-ph-s">Last 7 days by audit events</span>
+      </div>
+      <table class="ex-tbl">
+        <thead><tr>
+          <th>#</th><th>User</th><th>Role</th><th>Actions</th><th>Last Active</th><th>Share</th>
+        </tr></thead>
+        <tbody>${userRows}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Bottom Row: Stock Summary + Governance + Notifications -->
+  <div class="ex-row3">
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-package" style="color:var(--teal)"></i> Stock Movement Summary</span>
+        <span class="ex-ph-s">Last 30 days</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Movements (30d)</span>
+        <span class="ex-stat-v">${_fmtN(stock.movements30d)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Low Stock Items</span>
+        <span class="ex-stat-v ${stock.lowStockItems > 0 ? 'ex-stat-v-red' : 'ex-stat-v-green'}">${_fmtN(stock.lowStockItems)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Pending Transfers</span>
+        <span class="ex-stat-v ${stock.pendingTransfers > 0 ? 'ex-stat-v-amber' : ''}">${_fmtN(stock.pendingTransfers)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Pending Material Requests</span>
+        <span class="ex-stat-v ${stock.pendingMaterialReq > 0 ? 'ex-stat-v-amber' : ''}">${_fmtN(stock.pendingMaterialReq)}</span>
+      </div>
+    </div>
+
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-shield-check" style="color:var(--g-soft)"></i> Governance Metrics</span>
+        <span class="ex-ph-s">Last 30 days / 24h</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">SLA Compliance</span>
+        <span class="ex-stat-v ${slaCls}">${governance.slaCompliancePct ?? 0}%
+          ${_pbar(governance.slaCompliancePct, governance.slaCompliancePct < 70 ? 'ex-pbar-red' : governance.slaCompliancePct < 90 ? 'ex-pbar-amber' : '')}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Resolved (30d)</span>
+        <span class="ex-stat-v">${_fmtN(governance.totalResolved30d)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Escalation Rate</span>
+        <span class="ex-stat-v ${escCls}">${governance.escalationRatePct ?? 0}% <small style="font-weight:400;font-size:11px">(${_fmtN(governance.escalatedCount)} escalated)</small></span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Privileged Overrides (24h)</span>
+        <span class="ex-stat-v ${ovrdCls}">${_fmtN(governance.privOverrides24h)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Failed Logins (24h)</span>
+        <span class="ex-stat-v ${failCls}">${_fmtN(governance.failedLogins24h)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Audit Events (24h)</span>
+        <span class="ex-stat-v">${_fmtN(governance.auditVolume24h)}</span>
+      </div>
+    </div>
+
+    <div class="ex-panel">
+      <div class="ex-ph">
+        <span class="ex-ph-t"><i class="ti ti-bell" style="color:var(--amber)"></i> Notification Summary</span>
+        <span class="ex-ph-s">Your unread alerts</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l">Total Unread</span>
+        <span class="ex-stat-v ${notifications.totalUnread > 0 ? 'ex-stat-v-amber' : 'ex-stat-v-green'}">${_fmtN(notifications.totalUnread)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l"><span class="ex-badge ex-badge-red">Security</span></span>
+        <span class="ex-stat-v ${notifications.security > 0 ? 'ex-stat-v-red' : ''}">${_fmtN(notifications.security)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l"><span class="ex-badge ex-badge-amber">Approval</span></span>
+        <span class="ex-stat-v ${notifications.approval > 0 ? 'ex-stat-v-amber' : ''}">${_fmtN(notifications.approval)}</span>
+      </div>
+      <div class="ex-stat">
+        <span class="ex-stat-l"><span class="ex-badge ex-badge-blue">System</span></span>
+        <span class="ex-stat-v">${_fmtN(notifications.system)}</span>
+      </div>
+      <div style="padding:.75rem .875rem">
+        <button class="sbtn sbtn-primary" style="width:100%" onclick="showPage('notifications')">
+          <i class="ti ti-bell"></i> Open Notification Center
+        </button>
+      </div>
+    </div>
+  </div>`;
+
+  $('exec-refresh').onclick     = () => renderExecutiveDashboard();
+  $('exec-export-csv').onclick  = () => exportExecCSV();
+  $('exec-export-pdf').onclick  = () => window.print();
+}
+
+// ── Phase 7 — Business Intelligence helpers ────────────────────────────────────
+function _svgSparkline(vals, { w = 80, h = 26, color = '#2E8B57' } = {}) {
+  if (!vals || vals.length < 2) return '';
+  const max   = Math.max(...vals, 1);
+  const min   = Math.min(...vals, 0);
+  const range = max - min || 1;
+  const pts   = vals.map((v, i) => {
+    const x = (i / (vals.length - 1)) * w;
+    const y = h - 2 - ((v - min) / range) * (h - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:${w}px;height:${h}px;display:block;overflow:visible">
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"
+      stroke-linejoin="round" stroke-linecap="round" opacity=".8"/>
+  </svg>`;
+}
+
+function _svgGauge(score) {
+  const R  = 72, cx = 90, cy = 90;
+  const arc = Math.PI * R;
+  const dash = (score / 100) * arc;
+  const col  = score >= 90 ? '#2E8B57' : score >= 75 ? '#1D4ED8' : score >= 60 ? '#D97706' : '#DC2626';
+  const lbl  = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 60 ? 'Warning' : 'Critical';
+  return `<svg viewBox="0 0 180 110" style="width:100%;max-width:240px;display:block;margin:0 auto">
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+          fill="none" stroke="#E5E7EB" stroke-width="14" stroke-linecap="round"/>
+    <path d="M${cx-R},${cy} A${R},${R} 0 0,1 ${cx+R},${cy}"
+          fill="none" stroke="${col}" stroke-width="14" stroke-linecap="round"
+          stroke-dasharray="${dash.toFixed(1)},${arc.toFixed(1)}"/>
+    <text x="${cx}" y="${cy - 6}" text-anchor="middle"
+          font-family="DM Sans,sans-serif" font-size="30" font-weight="700" fill="${col}">${score}</text>
+    <text x="${cx}" y="${cy + 13}" text-anchor="middle"
+          font-family="DM Sans,sans-serif" font-size="11" font-weight="600" fill="#6B7280">${lbl}</text>
+  </svg>`;
+}
+
+function _svgForecast(hist, fcst, { h = 90, ch = '#2E8B57', cf = '#94A3B8' } = {}) {
+  const all = [...hist, ...fcst];
+  if (!all.length) return `<div class="bi-nod"><i class="ti ti-info-circle"></i> No data available</div>`;
+  const max = Math.max(...all, 1);
+  const W = 280, pd = 8, total = all.length;
+  const ptX = (i) => pd + (i / (total - 1 || 1)) * (W - pd * 2);
+  const ptY = (v) => h - pd - (v / max) * (h - pd * 2);
+  const hp  = hist.map((v, i) => `${ptX(i).toFixed(1)},${ptY(v).toFixed(1)}`).join(' ');
+  const fb  = hist.length - 1;
+  const fp  = [hist.at(-1) ?? fcst[0], ...fcst].map((v, i) =>
+    `${ptX(fb + i).toFixed(1)},${ptY(v).toFixed(1)}`).join(' ');
+  const dvX = hist.length > 0 ? ptX(hist.length - 1).toFixed(1) : (W / 2).toFixed(1);
+  return `<svg viewBox="0 0 ${W} ${h}" preserveAspectRatio="none"
+      style="width:100%;height:${h}px;display:block;overflow:visible">
+    ${hist.length > 1 ? `<polyline points="${hp}" fill="none" stroke="${ch}" stroke-width="2"
+        stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+    ${fcst.length ? `
+    <line x1="${dvX}" y1="${pd}" x2="${dvX}" y2="${h - pd}"
+          stroke="#CBD5E1" stroke-width="1" stroke-dasharray="3,2"/>
+    <polyline points="${fp}" fill="none" stroke="${cf}" stroke-width="2"
+        stroke-dasharray="5,3" stroke-linejoin="round" stroke-linecap="round"/>` : ''}
+  </svg>`;
+}
+
+function _biSevCls(sev) {
+  return { critical: 'bi-crit', high: 'bi-high', medium: 'bi-med', low: 'bi-low' }[sev] || 'bi-low';
+}
+
+function exportBiCSV() {
+  if (!_biData) return;
+  const d   = _biData;
+  const q   = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const row = (...cols) => cols.map(q).join(',');
+  const lines = [
+    row('UFCL Business Intelligence Report', new Date().toLocaleString()),
+    '',
+    row('COMPANY HEALTH SCORE', d.health.score, d.health.grade),
+    '',
+    row('HEALTH DEDUCTIONS'),
+    row('Category', 'Points Deducted'),
+    ...d.health.breakdown.map(b => row(b.label, b.pts)),
+    '',
+    row('RISKS'),
+    row('Severity', 'Module', 'Title', 'Detail'),
+    ...d.risks.map(r => row(r.severity, r.module, r.title, r.detail)),
+    '',
+    row('RECOMMENDATIONS'),
+    row('Priority', 'Module', 'Title', 'Description', 'Suggested Action'),
+    ...d.recommendations.map(r => row(r.priority, r.module, r.title, r.description, r.action)),
+    '',
+    row('STOCK DEPLETION FORECAST'),
+    row('Item', 'Category', 'Current Stock', 'UOM', 'Avg Daily', 'Days Until Depletion'),
+    ...(d.predictions.stockShortages || []).map(s =>
+      row(s.name, s.category, s.current_stock, s.uom, s.avg_daily_consumption, s.days_until_depletion ?? 'Below Min')),
+    '',
+    row('HARVEST COMPLETION FORECAST'),
+    row('Compartment', 'Sub', 'Species', 'Volume m3', 'Harvested', 'Remaining', 'Rate/Day', 'Est Days', '% Complete'),
+    ...(d.predictions.harvestForecast || []).map(h =>
+      row(h.compt_name, h.sub_name || '', h.species || '', h.volume_m3, h.total_harvested,
+          h.est_remaining, h.rate_per_day, h.days_to_complete ?? 'N/A', (h.pct_complete || 0) + '%')),
+    '',
+    row('GOVERNANCE SNAPSHOT'),
+    row('Metric', 'Value'),
+    row('Failed Logins (24h)',       d.govRisk.failed_logins_24h  ?? 0),
+    row('Governance Overrides (24h)', d.govRisk.priv_overrides_24h ?? 0),
+    row('Failed Workflow Jobs',      d.govRisk.failed_jobs        ?? 0),
+    row('Total Pending Approvals',   d.govRisk.total_pending      ?? 0),
+    row('Stalled >48h',              d.govRisk.stalled_48h        ?? 0),
+    row('Delayed Deliveries',        d.govRisk.delayed_deliveries ?? 0),
+  ];
+  UFCL.biExport(STORAGE.user.id, {
+    csv:      lines.join('\r\n'),
+    filename: `ufcl_bi_report_${new Date().toISOString().slice(0, 10)}.csv`,
+  }).then(r => { if (r?.ok) alert(`Saved: ${r.filePath}`); });
+}
+
+async function renderBI() {
+  _biLastLoad = Date.now();
+  const el = $('page-bi');
+  el.innerHTML = `<div class="ptitle"><i class="ti ti-chart-line"></i> Business Intelligence</div>
+    <div class="card" style="padding:32px;text-align:center">
+      <i class="ti ti-loader-2 spin"></i> Running predictive analytics…</div>`;
+
+  const res = await UFCL.biDashboard(STORAGE.user.id);
+  if (!res?.ok) {
+    el.innerHTML = `<div class="ptitle"><i class="ti ti-chart-line"></i> Business Intelligence</div>
+      <div class="card" style="padding:24px;color:var(--red)">
+        <i class="ti ti-alert-circle"></i> ${res?.error || 'Load failed'}</div>`;
+    return;
+  }
+  _biData = res;
+  const { health, predictions, forecasts, risks, recommendations, govRisk, stockAnomalies } = res;
+  const sec = new Set(res.sections || ['health','stock','fuel','machines','workshop','harvest','sales','governance','recommendations','charts']);
+  const ts = new Date().toLocaleString();
+
+  // ── Section 1: Health Score ───────────────────────────────────────────────
+  const gauge   = _svgGauge(health.score);
+  const bkdHtml = health.breakdown.length
+    ? health.breakdown.map(b =>
+        `<div class="bi-bkd-row"><i class="ti ${b.icon}"></i><span>${b.label}</span><b>−${b.pts}</b></div>`
+      ).join('')
+    : `<div class="bi-bkd-row" style="color:var(--t3)">
+         <i class="ti ti-circle-check"></i><span>No deductions — all systems healthy</span><b>0</b></div>`;
+
+  // ── Section 2: Prediction Cards with sparklines ───────────────────────────
+  const fuelZ   = Number(predictions.fuelAnomaly?.z_score)    || 0;
+  const fuelPct = Number(predictions.fuelAnomaly?.pct_change) || 0;
+  const fuelSev = fuelZ > 2 ? 'critical' : fuelZ > 1.5 ? 'high' : fuelZ > 0.8 ? 'medium' : 'low';
+  const fuelTxt = fuelZ > 1.5
+    ? `${Math.abs(fuelPct).toFixed(1)}% ${fuelPct > 0 ? 'above' : 'below'} baseline`
+    : `Z-score ${fuelZ.toFixed(2)} — normal range`;
+
+  const critSt = (predictions.stockShortages || []).filter(s => s.days_until_depletion != null && s.days_until_depletion <= 7);
+  const stSev  = critSt.length > 0 ? 'critical'
+    : (predictions.stockShortages || []).filter(s => s.days_until_depletion != null && s.days_until_depletion <= 14).length ? 'high'
+    : (predictions.stockShortages || []).length ? 'medium' : 'low';
+  const stTxt  = (predictions.stockShortages || []).length
+    ? `${predictions.stockShortages.length} item(s) at risk — ${critSt.length} critical`
+    : 'All items adequately stocked';
+  const stSpk  = _svgSparkline(
+    (predictions.stockShortages || []).slice(0, 10).map(s => s.days_until_depletion ?? 30).reverse(),
+    { color: critSt.length ? '#DC2626' : '#D97706' }
+  );
+
+  const overdueM = (predictions.machineAlerts || []).filter(m => Number(m.days_overdue) > 0);
+  const macSev   = overdueM.some(m => Number(m.days_overdue) > 14) ? 'critical'
+    : overdueM.length ? 'high'
+    : (predictions.machineAlerts || []).length ? 'medium' : 'low';
+  const macTxt   = overdueM.length
+    ? `${overdueM.length} overdue · ${(predictions.efficiencyDecline || []).length} declining`
+    : (predictions.machineAlerts || []).length
+    ? `${predictions.machineAlerts.length} due within 14 days`
+    : 'All machines on schedule';
+  const macSpk = _svgSparkline(
+    (predictions.efficiencyDecline || []).map(m => Number(m.avg_eff) || 0),
+    { color: '#EA580C' }
+  );
+
+  const sReg   = predictions.salesRegression || {};
+  const sAvg   = Number(sReg.avg_daily) || 0;
+  const sR2    = Number(sReg.r2) || 0;
+  const sTrend = sAvg > 0 ? (Number(sReg.slope) / sAvg) * 100 : 0;
+  const sSev   = sTrend < -10 ? 'high' : sTrend < -5 ? 'medium' : 'low';
+  const sTxt   = sR2 > 0.05
+    ? `${sTrend >= 0 ? '+' : ''}${sTrend.toFixed(1)}%/day · R²=${sR2.toFixed(2)}`
+    : 'Insufficient regression data';
+  const sSpk   = _svgSparkline(
+    (forecasts.sales30d || []).slice(-14).map(r => Number(r.revenue)),
+    { color: sTrend >= 0 ? '#2E8B57' : '#DC2626' }
+  );
+  const sTIcon = sTrend > 2 ? 'ti-trending-up bi-trend-up'
+    : sTrend < -2 ? 'ti-trending-down bi-trend-down' : 'ti-minus bi-trend-flat';
+
+  const wReg   = predictions.workshopRegression || {};
+  const wAvg   = Number(wReg.total_avg) || 0;
+  const wTrend = wAvg > 0 ? (Number(wReg.total_slope) / wAvg) * 100 : 0;
+  const wSev   = wTrend < -15 ? 'critical' : wTrend < -5 ? 'high' : 'low';
+  const wTxt   = wAvg > 0
+    ? `${wTrend >= 0 ? '+' : ''}${wTrend.toFixed(1)}%/wk · avg ${wAvg.toFixed(0)} u/wk`
+    : 'No production data';
+  const wSpk   = _svgSparkline(
+    (forecasts.wkTrend || []).map(r => Number(r.timber) + Number(r.poles)),
+    { color: wTrend >= 0 ? '#7C3AED' : '#EA580C' }
+  );
+  const wTIcon = wTrend > 2 ? 'ti-trending-up bi-trend-up'
+    : wTrend < -2 ? 'ti-trending-down bi-trend-down' : 'ti-minus bi-trend-flat';
+
+  const actH    = (predictions.harvestForecast || []).filter(h => Number(h.rate_per_day) > 0);
+  const behH    = actH.filter(h => h.days_to_complete !== null && h.days_to_complete > 90);
+  const hSev    = behH.length > 0 ? 'medium' : 'low';
+  const hTxt    = actH.length
+    ? `${actH.length} active · ${behH.length} behind schedule`
+    : 'No active harvest operations';
+  const hSpk    = _svgSparkline(
+    (predictions.harvestForecast || []).slice(0, 8).map(h => Number(h.pct_complete)),
+    { color: '#2E8B57' }
+  );
+  const hAvgPct = actH.length
+    ? Math.round(actH.reduce((s, h) => s + Number(h.pct_complete), 0) / actH.length) : 0;
+
+  const _conf = (n, max) => {
+    const level = n >= max ? 3 : n >= max / 2 ? 2 : n > 0 ? 1 : 0;
+    return Array.from({ length: 3 }, (_, i) =>
+      `<span class="bi-conf-dot${i < level ? ' on' : ''}"></span>`).join('');
+  };
+
+  const predCards = [
+    sec.has('stock')    && { icon: 'ti-package',          sev: stSev,  label: 'Stock Forecast',      val: stTxt,  spk: stSpk,
+      trend: '', trendTxt: `${(predictions.stockShortages||[]).length} items monitored`,
+      conf: _conf((predictions.stockShortages||[]).length, 10) },
+    sec.has('fuel')     && { icon: 'ti-droplet',          sev: fuelSev, label: 'Fuel Forecast',      val: fuelTxt, spk: '',
+      trend: fuelPct > 2 ? 'ti-trending-up bi-trend-down' : fuelPct < -2 ? 'ti-trending-down bi-trend-up' : 'ti-minus bi-trend-flat',
+      trendTxt: fuelPct !== 0 ? `${fuelPct > 0 ? '+' : ''}${fuelPct.toFixed(1)}% vs prior` : 'No change',
+      conf: _conf(Math.min(3, Math.round((predictions.fuelAnomaly?.data_points||0)/20)), 3) },
+    sec.has('machines') && { icon: 'ti-settings-2',       sev: macSev, label: 'Maintenance Forecast', val: macTxt, spk: macSpk,
+      trend: overdueM.length ? 'ti-alert-triangle bi-trend-down' : 'ti-circle-check bi-trend-up',
+      trendTxt: `${overdueM.length} overdue`,
+      conf: _conf((predictions.machineAlerts||[]).length, 5) },
+    sec.has('sales')    && { icon: 'ti-chart-line',       sev: sSev,   label: 'Sales Forecast',      val: sTxt,   spk: sSpk,
+      trend: sTIcon, trendTxt: sTrend !== 0 ? `${sTrend > 0 ? '+' : ''}${sTrend.toFixed(1)}%/day` : 'Stable',
+      conf: _conf(Math.round(sR2 * 10), 10) },
+    sec.has('workshop') && { icon: 'ti-building-factory', sev: wSev,   label: 'Workshop Forecast',   val: wTxt,   spk: wSpk,
+      trend: wTIcon, trendTxt: wTrend !== 0 ? `${wTrend > 0 ? '+' : ''}${wTrend.toFixed(1)}%/wk` : 'Stable',
+      conf: _conf(wReg.n || 0, 8) },
+    sec.has('harvest')  && { icon: 'ti-trees',            sev: hSev,   label: 'Harvest Forecast',    val: hTxt,   spk: hSpk,
+      trend: actH.length ? 'ti-plant bi-trend-up' : 'ti-minus bi-trend-flat',
+      trendTxt: actH.length ? `${hAvgPct}% avg done` : 'No data',
+      conf: _conf(actH.length, 5) },
+  ].filter(Boolean).map(c => `
+    <div class="bi-pcard bi-pcard--${c.sev}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="bi-pcard-icon"><i class="ti ${c.icon}"></i></div>
+        <span class="bi-badge ${_biSevCls(c.sev)}">${c.sev.toUpperCase()}</span>
+      </div>
+      <div class="bi-pcard-label" style="margin-top:6px">${c.label}</div>
+      <div class="bi-pcard-val" style="margin-top:3px">${c.val}</div>
+      ${c.spk ? `<div class="bi-sparkline-wrap">${c.spk}</div>` : ''}
+      ${c.trend ? `<div class="bi-trend-row"><i class="ti ${c.trend}" style="font-size:12px"></i><span>${c.trendTxt}</span></div>` : ''}
+      <div class="bi-conf" title="Data confidence">${c.conf}</div>
+    </div>`).join('');
+
+  // ── Section 3: Risk Cards ─────────────────────────────────────────────────
+  const gv  = govRisk;
+  const _riskCard = (mod, icon, sev, score, count, desc) => {
+    const scoreColor = sev === 'critical' ? '#DC2626' : sev === 'high' ? '#EA580C'
+      : sev === 'medium' ? '#D97706' : '#22C55E';
+    return `<div class="bi-risk-card bi-risk-card--${sev}">
+      <div class="bi-risk-card-hdr">
+        <div class="bi-risk-card-icon"><i class="ti ${icon}"></i></div>
+        <span class="bi-risk-card-mod">${mod}</span>
+        <span class="bi-badge ${_biSevCls(sev)}">${sev.toUpperCase()}</span>
+      </div>
+      <div class="bi-risk-score" style="color:${scoreColor}">${score}</div>
+      <div class="bi-risk-score-bar">
+        <div class="bi-risk-score-fill" style="width:${Math.min(100,score)}%;background:${scoreColor}"></div>
+      </div>
+      <div class="bi-risk-card-desc">${desc}</div>
+      ${count != null ? `<div class="bi-risk-card-count"><i class="ti ti-list-details"></i> ${count} record(s) affected</div>` : ''}
+    </div>`;
+  };
+
+  const fuelScore = Math.min(100, Math.round(Math.max(0, Math.abs(fuelZ) - 0.5) * 20));
+  const stScore   = Math.min(100, (predictions.stockShortages||[]).length * 8);
+  const stFuelSev = fuelZ > 2 ? 'critical' : fuelZ > 1.5 ? 'high' : fuelZ > 0.8 ? 'medium' : 'low';
+  const macScore  = Math.min(100, overdueM.length * 15 + (predictions.efficiencyDecline||[]).length * 10);
+  const macSevC   = overdueM.some(m => Number(m.days_overdue) > 14) ? 'critical'
+    : overdueM.length > 2 ? 'high' : overdueM.length > 0 ? 'medium' : 'low';
+  const delCount  = Number(gv.delayed_deliveries) || 0;
+  const delSev    = delCount > 5 ? 'critical' : delCount > 2 ? 'high' : delCount > 0 ? 'medium' : 'low';
+  const wfCount   = Number(gv.failed_jobs) || 0;
+  const wfSev     = wfCount > 10 ? 'critical' : wfCount > 5 ? 'high' : wfCount > 0 ? 'medium' : 'low';
+  const secCount  = Number(gv.failed_logins_24h) || 0;
+  const secSev    = secCount >= 20 ? 'critical' : secCount >= 10 ? 'high' : secCount >= 3 ? 'medium' : 'low';
+  const govCount  = Number(gv.priv_overrides_24h) || 0;
+  const govStall  = Number(gv.stalled_48h) || 0;
+  const govSev    = govCount > 3 ? 'critical' : govCount > 0 ? 'high' : govStall > 3 ? 'medium' : govStall > 0 ? 'medium' : 'low';
+  const govScore  = Math.min(100, govCount * 15 + govStall * 5);
+
+  const riskCardsHtml = [
+    sec.has('fuel') && _riskCard('Fuel', 'ti-droplet', stFuelSev,
+      fuelScore, null,
+      fuelZ > 1.5 ? `${Math.abs(fuelPct).toFixed(1)}% ${fuelPct > 0 ? 'above' : 'below'} baseline (Z=${fuelZ.toFixed(2)})` : `Z-score ${fuelZ.toFixed(2)} — normal range`),
+    sec.has('stock') && _riskCard('Stock', 'ti-package', stSev,
+      stScore, (predictions.stockShortages||[]).length, stTxt),
+    sec.has('machines') && _riskCard('Machines', 'ti-settings-2', macSevC,
+      macScore, overdueM.length + (predictions.efficiencyDecline||[]).length,
+      overdueM.length ? `${overdueM.length} overdue · ${(predictions.efficiencyDecline||[]).length} efficiency decline(s)` : 'No overdue maintenance'),
+    (sec.has('machines') || sec.has('workshop') || sec.has('harvest')) && _riskCard('Logistics', 'ti-truck', delSev,
+      Math.min(100, delCount * 12), delCount,
+      delCount ? `${delCount} delivery order(s) past due date` : 'All deliveries on schedule'),
+    sec.has('governance') && _riskCard('Workflow', 'ti-alert-triangle', wfSev,
+      Math.min(100, wfCount * 8), wfCount,
+      wfCount ? `${wfCount} workflow job(s) in failed state` : 'All workflow jobs healthy'),
+    sec.has('governance') && _riskCard('Security', 'ti-lock', secSev,
+      Math.min(100, secCount * 3), secCount,
+      secCount ? `${secCount} failed login attempt(s) in last 24h` : 'No unusual login activity'),
+    sec.has('governance') && _riskCard('Governance', 'ti-shield-exclamation', govSev,
+      govScore, govCount + govStall,
+      govCount ? `${govCount} privileged override(s) in 24h · ${govStall} stalled approval(s)` : `${govStall} stalled approval(s) >48h`),
+  ].filter(Boolean).join('');
+
+  // ── Section 4: Recommendations ───────────────────────────────────────────
+  const recHtml = recommendations.length
+    ? recommendations.slice(0, 12).map(r => `
+        <div class="bi-rec-card">
+          <div class="bi-rec-card-icon"><i class="ti ${r.icon || 'ti-bulb'}"></i></div>
+          <div class="bi-rec-card-body">
+            <div class="bi-rec-card-meta">
+              <span class="bi-badge ${_biSevCls(r.priority)}">${(r.priority||'low').toUpperCase()}</span>
+              <span class="bi-mod-chip">${r.module || ''}</span>
+            </div>
+            <div class="bi-rec-card-title">${r.title || r.description}</div>
+            <div class="bi-rec-card-desc">${r.description}</div>
+            ${r.action ? `<div class="bi-rec-card-action"><i class="ti ti-arrow-right" style="font-size:11px"></i>${r.action}</div>` : ''}
+          </div>
+        </div>`).join('')
+    : `<div class="bi-nod"><i class="ti ti-circle-check"></i> No recommendations — company health is strong</div>`;
+
+  // ── Section 5: Forecast Charts ────────────────────────────────────────────
+  const salesHistVals  = (forecasts.sales30d || []).map(r => Number(r.revenue));
+  const salesChartHtml = _svgForecast(salesHistVals, (forecasts.salesForecast || []).slice(0, 15), {
+    h: 110, ch: '#2E8B57', cf: '#94A3B8',
+  });
+  const sfcstAvg   = (forecasts.salesForecast || []).length
+    ? Math.round((forecasts.salesForecast).reduce((a, b) => a + b, 0) / forecasts.salesForecast.length) : 0;
+  const sDateLbls  = _clabels(forecasts.sales30d || [], 'day', 6);
+
+  const wkHistVals  = (forecasts.wkTrend || []).map(r => Number(r.timber) + Number(r.poles));
+  const wkChartHtml = _svgForecast(wkHistVals, forecasts.wkForecast || [], {
+    h: 110, ch: '#7C3AED', cf: '#94A3B8',
+  });
+  const wfcstAvg = (forecasts.wkForecast || []).length
+    ? Math.round((forecasts.wkForecast).reduce((a, b) => a + b, 0) / forecasts.wkForecast.length) : 0;
+
+  // ── Section 6: Risk Timeline ──────────────────────────────────────────────
+  const tlItems = [];
+  if (secCount > 0)
+    tlItems.push({ sev: secSev, mod: 'Security', icon: 'ti-lock',
+      text: `${secCount} failed login attempt(s) in last 24h` });
+  if (govCount > 0)
+    tlItems.push({ sev: govSev, mod: 'Governance', icon: 'ti-shield-exclamation',
+      text: `${govCount} privileged override(s) recorded in last 24h` });
+  if (wfCount > 0)
+    tlItems.push({ sev: wfSev, mod: 'Workflow', icon: 'ti-alert-triangle',
+      text: `${wfCount} workflow job(s) in failed state — attention required` });
+  if (govStall > 0)
+    tlItems.push({ sev: 'medium', mod: 'Approvals', icon: 'ti-clock-off',
+      text: `${govStall} approval request(s) stalled >48h — SLA breached` });
+  for (const sm of (stockAnomalies || []).slice(0, 3))
+    tlItems.push({ sev: Number(sm.z_score) > 3 ? 'high' : 'medium', mod: 'Stock', icon: 'ti-arrows-exchange',
+      text: `Abnormal movement: ${sm.item_name} — qty ${sm.quantity} (${sm.movement_type}), Z=${Number(sm.z_score).toFixed(1)}` });
+  for (const m of overdueM.slice(0, 3))
+    tlItems.push({ sev: Number(m.days_overdue) > 14 ? 'critical' : 'high', mod: 'Machines', icon: 'ti-settings-2',
+      text: `${m.machine_code} ${m.name} — ${m.maintenance_type} is ${m.days_overdue} day(s) overdue` });
+  if (delCount > 0)
+    tlItems.push({ sev: delSev, mod: 'Logistics', icon: 'ti-truck',
+      text: `${delCount} delivery order(s) past due date` });
+
+  const dotCls = { critical: 'bi-tl-dot-crit', high: 'bi-tl-dot-high', medium: 'bi-tl-dot-med', low: 'bi-tl-dot-low' };
+  const tlHtml = tlItems.length
+    ? tlItems.map(t => `
+        <div class="bi-tl-item">
+          <span class="bi-tl-dot ${dotCls[t.sev] || ''}"></span>
+          <span class="bi-tl-mod"><i class="ti ${t.icon}"></i> ${t.mod}</span>
+          <span class="bi-tl-text">${t.text}</span>
+          <span class="bi-tl-sev"><span class="bi-badge ${_biSevCls(t.sev)}">${t.sev.toUpperCase()}</span></span>
+        </div>`).join('')
+    : `<div class="bi-nod"><i class="ti ti-circle-check"></i> No risk events in current data window</div>`;
+
+  // ── Section 7: Data Tables ────────────────────────────────────────────────
+  const stockTableHtml = (predictions.stockShortages || []).length
+    ? `<table class="bi-tbl"><thead><tr>
+        <th>Item</th><th>Stock</th><th>Avg/Day</th><th>Days Left</th>
+      </tr></thead><tbody>${(predictions.stockShortages || []).slice(0, 8).map(s => {
+        const d   = s.days_until_depletion;
+        const cls = d != null ? (d <= 7 ? 'bi-crit' : d <= 14 ? 'bi-high' : 'bi-med') : 'bi-med';
+        return `<tr>
+          <td>${s.name}</td>
+          <td>${s.current_stock} <span style="color:var(--t4);font-size:10px">${s.uom}</span></td>
+          <td style="color:var(--t3)">${Number(s.avg_daily_consumption).toFixed(1)}/d</td>
+          <td><span class="bi-badge ${cls}">${d != null ? d + 'd' : 'Below Min'}</span></td>
+        </tr>`;
+      }).join('')}</tbody></table>`
+    : `<div class="bi-nod"><i class="ti ti-circle-check"></i> All items adequately stocked</div>`;
+
+  const harvTableHtml = (predictions.harvestForecast || []).length
+    ? `<table class="bi-tbl"><thead><tr>
+        <th>Compartment</th><th>Species</th><th>Progress</th><th>Est. Days</th>
+      </tr></thead><tbody>${(predictions.harvestForecast || []).slice(0, 8).map(h => {
+        const cls = h.days_to_complete !== null
+          ? (h.days_to_complete > 120 ? 'bi-high' : h.days_to_complete > 90 ? 'bi-med' : 'bi-low')
+          : 'bi-low';
+        return `<tr>
+          <td>${h.compt_name}${h.sub_name ? ` <span style="color:var(--t4);font-size:10px">${h.sub_name}</span>` : ''}</td>
+          <td style="color:var(--t3)">${h.species || '—'}</td>
+          <td><div class="bi-bar-wrap">
+            <div class="bi-bar"><div class="bi-bar-fill" style="width:${h.pct_complete}%;background:#2E8B57"></div></div>
+            <span style="font-size:10px;color:var(--t3)">${h.pct_complete}%</span>
+          </div></td>
+          <td><span class="bi-badge ${cls}">${h.days_to_complete !== null ? h.days_to_complete + 'd' : '—'}</span></td>
+        </tr>`;
+      }).join('')}</tbody></table>`
+    : `<div class="bi-nod"><i class="ti ti-info-circle"></i> No active harvest compartments</div>`;
+
+  // ── Section 8: KPI Summary panels ────────────────────────────────────────
+  const machineKpi = (predictions.machineAlerts || []).slice(0, 5).map((m, i) => {
+    const eff = Number(m.recent_eff_pct) || 0;
+    const pc  = Math.min(100, eff);
+    const bc  = eff < 50 ? '#DC2626' : eff < 75 ? '#D97706' : '#2E8B57';
+    return `<div class="bi-kpi-item">
+      <span class="bi-kpi-rank">${i + 1}</span>
+      <span class="bi-kpi-label">${m.machine_code} <span style="color:var(--t4)">${m.name}</span></span>
+      <div class="bi-kpi-pbar-wrap"><div class="bi-kpi-pbar" style="width:${pc}%;background:${bc}"></div></div>
+      <span class="bi-kpi-val">${eff > 0 ? eff.toFixed(0) + '%' : '—'}</span>
+    </div>`;
+  }).join('') || `<div class="bi-nod" style="padding:10px 14px"><i class="ti ti-info-circle"></i> No data</div>`;
+
+  const harvestKpi = [...(predictions.harvestForecast || [])]
+    .sort((a, b) => Number(b.total_harvested) - Number(a.total_harvested))
+    .slice(0, 5).map((h, i) => {
+      const vol = Number(h.volume_m3) || 1;
+      const pct = Math.min(100, Math.round((Number(h.total_harvested) / vol) * 100));
+      return `<div class="bi-kpi-item">
+        <span class="bi-kpi-rank">${i + 1}</span>
+        <span class="bi-kpi-label">${h.compt_name}</span>
+        <div class="bi-kpi-pbar-wrap"><div class="bi-kpi-pbar" style="width:${pct}%"></div></div>
+        <span class="bi-kpi-val">${Number(h.total_harvested).toLocaleString()} m³</span>
+      </div>`;
+    }).join('') || `<div class="bi-nod" style="padding:10px 14px"><i class="ti ti-info-circle"></i> No active compartments</div>`;
+
+  const govKpi = [
+    { label: 'Failed Logins (24h)',    val: gv.failed_logins_24h  || 0, c: Number(gv.failed_logins_24h) >= 10 ? '#DC2626' : Number(gv.failed_logins_24h) >= 3 ? '#EA580C' : '#22C55E' },
+    { label: 'Gov. Overrides (24h)',   val: gv.priv_overrides_24h || 0, c: Number(gv.priv_overrides_24h) > 0 ? '#EA580C' : '#22C55E' },
+    { label: 'Failed Jobs',            val: gv.failed_jobs        || 0, c: Number(gv.failed_jobs) > 5 ? '#DC2626' : Number(gv.failed_jobs) > 0 ? '#EA580C' : '#22C55E' },
+    { label: 'Pending Approvals',      val: gv.total_pending      || 0, c: Number(gv.total_pending) > 10 ? '#D97706' : '#22C55E' },
+    { label: 'Stalled >48h',           val: gv.stalled_48h        || 0, c: Number(gv.stalled_48h) > 0 ? '#D97706' : '#22C55E' },
+    { label: 'Delayed Deliveries',     val: gv.delayed_deliveries || 0, c: Number(gv.delayed_deliveries) > 0 ? '#D97706' : '#22C55E' },
+  ].map((g, i) => `<div class="bi-kpi-item">
+    <span class="bi-kpi-rank">${i + 1}</span>
+    <span class="bi-kpi-label">${g.label}</span>
+    <span class="bi-kpi-val" style="color:${g.c};font-size:13px">${g.val}</span>
+  </div>`).join('');
+
+  // ── Stock anomalies sub-block ─────────────────────────────────────────────
+  const anomalyHtml = (stockAnomalies || []).length
+    ? `<div class="bi-ph" style="margin-top:14px;margin-bottom:6px">
+         <i class="ti ti-arrows-exchange"></i> Abnormal Stock Movements (7d)
+         <span class="bi-risk-count">${stockAnomalies.length}</span>
+       </div>
+       ${(stockAnomalies || []).slice(0, 5).map(sm => `
+         <div class="bi-anomaly-row">
+           <i class="ti ti-alert-circle" style="color:#EA580C;flex-shrink:0"></i>
+           <span>${sm.item_name}</span>
+           <b>Qty ${sm.quantity}</b>
+           <span class="bi-badge bi-high">Z=${Number(sm.z_score).toFixed(1)}</span>
+         </div>`).join('')}`
+    : '';
+
+  // ── Assemble ──────────────────────────────────────────────────────────────
+  el.innerHTML = `
+    <div class="ex-header">
+      <div>
+        <div class="ptitle"><i class="ti ti-chart-line"></i> Business Intelligence Center</div>
+        <div class="psub">Statistical forecasting · Anomaly detection · Risk scoring — live PostgreSQL data · No external AI</div>
+      </div>
+      <div class="ex-actions">
+        <span class="ex-ts" id="bi-ts">Updated: ${ts}</span>
+        <button class="ibtn" id="bi-refresh" title="Refresh"><i class="ti ti-refresh"></i></button>
+        <button class="ibtn" id="bi-export"  title="Export CSV"><i class="ti ti-file-download"></i></button>
+        <button class="ibtn" id="bi-print"   title="Print / PDF"><i class="ti ti-printer"></i></button>
+      </div>
+    </div>
+
+    <!-- Health + Predictions -->
+    <div class="bi-row2a">
+      <div class="card bi-health-card">
+        <div class="bi-ph" style="margin-bottom:2px"><i class="ti ti-activity-heartbeat"></i> Company Health Score</div>
+        ${gauge}
+        <div class="bi-refresh-ts">${ts}</div>
+        <div class="bi-bkd" style="margin-top:10px">${bkdHtml}</div>
+      </div>
+      <div class="bi-pred-grid">${predCards}</div>
+    </div>
+
+    <!-- Risk Radar Cards -->
+    ${riskCardsHtml ? `
+    <div class="bi-section-hdr">
+      <i class="ti ti-radar-2"></i> Risk Radar
+      <span class="bi-risk-count">${risks.length} active</span>
+    </div>
+    <div class="bi-risk-cards">${riskCardsHtml}</div>` : ''}
+
+    <!-- Recommendations -->
+    ${sec.has('recommendations') ? `
+    <div class="card" style="margin-bottom:16px">
+      <div class="bi-ph">
+        <i class="ti ti-bulb"></i> ${sec.has('governance') ? 'Executive' : 'Operational'} Recommendations
+        <span style="margin-left:auto;font-size:10px;color:var(--t4)">${recommendations.length} action item(s)</span>
+      </div>
+      <div>${recHtml}</div>
+    </div>` : ''}
+
+    <!-- Forecast Charts (sales + workshop) -->
+    ${sec.has('charts') ? `
+    <div class="bi-row2">
+      ${sec.has('sales') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-chart-line"></i> Sales Revenue — 30d History + 30d Forecast</div>
+        ${salesChartHtml}
+        ${(forecasts.sales30d||[]).length > 5 ? `<div class="ex-clabels">${sDateLbls}</div>` : ''}
+        <div class="bi-legend">
+          <span><span class="bi-dot" style="background:#2E8B57"></span>Historical (30d)</span>
+          <span><span class="bi-dot bi-dot--dash"></span>Forecast (30d)</span>
+        </div>
+        ${sfcstAvg ? `<div class="bi-stat-note">30d projected avg: <strong>${_fmtCur(sfcstAvg)}/day</strong> · R²=${sR2.toFixed(2)}</div>` : ''}
+      </div>` : ''}
+      ${sec.has('workshop') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-building-factory"></i> Workshop Output — 12-Week History + 4-Week Forecast</div>
+        ${wkChartHtml}
+        <div class="bi-legend">
+          <span><span class="bi-dot" style="background:#7C3AED"></span>Historical (12 wk)</span>
+          <span><span class="bi-dot bi-dot--dash"></span>Forecast (4 wk)</span>
+        </div>
+        ${wfcstAvg ? `<div class="bi-stat-note">4-week avg: <strong>${wfcstAvg} units/week</strong> · ${wTrend >= 0 ? '+' : ''}${wTrend.toFixed(1)}%/wk trend</div>` : ''}
+      </div>` : ''}
+    </div>` : ''}
+
+    <!-- Risk Timeline -->
+    ${(sec.has('recommendations') || sec.has('governance')) && tlItems.length ? `
+    <div class="card" style="margin-bottom:16px">
+      <div class="bi-ph">
+        <i class="ti ti-timeline"></i> Risk &amp; Event Timeline
+        <span style="margin-left:auto;font-size:10px;color:var(--t4)">Current snapshot — critical first</span>
+      </div>
+      <div class="bi-timeline">${tlHtml}</div>
+    </div>` : ''}
+
+    <!-- Data Tables: Stock + Harvest -->
+    ${(sec.has('stock') || sec.has('harvest')) ? `
+    <div class="bi-row2">
+      ${sec.has('stock') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-package"></i> Stock Depletion Forecast</div>
+        ${stockTableHtml}
+      </div>` : ''}
+      ${sec.has('harvest') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-trees"></i> Harvest Completion Forecast</div>
+        ${harvTableHtml}
+      </div>` : ''}
+    </div>` : ''}
+
+    <!-- Machine Efficiency + Governance Snapshot -->
+    ${(sec.has('machines') || sec.has('governance')) ? `
+    <div class="bi-row2">
+      ${sec.has('machines') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-trending-down"></i> Declining Machine Efficiency</div>
+        ${(predictions.efficiencyDecline||[]).length
+          ? `<table class="bi-tbl"><thead><tr>
+              <th>Machine</th><th>Avg Eff</th><th>Trend/Week</th><th>Weeks Obs.</th>
+             </tr></thead><tbody>${(predictions.efficiencyDecline||[]).map(m => `<tr>
+               <td>${m.machine_code} <span style="color:var(--t3)">${m.name}</span></td>
+               <td>${Number(m.avg_eff).toFixed(1)}%</td>
+               <td style="color:#DC2626;font-weight:600"><i class="ti ti-trending-down"></i> ${Number(m.eff_slope).toFixed(1)}%</td>
+               <td style="color:var(--t3)">${m.weeks}w</td>
+             </tr>`).join('')}</tbody></table>`
+          : `<div class="bi-nod"><i class="ti ti-circle-check"></i> No declining efficiency detected</div>`}
+      </div>` : ''}
+      ${sec.has('governance') ? `<div class="card">
+        <div class="bi-ph"><i class="ti ti-shield-lock"></i> Governance &amp; Security Snapshot</div>
+        <div class="bi-stat-grid">
+          ${[
+            { label: 'Failed Logins (24h)',  val: gv.failed_logins_24h  || 0, cls: Number(gv.failed_logins_24h) >= 10 ? 'bi-crit-txt' : Number(gv.failed_logins_24h) >= 3 ? 'bi-high-txt' : '' },
+            { label: 'Gov. Overrides (24h)', val: gv.priv_overrides_24h || 0, cls: Number(gv.priv_overrides_24h) > 0 ? 'bi-high-txt' : '' },
+            { label: 'Failed Jobs',          val: gv.failed_jobs        || 0, cls: Number(gv.failed_jobs) > 5 ? 'bi-crit-txt' : Number(gv.failed_jobs) > 0 ? 'bi-high-txt' : '' },
+            { label: 'Pending Approvals',    val: gv.total_pending      || 0, cls: '' },
+            { label: 'Stalled >48h',         val: gv.stalled_48h        || 0, cls: Number(gv.stalled_48h) > 0 ? 'bi-med-txt' : '' },
+            { label: 'Delayed Deliveries',   val: gv.delayed_deliveries || 0, cls: Number(gv.delayed_deliveries) > 0 ? 'bi-med-txt' : '' },
+          ].map(g => `<div class="bi-stat-item"><span>${g.label}</span><b class="${g.cls}">${g.val}</b></div>`).join('')}
+        </div>
+        ${anomalyHtml}
+      </div>` : ''}
+    </div>` : ''}
+
+    <!-- KPI Summary panels -->
+    ${(sec.has('machines') || sec.has('harvest') || sec.has('governance')) ? `
+    <div class="bi-kpi-row">
+      ${sec.has('machines') ? `<div class="bi-kpi-panel">
+        <div class="bi-kpi-ph"><i class="ti ti-settings-2"></i> Machine Performance (14d avg eff)</div>
+        ${machineKpi}
+      </div>` : ''}
+      ${sec.has('harvest') ? `<div class="bi-kpi-panel">
+        <div class="bi-kpi-ph"><i class="ti ti-trees"></i> Top Harvest Compartments</div>
+        ${harvestKpi}
+      </div>` : ''}
+      ${sec.has('governance') ? `<div class="bi-kpi-panel">
+        <div class="bi-kpi-ph"><i class="ti ti-shield-check"></i> Governance KPIs</div>
+        ${govKpi}
+      </div>` : ''}
+    </div>` : ''}`;
+
+  $('bi-refresh').onclick = () => renderBI();
+  $('bi-export').onclick  = () => exportBiCSV();
+  $('bi-print').onclick   = () => window.print();
+}
+
+async function renderSecGovDashboard() {
+  _secGovLastLoad = Date.now();
+  const container = $('page-secgov');
+  container.innerHTML = `<div class="ptitle">Security &amp; Governance</div><div class="psub">Loading…</div>`;
+
+  const res = await UFCL.secGovDashboard(STORAGE.user.id);
+  if (!res.ok) return renderDenied('secgov', res.error);
+
+  const kpi   = res.kpi           || {};
+  const appr  = res.approvals     || {};
+  const notif = res.notifCounts   || {};
+  const sec   = res.securityEvents || [];
+  const wf    = res.workflowHealth || [];
+  const feed  = res.auditFeed      || [];
+
+  const now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  // ── KPI cards ───────────────────────────────────────────────────────────────
+  const kpiHtml = `
+    <div class="sg-grid4">
+      <div class="sg-kpi${kpi.failedLogins    > 0 ? ' sg-kpi-red'   : ''}">
+        <div class="sg-kpi-n">${kpi.failedLogins}</div>
+        <div class="sg-kpi-l">Failed Logins</div>
+        <div class="sg-kpi-s">Last 24 hours</div>
+      </div>
+      <div class="sg-kpi${kpi.privOverrides   > 0 ? ' sg-kpi-amber' : ''}">
+        <div class="sg-kpi-n">${kpi.privOverrides}</div>
+        <div class="sg-kpi-l">Privileged Overrides</div>
+        <div class="sg-kpi-s">Last 24 hours</div>
+      </div>
+      <div class="sg-kpi${kpi.pendingApprovals > 0 ? ' sg-kpi-amber' : ' sg-kpi-green'}">
+        <div class="sg-kpi-n">${kpi.pendingApprovals}</div>
+        <div class="sg-kpi-l">Pending Approvals</div>
+        <div class="sg-kpi-s">Edit &amp; deletion requests</div>
+      </div>
+      <div class="sg-kpi${kpi.workflowFailures > 0 ? ' sg-kpi-red'  : ' sg-kpi-green'}">
+        <div class="sg-kpi-n">${kpi.workflowFailures}</div>
+        <div class="sg-kpi-l">Workflow Failures</div>
+        <div class="sg-kpi-s">Permanently failed jobs</div>
+      </div>
+    </div>`;
+
+  // ── Unread notification counts ─────────────────────────────────────────────
+  const notifHtml = `
+    <div class="sg-notif-row">
+      <div class="sg-notif-box">
+        <div class="ndot nd-red"   style="width:9px;height:9px;flex-shrink:0"></div>
+        <div><div class="sg-notif-n" style="color:var(--red)">${notif.security}</div><div class="sg-notif-l">Security Alerts</div></div>
+      </div>
+      <div class="sg-notif-box">
+        <div class="ndot nd-amber" style="width:9px;height:9px;flex-shrink:0"></div>
+        <div><div class="sg-notif-n" style="color:var(--amber)">${notif.approval}</div><div class="sg-notif-l">Approval Alerts</div></div>
+      </div>
+      <div class="sg-notif-box">
+        <div class="ndot nd-blue"  style="width:9px;height:9px;flex-shrink:0"></div>
+        <div><div class="sg-notif-n" style="color:var(--blue)">${notif.system}</div><div class="sg-notif-l">System Alerts</div></div>
+      </div>
+    </div>`;
+
+  // ── Security events table ───────────────────────────────────────────────────
+  const secRows = sec.length === 0
+    ? `<div style="padding:2rem;text-align:center;color:var(--t3);font-size:13px"><i class="ti ti-shield-check" style="font-size:24px;display:block;margin-bottom:.5rem;opacity:.3"></i>No security events in the last period.</div>`
+    : sec.map(e => {
+        const [lbl, cls] = e.action_type === 'privileged_override' ? ['OVERRIDE','sg-bd-amber']
+                         : e.action_type === 'login_denied'        ? ['DENIED',  'sg-bd-amber']
+                         : ['FAILED', 'sg-bd-red'];
+        return `<div class="sg-row">
+          <div class="sg-col-time">${e.time}</div>
+          <div class="sg-col-user" title="${e.username}">${e.username || '—'}</div>
+          <span class="sg-badge ${cls}">${lbl}</span>
+          <div class="sg-col-action" title="${e.action}">${e.action}</div>
+        </div>`;
+      }).join('');
+
+  // ── Approval overview ────────────────────────────────────────────────────────
+  const avgStr = appr.avgHours != null ? `${appr.avgHours} h` : '—';
+  const apprHtml = `
+    <div class="sg-stat-row"><span class="sg-stat-l">Leader-level pending</span><strong class="sg-stat-v">${appr.leaderPending}</strong></div>
+    <div class="sg-stat-row"><span class="sg-stat-l">Manager-level pending</span><strong class="sg-stat-v">${appr.managerPending}</strong></div>
+    <div class="sg-stat-row"><span class="sg-stat-l">Escalated requests</span><strong class="sg-stat-v${appr.escalated > 0 ? ' sg-stat-alert' : ''}">${appr.escalated}</strong></div>
+    <div class="sg-stat-row"><span class="sg-stat-l">Total pending</span><strong class="sg-stat-v">${kpi.pendingApprovals}</strong></div>
+    <div class="sg-stat-row" style="border-bottom:none"><span class="sg-stat-l">Avg approval time (30 d)</span><strong class="sg-stat-v">${avgStr}</strong></div>`;
+
+  // ── Workflow health ──────────────────────────────────────────────────────────
+  const wfRows = wf.length === 0
+    ? `<div style="padding:2rem;text-align:center;color:var(--t3);font-size:13px"><i class="ti ti-circle-check" style="font-size:24px;display:block;margin-bottom:.5rem;opacity:.3"></i>No active or failed jobs.</div>`
+    : wf.map(j => {
+        const st  = (j.status === 'pending' && j.attempts > 0) ? 'retrying' : j.status;
+        const cls = st === 'failed' ? 'sg-bd-red' : st === 'retrying' ? 'sg-bd-amber' : 'sg-bd-blue';
+        const err = j.last_error ? `<div style="color:var(--red);font-size:11px;margin-top:2px;white-space:normal">${j.last_error.slice(0, 90)}</div>` : '';
+        return `<div class="sg-row">
+          <div class="sg-col-time">${j.created_fmt || '—'}</div>
+          <div class="sg-col-user">#${j.id} ${j.type}</div>
+          <span class="sg-badge ${cls}">${st}</span>
+          <div class="sg-col-action">${j.attempts}/${j.max_attempts} attempts${err}</div>
+        </div>`;
+      }).join('');
+
+  // ── Audit feed ───────────────────────────────────────────────────────────────
+  function auditTag(row) {
+    const at  = (row.action_type || '').toLowerCase();
+    const mod = (row.module      || '').toLowerCase();
+    if (['login_failed','login_denied','privileged_override'].includes(at) || mod === 'auth')
+      return ['SECURITY',   'sg-bd-red'];
+    if (['approve','reject','create_request'].includes(at) || ['governance','pending_edits'].includes(mod))
+      return ['GOVERNANCE', 'sg-bd-amber'];
+    if (mod === 'workflow')
+      return ['WORKFLOW',   'sg-bd-blue'];
+    return ['OPERATIONS', 'sg-bd-green'];
+  }
+
+  const feedRows = feed.length === 0
+    ? `<div style="padding:2rem;text-align:center;color:var(--t3);font-size:13px">No audit events.</div>`
+    : feed.map(e => {
+        const [lbl, cls] = auditTag(e);
+        return `<div class="sg-row">
+          <div class="sg-col-time">${e.time}</div>
+          <div class="sg-col-user" title="${e.full_name || e.username}">${e.username || '—'}</div>
+          <span class="sg-badge ${cls}">${lbl}</span>
+          <div class="sg-col-action" title="${e.action}">${e.action}</div>
+        </div>`;
+      }).join('');
+
+  // ── Assemble ─────────────────────────────────────────────────────────────────
+  container.innerHTML = `
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1rem">
+      <div>
+        <div class="ptitle" style="margin-bottom:0">Security &amp; Governance</div>
+        <div class="psub">Real-time security, governance, and workflow monitoring.</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:.5rem;padding-top:.25rem;flex-shrink:0">
+        <span style="font-size:11px;color:var(--t4)">Updated ${now}</span>
+        <button id="sg-refresh" class="bs1" style="padding:4px 10px;font-size:12px"><i class="ti ti-refresh"></i> Refresh</button>
+      </div>
+    </div>
+
+    ${kpiHtml}
+    ${notifHtml}
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.75rem;margin-bottom:.875rem">
+      <div class="sg-panel" style="margin-bottom:0">
+        <div class="sg-ph"><span>Security Events</span><em>latest 25</em></div>
+        ${secRows}
+      </div>
+      <div class="sg-panel" style="margin-bottom:0">
+        <div class="sg-ph"><span>Approval Overview</span><em>edit &amp; deletion requests</em></div>
+        ${apprHtml}
+      </div>
+    </div>
+
+    <div class="sg-panel">
+      <div class="sg-ph"><span>Workflow Health</span><em>failed · retrying · processing</em></div>
+      ${wfRows}
+    </div>
+
+    <div class="sg-panel">
+      <div class="sg-ph"><span>Audit Activity</span><em>latest 50 events</em></div>
+      ${feedRows}
+    </div>`;
+
+  $('sg-refresh').onclick = () => renderSecGovDashboard();
+}
+
+async function renderNotifications() {
+  _NOTIF.page = 0;
+  const container = $('page-notifications');
+
+  const catChips = ['', 'security', 'approval', 'workflow', 'system', 'audit'].map(v => {
+    const lbl    = v === '' ? 'All Categories' : v[0].toUpperCase() + v.slice(1);
+    const active = (!_NOTIF.filters.category && v === '') || _NOTIF.filters.category === v;
+    return `<button class="nchip${active ? ' active' : ''}" data-fcat="${v}">${lbl}</button>`;
+  }).join('');
+
+  const typeChips = [['', 'All Types'], ['red', '● Red'], ['amber', '● Amber'], ['green', '● Green']].map(([v, l]) => {
+    const active = (!_NOTIF.filters.type && v === '') || _NOTIF.filters.type === v;
+    return `<button class="nchip${active ? ' active' : ''}" data-ftype="${v}">${l}</button>`;
+  }).join('');
+
+  container.innerHTML = `
+    <div class="ptitle">Notifications</div>
+    <div class="psub">System alerts, security events, and approval workflows.</div>
+
+    <div class="nstats">
+      <div class="nstat-box"><div class="nstat-n" id="ns-unread">—</div><div class="nstat-l">Unread</div></div>
+      <div class="nstat-box nstat-red"><div class="nstat-n" id="ns-security">—</div><div class="nstat-l">Security</div></div>
+      <div class="nstat-box nstat-amber"><div class="nstat-n" id="ns-approval">—</div><div class="nstat-l">Approval</div></div>
+      <div class="nstat-box nstat-blue"><div class="nstat-n" id="ns-system">—</div><div class="nstat-l">System</div></div>
+    </div>
+
+    <div class="npanel" style="margin-bottom:0;border-radius:var(--r-lg) var(--r-lg) 0 0">
+      <div class="nhead">
+        <span>Filters</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button id="notif-clear" style="background:none;border:1px solid var(--border2);border-radius:var(--r-sm);font-size:11px;padding:3px 9px;cursor:pointer;font-family:var(--ff);color:var(--t3)">Clear filters</button>
+          <button id="notif-mark-all" class="appbtn" style="padding:4px 12px;font-size:12px">Mark all read</button>
+        </div>
+      </div>
+      <div class="nfilterbar">${catChips}</div>
+      <div class="nfilterbar">${typeChips}</div>
+      <div class="nfilterbar" style="border-bottom:none">
+        <input id="notif-search" type="text" placeholder="Search title or body…" value="${_NOTIF.filters.search || ''}"
+          style="flex:1;min-width:160px;border:1px solid var(--border2);border-radius:var(--r-sm);padding:5px 10px;font-size:12px;background:var(--surf);color:var(--t1);font-family:var(--ff);outline:none">
+        <input id="notif-from" type="date" value="${_NOTIF.filters.fromDate || ''}"
+          style="border:1px solid var(--border2);border-radius:var(--r-sm);padding:5px 8px;font-size:12px;background:var(--surf);color:var(--t1);font-family:var(--ff);outline:none">
+        <input id="notif-to" type="date" value="${_NOTIF.filters.toDate || ''}"
+          style="border:1px solid var(--border2);border-radius:var(--r-sm);padding:5px 8px;font-size:12px;background:var(--surf);color:var(--t1);font-family:var(--ff);outline:none">
+      </div>
+    </div>
+
+    <div id="notif-list-wrap">
+      <div style="text-align:center;padding:2rem;color:var(--t3);font-size:13px">Loading…</div>
+    </div>`;
+
+  container.querySelectorAll('[data-fcat]').forEach(btn => {
+    btn.onclick = () => {
+      _NOTIF.filters.category = btn.dataset.fcat || null;
+      _NOTIF.page = 0;
+      container.querySelectorAll('[data-fcat]').forEach(b =>
+        b.classList.toggle('active', b.dataset.fcat === btn.dataset.fcat));
+      _loadNotifItems();
+    };
+  });
+
+  container.querySelectorAll('[data-ftype]').forEach(btn => {
+    btn.onclick = () => {
+      _NOTIF.filters.type = btn.dataset.ftype || null;
+      _NOTIF.page = 0;
+      container.querySelectorAll('[data-ftype]').forEach(b =>
+        b.classList.toggle('active', b.dataset.ftype === btn.dataset.ftype));
+      _loadNotifItems();
+    };
+  });
+
+  $('notif-search').oninput = () => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => {
+      _NOTIF.filters.search = $('notif-search').value.trim() || null;
+      _NOTIF.page = 0;
+      _loadNotifItems();
+    }, 300);
+  };
+
+  $('notif-from').onchange = () => {
+    _NOTIF.filters.fromDate = $('notif-from').value || null;
+    _NOTIF.page = 0;
+    _loadNotifItems();
+  };
+  $('notif-to').onchange = () => {
+    _NOTIF.filters.toDate = $('notif-to').value || null;
+    _NOTIF.page = 0;
+    _loadNotifItems();
+  };
+
+  $('notif-clear').onclick = () => {
+    _NOTIF.filters = {};
+    _NOTIF.page = 0;
+    renderNotifications();
+  };
+
+  $('notif-mark-all').onclick = async () => {
     const r = await UFCL.notificationsMarkAllRead(STORAGE.user.id);
     if (r.ok) {
-      STORAGE.unread = r.unread || 0;
+      STORAGE.unread = r.unread ?? 0;
       updateBadge();
-      await renderNotifications();
+      await _loadNotifItems();
     }
   };
-  document.querySelectorAll('[data-mr]').forEach((b) => {
+
+  await _loadNotifItems();
+}
+
+async function _loadNotifItems() {
+  const wrap = $('notif-list-wrap');
+  if (!wrap) return;
+
+  const res = await UFCL.notificationsList(STORAGE.user.id, {
+    type:     _NOTIF.filters.type     || undefined,
+    category: _NOTIF.filters.category || undefined,
+    search:   _NOTIF.filters.search   || undefined,
+    fromDate: _NOTIF.filters.fromDate || undefined,
+    toDate:   _NOTIF.filters.toDate   || undefined,
+    page:     _NOTIF.page,
+    limit:    50,
+  });
+
+  if (!res.ok) {
+    wrap.innerHTML = `<div style="text-align:center;padding:2rem;color:var(--red);font-size:13px">Failed to load: ${res.error || 'Error'}</div>`;
+    return;
+  }
+
+  STORAGE.unread = res.unread ?? 0;
+  updateBadge();
+
+  const rows    = res.rows    || [];
+  const total   = res.total   || 0;
+  const page    = res.page    || 0;
+  const hasMore = res.hasMore || false;
+
+  const ns  = $('ns-unread');   if (ns)  ns.textContent  = STORAGE.unread;
+  const nss = $('ns-security'); if (nss) nss.textContent = rows.filter(r => !r.read && r.category === 'security').length;
+  const nsa = $('ns-approval'); if (nsa) nsa.textContent = rows.filter(r => !r.read && r.category === 'approval').length;
+  const nsm = $('ns-system');   if (nsm) nsm.textContent = rows.filter(r => !r.read && r.category === 'system').length;
+
+  const catCls  = { security: 'ncat-security', approval: 'ncat-approval', workflow: 'ncat-workflow', system: 'ncat-system', audit: 'ncat-audit' };
+  const typeDot = t => t === 'red' ? 'nd-red' : t === 'amber' ? 'nd-amber' : t === 'blue' ? 'nd-blue' : 'nd-green';
+  const hasFilters = Object.values(_NOTIF.filters).some(v => v != null && v !== '');
+
+  const itemsHtml = rows.length === 0
+    ? `<div style="text-align:center;padding:3rem 1rem;color:var(--t3);font-size:13px">
+         <i class="ti ti-bell-off" style="font-size:28px;display:block;margin-bottom:.5rem;opacity:.3"></i>
+         No notifications${hasFilters ? ' match your filters' : ''}.
+       </div>`
+    : rows.map(n => {
+        const cat    = n.category ? `<span class="ncat ${catCls[n.category] || 'ncat-system'}">${n.category}</span>` : '';
+        const direct = n.direct   ? `<span style="font-size:10px;background:rgba(99,102,241,.12);color:#6366f1;padding:1px 6px;border-radius:10px;font-weight:600;margin-left:4px">For you</span>` : '';
+        const rel    = (n.related_module || n.related_id)
+          ? `<div class="nrelated"><i class="ti ti-corner-right-down" style="font-size:10px"></i>${n.related_module ? `<strong>${n.related_module}</strong>` : ''}${n.related_id ? `&nbsp;·&nbsp;${n.related_id}` : ''}</div>`
+          : '';
+        const markBtn = n.read ? '' : `<button class="bs1" style="padding:3px 9px;font-size:11px;flex-shrink:0" data-mr="${n.id}">Mark read</button>`;
+        return `<div class="nitem ${n.read ? '' : 'unread'}" id="nn-${n.id}">
+          <div class="ndot ${typeDot(n.type)}" style="margin-top:3px;flex-shrink:0"></div>
+          <div style="flex:1;min-width:0">
+            <div class="ntxt"><strong>${n.title}</strong>${cat}${direct}
+              <div style="color:var(--t3);margin-top:2px;line-height:1.5">${n.body}</div>${rel}
+            </div>
+            <div class="ntime">${n.time}</div>
+          </div>
+          ${markBtn}
+        </div>`;
+      }).join('');
+
+  const start = page * 50 + 1;
+  const end   = Math.min(page * 50 + rows.length, total);
+  const pager = total > 50
+    ? `<div class="npager">
+         <button class="nchip" id="notif-prev" ${page === 0 ? 'disabled' : ''}>← Prev</button>
+         <span style="font-size:12px;color:var(--t3)">${start}–${end} of ${total}</span>
+         <button class="nchip" id="notif-next" ${!hasMore ? 'disabled' : ''}>Next →</button>
+       </div>`
+    : '';
+
+  wrap.innerHTML = `
+    <div class="npanel" style="border-radius:0 0 var(--r-lg) var(--r-lg);border-top:none">
+      <div class="nhead"><span>${total} notification${total !== 1 ? 's' : ''}${hasFilters ? ' (filtered)' : ''}</span></div>
+      <div id="notif-scroll">${itemsHtml}</div>
+    </div>${pager}`;
+
+  wrap.querySelectorAll('[data-mr]').forEach(b => {
     b.onclick = async () => {
-      const id = Number(b.dataset.mr);
-      const r = await UFCL.notificationsMarkRead(STORAGE.user.id, id);
+      const r = await UFCL.notificationsMarkRead(STORAGE.user.id, Number(b.dataset.mr));
       if (r.ok) {
-        STORAGE.unread = r.unread || 0;
+        STORAGE.unread = r.unread ?? 0;
         updateBadge();
-        await renderNotifications();
+        await _loadNotifItems();
       }
     };
   });
+
+  const prevBtn = $('notif-prev');
+  const nextBtn = $('notif-next');
+  if (prevBtn) prevBtn.onclick = () => { _NOTIF.page = Math.max(0, page - 1); _loadNotifItems(); };
+  if (nextBtn) nextBtn.onclick = () => { _NOTIF.page = page + 1; _loadNotifItems(); };
 }
 
-async function renderAudit() {
-  const res = await UFCL.auditList(STORAGE.user.id, 'All');
+async function renderAudit(filters = {}) {
+  const res = await UFCL.auditList(STORAGE.user.id, filters);
   if (!res.ok) return renderDenied('audit', res.error);
-  const rows = res.rows || [];
+  const rows    = res.rows    || [];
+  const modules = res.modules || [];
+
+  const sel = (id, val, opts) =>
+    `<select id="${id}" style="height:32px;font-size:12px">${
+      opts.map(o => `<option value="${o}" ${val===o?'selected':''}>${o}</option>`).join('')
+    }</select>`;
+
+  const moduleOpts    = ['All', ...modules];
+  const typeOpts      = ['All','login','login_failed','login_denied','create','update','delete'];
+  const roleOpts      = ['All','admin','ceo','operations','sales','sales-staff','finance',
+                          'logistics','logistics-officer','supervisor','storekeeper',
+                          'storekeeper-assistant','mechanician','harvesting-leader',
+                          'sawmill-leader','poles-leader','vat-leader',
+                          'harvesting-supervisor','sawmill-supervisor',
+                          'poles-supervisor','vat-supervisor'];
+
+  const typeBadge = t => {
+    if (!t) return '<span style="color:var(--t3);font-size:10px">—</span>';
+    const cls = {login:'bg',login_failed:'br',login_denied:'ba',create:'bp',update:'ba',delete:'br'}[t] || 'bp';
+    return `<span class="badge ${cls}" style="font-size:10px">${t.replace('_',' ')}</span>`;
+  };
+
   $('page-audit').innerHTML = `
-    <div class="ptitle">Audit trail</div>
-    <div class="psub">Every important action is recorded.</div>
+    <div class="ptitle">Audit Trail</div>
+    <div class="psub">Complete record of every action, login attempt, and data change across desktop and mobile.</div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end">
+        <div class="fg" style="min-width:120px;flex:0 1 auto">
+          <label style="font-size:11px">Module</label>
+          ${sel('af-module', filters.module||'All', moduleOpts)}
+        </div>
+        <div class="fg" style="min-width:130px;flex:0 1 auto">
+          <label style="font-size:11px">Action type</label>
+          ${sel('af-type', filters.actionType||'All', typeOpts)}
+        </div>
+        <div class="fg" style="min-width:150px;flex:0 1 auto">
+          <label style="font-size:11px">Role</label>
+          ${sel('af-role', filters.roleFilter||'All', roleOpts)}
+        </div>
+        <div class="fg" style="min-width:115px;flex:0 1 auto">
+          <label style="font-size:11px">From date</label>
+          <input type="date" id="af-from" value="${filters.fromDate||''}" style="height:32px;font-size:12px">
+        </div>
+        <div class="fg" style="min-width:115px;flex:0 1 auto">
+          <label style="font-size:11px">To date</label>
+          <input type="date" id="af-to" value="${filters.toDate||''}" style="height:32px;font-size:12px">
+        </div>
+        <div class="fg" style="min-width:180px;flex:1 1 180px">
+          <label style="font-size:11px">Search user / action</label>
+          <input type="text" id="af-search" value="${filters.search||''}" placeholder="type to filter…" style="height:32px;font-size:12px">
+        </div>
+        <button class="bp1" id="af-apply" style="height:32px;padding:0 14px;font-size:12px"><i class="ti ti-filter"></i>Apply</button>
+        <button class="bs1" id="af-clear"  style="height:32px;padding:0 10px;font-size:12px">Clear</button>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--t3)">
+        Showing <strong>${rows.length}</strong> record${rows.length!==1?'s':''} · max 500 · click a row to see before/after values
+      </div>
+    </div>
+
     <div class="card">
-      <h3><i class="ti ti-shield-check"></i>Recent activity</h3>
       <div class="tw">
-        <table class="dt">
-          <thead><tr><th>Time</th><th>User</th><th>Role</th><th>Action</th></tr></thead>
+        <table class="dt" id="audit-table">
+          <thead>
+            <tr>
+              <th style="width:140px">Time</th>
+              <th>User</th>
+              <th style="width:110px">Role</th>
+              <th style="width:85px">Module</th>
+              <th style="width:115px">Type</th>
+              <th>Action</th>
+              <th style="width:115px">IP Address</th>
+            </tr>
+          </thead>
           <tbody>
-            ${rows
-              .map(
-                (r) => `<tr>
-                <td style="font-family:var(--fm);color:var(--t3)">${r.time}</td>
-                <td>${r.user_name || '—'}</td>
-                <td><span class="badge bp">${r.role}</span></td>
-                <td>${r.action}</td>
-              </tr>`
-              )
-              .join('')}
+            ${rows.map((r, i) => {
+              const displayName = r.full_name || r.user_name || r.username || '—';
+              const hasDetail = r.before_values || r.after_values || r.reason;
+              return `<tr class="audit-row" data-idx="${i}" style="cursor:${hasDetail?'pointer':'default'}${hasDetail?' background-color:transparent':''}" title="${hasDetail?'Click to expand details':''}">
+                <td style="font-family:var(--fm);font-size:11px;color:var(--t3);white-space:nowrap">${r.time}</td>
+                <td>
+                  <div style="font-size:13px">${displayName}</div>
+                  ${r.username && r.username !== displayName ? `<div style="font-size:10px;color:var(--t3)">@${r.username}</div>` : ''}
+                </td>
+                <td><span class="badge bp" style="font-size:10px">${r.role||'—'}</span></td>
+                <td style="font-size:11px;color:var(--t3)">${r.module||'—'}</td>
+                <td>${typeBadge(r.action_type)}</td>
+                <td style="font-size:12px">${r.action}</td>
+                <td style="font-family:var(--fm);font-size:10px;color:var(--t3)">${r.ip_address||'—'}</td>
+              </tr>
+              ${hasDetail ? `<tr class="audit-detail" id="audit-detail-${i}" style="display:none">
+                <td colspan="7" style="padding:0 12px 10px">
+                  <div style="padding:10px 14px;background:var(--bg2);border-radius:6px;font-family:var(--fm);font-size:11px;display:flex;gap:24px;flex-wrap:wrap">
+                    ${r.before_values ? `<div>
+                      <div style="font-weight:600;margin-bottom:4px;color:var(--t2)">Before</div>
+                      <pre style="margin:0;color:var(--t3);white-space:pre-wrap;max-width:420px;font-size:11px">${JSON.stringify(r.before_values,null,2)}</pre>
+                    </div>` : ''}
+                    ${r.after_values ? `<div>
+                      <div style="font-weight:600;margin-bottom:4px;color:var(--t2)">After</div>
+                      <pre style="margin:0;color:var(--t3);white-space:pre-wrap;max-width:420px;font-size:11px">${JSON.stringify(r.after_values,null,2)}</pre>
+                    </div>` : ''}
+                    ${r.reason ? `<div>
+                      <div style="font-weight:600;margin-bottom:4px;color:var(--t2)">Reason</div>
+                      <div style="color:var(--t3)">${r.reason}</div>
+                    </div>` : ''}
+                  </div>
+                </td>
+              </tr>` : ''}`;
+            }).join('')}
           </tbody>
         </table>
       </div>
     </div>
   `;
+
+  $('af-apply').onclick = () => renderAudit({
+    module:     $('af-module').value,
+    actionType: $('af-type').value,
+    roleFilter: $('af-role').value,
+    fromDate:   $('af-from').value  || undefined,
+    toDate:     $('af-to').value    || undefined,
+    search:     $('af-search').value.trim() || undefined,
+  });
+  $('af-clear').onclick = () => renderAudit({});
+
+  document.querySelectorAll('.audit-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const detail = $(`audit-detail-${row.dataset.idx}`);
+      if (detail) detail.style.display = detail.style.display === 'none' ? '' : 'none';
+    });
+  });
 }
 
 async function renderChanges() {
@@ -9864,6 +11449,7 @@ function wireUpdateBanner() {
 
 function wireTopbar() {
   $('logoutBtn').onclick = async () => {
+    stopNotificationPoll();
     await UFCL.logout();
     STORAGE.user = null;
     show($('shell'), false);
@@ -9915,6 +11501,7 @@ window.addEventListener('DOMContentLoaded', () => {
     wireLogin();
     wireTopbar();
     wireUpdateBanner();
+    window.addEventListener('unload', stopNotificationPoll);
   } catch (e) {
     const msg = e?.message || String(e);
     document.body.innerHTML = `<div style="font-family:Arial;padding:24px">
@@ -9923,4 +11510,844 @@ window.addEventListener('DOMContentLoaded', () => {
     </div>`;
   }
 });
+
+// ── Phase 8 Parts 5-11 — Automation Center ───────────────────────────────────
+
+// 7-day SVG bar chart for automation activity
+function _acBarChart(activityByDay) {
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d   = new Date(Date.now() - i * 86_400_000);
+    const key = d.toISOString().slice(0, 10);
+    const hit = (activityByDay || []).find(x => x.day === key);
+    days.push({ label: d.toLocaleDateString('en-GB', { weekday: 'short' }), count: Number(hit?.count) || 0 });
+  }
+  const maxC = Math.max(...days.map(d => d.count), 1);
+  const W = 300, H = 72, barW = Math.floor(W / 7) - 5;
+  const bars = days.map((d, i) => {
+    const bh = Math.max(2, Math.round((d.count / maxC) * (H - 22)));
+    const x  = i * (barW + 5) + 2;
+    const y  = H - 18 - bh;
+    return `<rect x="${x}" y="${y}" width="${barW}" height="${bh}" fill="${d.count > 0 ? '#3b82f6' : '#e5e7eb'}" rx="2"/>
+      <text x="${x + barW / 2}" y="${H - 2}" text-anchor="middle" font-size="8" fill="#9ca3af">${d.label}</text>
+      ${d.count > 0 ? `<text x="${x + barW / 2}" y="${y - 3}" text-anchor="middle" font-size="9" fill="#1d4ed8" font-weight="600">${d.count}</text>` : ''}`;
+  }).join('');
+  return `<svg width="${W}" height="${H}" style="display:block;overflow:visible;margin:0 auto">${bars}</svg>`;
+}
+
+function _acExportHistoryCsv(logRows) {
+  const header = 'Rule,Module,Record ID,Action,Fired At';
+  const csv = (logRows || []).map(r => [
+    `"${(r.rule_key        || '').replace(/"/g, '""')}"`,
+    `"${(r.related_module  || '').replace(/"/g, '""')}"`,
+    `"${(r.related_id      || '').replace(/"/g, '""')}"`,
+    `"${(r.action_taken    || '').replace(/"/g, '""')}"`,
+    `"${(r.fired_at        || '').replace(/"/g, '""')}"`,
+  ].join(',')).join('\n');
+  downloadCsv(`${header}\n${csv}`, `automation_history_${new Date().toISOString().slice(0, 10)}.csv`);
+}
+
+function _acPrintReport(res) {
+  const { summary: sm, scheduler: sch, rules, automation_log } = res;
+  const ts = new Date().toLocaleString();
+  const win = window.open('', '_blank', 'width=900,height=700');
+  if (!win) { alert('Allow pop-ups to print the report.'); return; }
+  win.document.write(`<!DOCTYPE html><html><head>
+  <title>UFCL Automation Report</title>
+  <style>
+    body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px}
+    h1{font-size:18px;margin-bottom:4px} h2{font-size:13px;margin:14px 0 5px;border-bottom:1px solid #ccc;padding-bottom:3px}
+    .krow{display:flex;gap:12px;margin-bottom:14px} .kpi{background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px}
+    .kn{font-size:20px;font-weight:700} .kl{font-size:11px;color:#6b7280}
+    table{width:100%;border-collapse:collapse} th{background:#f3f4f6;text-align:left;padding:4px 8px;font-size:11px}
+    td{padding:3px 8px;border-bottom:1px solid #f0f0f0;font-size:11px}
+    @media print{body{padding:0}}
+  </style></head><body>
+  <h1>UFCL Automation Center Report</h1>
+  <div style="color:#6b7280;margin-bottom:14px">Generated: ${ts}</div>
+  <h2>Summary</h2>
+  <div class="krow">
+    <div class="kpi"><div class="kn">${sm.rules_enabled}/${sm.rules_total}</div><div class="kl">Rules Active</div></div>
+    <div class="kpi"><div class="kn">${sm.active_escalations}</div><div class="kl">Active Escalations</div></div>
+    <div class="kpi"><div class="kn">${sm.failed_jobs}</div><div class="kl">Failed Jobs</div></div>
+    <div class="kpi"><div class="kn">${sm.automations_24h}</div><div class="kl">Automations (24h)</div></div>
+    <div class="kpi"><div class="kn">${sm.ticks_24h}</div><div class="kl">Scheduler Ticks (24h)</div></div>
+  </div>
+  <h2>Scheduler</h2>
+  <p>Last run: ${sch.last_automation ? new Date(sch.last_automation).toLocaleString() : 'N/A'} ·
+     Avg tick: ${sm.avg_tick_ms != null ? sm.avg_tick_ms + 'ms' : 'N/A'}</p>
+  <h2>Rule Status</h2>
+  <table><tr><th>Rule</th><th>Key</th><th>Enabled</th><th>Severity</th><th>Action</th><th>Last Fired</th></tr>
+  ${(rules || []).map(r => `<tr>
+    <td>${r.label}</td><td>${r.rule_key}</td>
+    <td>${r.enabled ? 'Yes' : 'No'}</td><td>${r.severity}</td><td>${r.auto_action}</td>
+    <td>${r.last_fired ? new Date(r.last_fired).toLocaleString() : 'Never'}</td>
+  </tr>`).join('')}</table>
+  <h2>Automation Log</h2>
+  <table><tr><th>Rule</th><th>Module</th><th>Action</th><th>Time</th></tr>
+  ${(automation_log || []).map(l => `<tr>
+    <td>${l.rule_key}</td><td>${l.related_module || '—'}</td>
+    <td>${l.action_taken}</td><td>${l.fired_at ? new Date(l.fired_at).toLocaleString() : '—'}</td>
+  </tr>`).join('')}</table>
+  <script>window.onload=()=>window.print();</script></body></html>`);
+  win.document.close();
+}
+
+async function renderAutomationCenter() {
+  _autoLastLoad = Date.now();
+  const el = $('page-automation');
+  el.innerHTML = `<div class="ptitle"><i class="ti ti-robot"></i> Automation Center</div>
+    <div class="card" style="padding:32px;text-align:center">
+      <i class="ti ti-loader-2 spin"></i> Loading automation data…</div>`;
+
+  const res = await UFCL.automationDashboard(STORAGE.user.id);
+  if (!res?.ok) {
+    el.innerHTML = `<div class="ptitle"><i class="ti ti-robot"></i> Automation Center</div>
+      <div class="card" style="padding:24px;color:var(--red)">
+        <i class="ti ti-alert-circle"></i> ${res?.error || 'Load failed'}</div>`;
+    return;
+  }
+
+  // Stash full response on the page element so export/print can access it
+  el._acData = res;
+
+  const { summary: sm, scheduler: sch, rules, automation_log, pending_jobs,
+          failed_jobs, escalations, activity_by_day } = res;
+  const active      = escalations?.active      || [];
+  const levelCounts = escalations?.level_counts || {};
+  const recentRuns  = sch.recent_runs           || [];
+  const ts = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const fmtAgo = (iso) => {
+    if (!iso) return '—';
+    const mins = Math.floor((Date.now() - new Date(iso)) / 60000);
+    if (mins < 1)    return 'just now';
+    if (mins < 60)   return `${mins}m ago`;
+    if (mins < 1440) return `${Math.floor(mins / 60)}h ago`;
+    return `${Math.floor(mins / 1440)}d ago`;
+  };
+
+  const sevColor = { critical:'#dc2626', high:'#d97706', medium:'#2563eb', low:'#16a34a', info:'#6366f1' };
+  const sevBg    = { critical:'#fee2e2', high:'#fef3c7', medium:'#dbeafe', low:'#dcfce7', info:'#e0e7ff' };
+  const lvlColor = { leader:'#0369a1', manager:'#b45309', director:'#9a3412', ceo:'#991b1b' };
+  const lvlBg    = { leader:'#e0f2fe', manager:'#fef3c7', director:'#fed7aa', ceo:'#fee2e2' };
+
+  const sevBadge = (sev) =>
+    `<span style="background:${sevBg[sev]||'#f3f4f6'};color:${sevColor[sev]||'#374151'};padding:2px 7px;border-radius:12px;font-size:11px;font-weight:600">${(sev||'—').toUpperCase()}</span>`;
+
+  const actionBadge = (action) => {
+    const map = { notify:['#dbeafe','#1d4ed8'], draft_request:['#dcfce7','#166534'], escalate:['#fef3c7','#92400e'], log_only:['#f3f4f6','#6b7280'] };
+    const [bg, fg] = map[action] || ['#f3f4f6','#6b7280'];
+    return `<span style="background:${bg};color:${fg};padding:2px 7px;border-radius:12px;font-size:11px;font-weight:600">${(action||'—').replace('_',' ')}</span>`;
+  };
+
+  const lvlBadge = (lvl) =>
+    `<span style="background:${lvlBg[lvl]||'#f3f4f6'};color:${lvlColor[lvl]||'#374151'};padding:2px 7px;border-radius:12px;font-size:11px;font-weight:700;text-transform:uppercase">${lvl||'—'}</span>`;
+
+  // ── KPI cards ─────────────────────────────────────────────────────────────────
+  const kpiHtml = `
+    <div class="sg-grid4" style="margin-bottom:1rem">
+      <div class="sg-kpi${sm.rules_disabled > 0 ? ' sg-kpi-amber' : ' sg-kpi-green'}">
+        <div class="sg-kpi-n">${sm.rules_enabled}<span style="font-size:14px;color:var(--t3);font-weight:500"> / ${sm.rules_total}</span></div>
+        <div class="sg-kpi-l">Rules Active</div>
+        <div class="sg-kpi-s">${sm.rules_disabled} disabled</div>
+      </div>
+      <div class="sg-kpi${sm.active_escalations > 0 ? ' sg-kpi-red' : ' sg-kpi-green'}">
+        <div class="sg-kpi-n">${sm.active_escalations}</div>
+        <div class="sg-kpi-l">Active Escalations</div>
+        <div class="sg-kpi-s">CEO:${levelCounts.ceo||0} · Dir:${levelCounts.director||0} · Mgr:${levelCounts.manager||0}</div>
+      </div>
+      <div class="sg-kpi${sm.failed_jobs > 0 ? ' sg-kpi-red' : ' sg-kpi-green'}">
+        <div class="sg-kpi-n">${sm.failed_jobs}</div>
+        <div class="sg-kpi-l">Failed Jobs</div>
+        <div class="sg-kpi-s">${sm.pending_jobs} pending</div>
+      </div>
+      <div class="sg-kpi">
+        <div class="sg-kpi-n">${sm.automations_24h}</div>
+        <div class="sg-kpi-l">Automations (24h)</div>
+        <div class="sg-kpi-s">${sm.ticks_24h} ticks · avg ${sm.avg_tick_ms != null ? sm.avg_tick_ms + 'ms' : '—'}</div>
+      </div>
+    </div>`;
+
+  // ── System Status — health + activity chart ────────────────────────────────────
+  const lastRun   = recentRuns[0];
+  const totalRuns = recentRuns.length;
+  const errRuns   = recentRuns.filter(r => r.errors > 0).length;
+  const healthClr = !totalRuns ? '#9ca3af' : errRuns === 0 ? 'var(--green)' : errRuns < totalRuns / 2 ? '#d97706' : 'var(--red)';
+  const healthTxt = !totalRuns ? 'No data' : errRuns === 0 ? 'Healthy' : `${errRuns}/${totalRuns} ticks had errors`;
+
+  const recentRunsRows = recentRuns.length === 0
+    ? `<div style="padding:.75rem;text-align:center;color:var(--t3);font-size:12px">No runs recorded yet.</div>`
+    : recentRuns.map(r => {
+        const dot = r.errors > 0 ? 'var(--amber)' : 'var(--green)';
+        return `<div style="display:grid;grid-template-columns:8px 1fr auto auto;align-items:center;gap:.375rem .75rem;padding:.3rem 0;border-bottom:1px solid var(--bd)">
+          <span style="width:7px;height:7px;border-radius:50%;background:${dot};display:inline-block;flex-shrink:0"></span>
+          <span style="font-size:11px;color:var(--t2)">${fmtAgo(r.started_at)}</span>
+          <span style="font-size:11px;color:var(--t3)">${r.duration_ms != null ? r.duration_ms + 'ms' : '—'}</span>
+          <span style="font-size:11px;color:${r.errors > 0 ? 'var(--red)' : 'var(--t3)'}">${r.errors > 0 ? r.errors + ' err' : '✓'}</span>
+        </div>`;
+      }).join('');
+
+  const statusPanel = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem">
+      <div class="card" style="padding:1rem">
+        <div style="font-weight:700;font-size:13px;margin-bottom:.75rem"><i class="ti ti-heart-rate-monitor" style="color:var(--blue);margin-right:5px"></i>System Status</div>
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.75rem">
+          <span style="width:11px;height:11px;border-radius:50%;background:${healthClr};flex-shrink:0"></span>
+          <span style="font-weight:600;font-size:13px">${healthTxt}</span>
+        </div>
+        <div style="font-size:12px;color:var(--t2);line-height:1.9;margin-bottom:.75rem">
+          <div>Interval: <strong>15 min</strong> · Last run: <strong>${fmtAgo(sch.last_automation)}</strong></div>
+          <div>Last security scan: <strong>${fmtAgo(sch.last_security)}</strong></div>
+          <div>Avg tick: <strong>${sm.avg_tick_ms != null ? sm.avg_tick_ms + 'ms' : '—'}</strong> · Ticks 24h: <strong>${sm.ticks_24h}</strong></div>
+        </div>
+        <div style="font-weight:600;font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.25rem">Recent Runs</div>
+        <div>${recentRunsRows}</div>
+      </div>
+      <div class="card" style="padding:1rem">
+        <div style="font-weight:700;font-size:13px;margin-bottom:.5rem"><i class="ti ti-chart-bar" style="color:var(--blue);margin-right:5px"></i>Automation Activity — Last 7 Days</div>
+        <div style="margin:.75rem 0">${_acBarChart(activity_by_day)}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:.75rem">
+          ${['leader','manager','director','ceo'].map(lvl => `
+            <div style="text-align:center">
+              ${lvlBadge(lvl)}
+              <div style="font-weight:700;font-size:14px;margin-top:3px;color:${levelCounts[lvl] > 0 ? lvlColor[lvl] : 'var(--t3)'}">${levelCounts[lvl] || 0}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+
+  // ── Rule status table ─────────────────────────────────────────────────────────
+  const ruleRows = (rules || []).map(r => `
+    <div style="display:grid;grid-template-columns:10px 1fr auto auto auto auto;align-items:center;gap:.4rem .9rem;padding:.5rem 0;border-bottom:1px solid var(--bd)">
+      <span style="width:8px;height:8px;border-radius:50%;background:${r.enabled ? 'var(--green)' : 'var(--red)'};display:inline-block;flex-shrink:0"></span>
+      <div>
+        <div style="font-weight:600;font-size:13px">${r.label}</div>
+        <div style="font-size:11px;color:var(--t3)">${r.rule_key} · cooldown ${r.cooldown_hours}h · last: ${fmtAgo(r.last_fired)}</div>
+      </div>
+      ${sevBadge(r.severity)}
+      ${actionBadge(r.auto_action)}
+      <button class="bs1" style="font-size:11px;padding:3px 10px" onclick="_acToggleRule('${r.rule_key}',${!r.enabled})">${r.enabled ? 'Disable' : 'Enable'}</button>
+      <button class="bs1" style="font-size:11px;padding:3px 10px" onclick="_acEditRule('${r.rule_key}')"><i class="ti ti-edit" style="font-size:11px"></i> Edit</button>
+    </div>`).join('');
+
+  const rulesPanel = `
+    <div class="card" style="padding:1rem">
+      <div style="font-weight:700;font-size:13px;margin-bottom:.75rem"><i class="ti ti-cpu" style="color:var(--blue);margin-right:5px"></i>Rule Status</div>
+      <div style="display:grid;grid-template-columns:10px 1fr auto auto auto auto;gap:.25rem .9rem;padding:.375rem 0;border-bottom:2px solid var(--bd);margin-bottom:.125rem">
+        <span></span>
+        <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Rule</span>
+        <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Severity</span>
+        <span style="font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.05em">Action</span>
+        <span></span><span></span>
+      </div>
+      ${ruleRows || '<div style="padding:1rem;text-align:center;color:var(--t3);font-size:13px">No rules found.</div>'}
+    </div>`;
+
+  // ── Scheduler sidebar ─────────────────────────────────────────────────────────
+  const sidePanel = `
+    <div style="display:flex;flex-direction:column;gap:1rem">
+      <div class="card" style="padding:1rem">
+        <div style="font-weight:700;font-size:13px;margin-bottom:.5rem"><i class="ti ti-clock" style="color:var(--blue);margin-right:5px"></i>Scheduler</div>
+        <div style="font-size:12px;color:var(--t2);line-height:2">
+          <div>Interval: <strong>15 min</strong></div>
+          <div>Last automation: <strong>${fmtAgo(sch.last_automation)}</strong></div>
+          <div>Last security: <strong>${fmtAgo(sch.last_security)}</strong></div>
+          <div>Failed jobs: <strong style="color:${sm.failed_jobs > 0 ? 'var(--red)' : 'inherit'}">${sm.failed_jobs}</strong></div>
+          <div>Pending jobs: <strong>${sm.pending_jobs}</strong></div>
+        </div>
+      </div>
+    </div>`;
+
+  // ── Active escalations ─────────────────────────────────────────────────────────
+  const entityIcon = { maintenance:'ti-engine', delivery:'ti-truck-delivery', workflow:'ti-cpu',
+    security:'ti-shield-exclamation', approval_edit:'ti-edit', approval_del:'ti-trash' };
+  const isAdmin = ['admin','ceo','director','manager','operations'].includes(STORAGE.user?.role);
+  const escRows = active.length === 0
+    ? `<div style="padding:1.5rem;text-align:center;color:var(--t3);font-size:13px">
+         <i class="ti ti-circle-check" style="font-size:24px;display:block;margin-bottom:.5rem;opacity:.3"></i>No active escalations.</div>`
+    : active.map(e => {
+        const icon = entityIcon[e.entity_type] || 'ti-alert-circle';
+        const ageH = Number(e.age_hours) || 0;
+        return `<div style="display:grid;grid-template-columns:auto 1fr auto auto ${isAdmin ? 'auto' : ''} auto;align-items:center;gap:.5rem 1rem;padding:.5rem .75rem;border-bottom:1px solid var(--bd)">
+          <i class="ti ${icon}" style="color:${lvlColor[e.current_level]||'var(--t3)'}"></i>
+          <div>
+            <div style="font-weight:600;font-size:13px">${e.entity_ref || e.entity_id}</div>
+            <div style="font-size:11px;color:var(--t3)">${(e.entity_type||'').replace('_',' ')} · rule: ${e.triggered_by}</div>
+          </div>
+          ${lvlBadge(e.current_level)}
+          <span style="font-size:12px;color:var(--t3)">${ageH < 1 ? '<1h' : Math.round(ageH) + 'h'}</span>
+          ${isAdmin ? `<button class="bs1" style="font-size:11px;padding:3px 10px" onclick="_acResolveEsc(${e.id})"><i class="ti ti-check" style="font-size:11px"></i> Resolve</button>` : ''}
+          <button class="bs1" style="font-size:11px;padding:3px 10px" onclick="_acAckEsc(${e.id})"><i class="ti ti-eye" style="font-size:11px"></i> Ack</button>
+        </div>`;
+      }).join('');
+
+  const escalPanel = `
+    <div class="card" style="padding:1rem;margin-bottom:1rem">
+      <div style="font-weight:700;font-size:13px;margin-bottom:.5rem">
+        <i class="ti ti-arrows-up" style="color:${sm.active_escalations > 0 ? 'var(--red)' : 'var(--t3)'};margin-right:5px"></i>
+        Active Escalations (${sm.active_escalations})
+      </div>
+      ${escRows}
+    </div>`;
+
+  // ── History with filters ──────────────────────────────────────────────────────
+  const ruleKeys = [...new Set((automation_log || []).map(l => l.rule_key))].sort();
+  const filterOpts = ruleKeys.map(k => `<option value="${k}">${k}</option>`).join('');
+
+  const logRowsHtml = (automation_log || []).length === 0
+    ? `<div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">No log entries.</div>`
+    : automation_log.map(l => `
+        <div class="ac-log-row" data-rule="${l.rule_key}" style="padding:.375rem 0;border-bottom:1px solid var(--bd)">
+          <div style="font-size:12px;font-weight:600;color:var(--t2)">${l.rule_key}</div>
+          <div style="font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${l.action_taken}</div>
+          <div style="font-size:10px;color:var(--t3);opacity:.7">${fmtAgo(l.fired_at)}</div>
+        </div>`).join('');
+
+  const logPanel = `
+    <div class="card" style="padding:1rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem;gap:.5rem;flex-wrap:wrap">
+        <div style="font-weight:700;font-size:13px"><i class="ti ti-history" style="color:var(--blue);margin-right:5px"></i>History (${(automation_log||[]).length})</div>
+        <div style="display:flex;align-items:center;gap:.375rem">
+          <select id="ac-log-filter" class="finput" style="font-size:11px;padding:2px 6px;height:auto">
+            <option value="">All rules</option>${filterOpts}
+          </select>
+          <button class="bs1" id="ac-export-btn" style="font-size:11px;padding:3px 8px"><i class="ti ti-download" style="font-size:11px"></i> CSV</button>
+        </div>
+      </div>
+      <div id="ac-log-list" style="max-height:360px;overflow-y:auto">${logRowsHtml}</div>
+    </div>`;
+
+  // ── Upcoming jobs ─────────────────────────────────────────────────────────────
+  const pendRows = (pending_jobs || []).length === 0
+    ? `<div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">No pending jobs.</div>`
+    : pending_jobs.map(j => `
+        <div style="padding:.375rem 0;border-bottom:1px solid var(--bd)">
+          <div style="font-size:12px;font-weight:600;color:var(--t2)">${j.type}</div>
+          <div style="font-size:11px;color:var(--t3)">Run at: ${j.run_at ? new Date(j.run_at).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}) : '—'} · ${j.attempts}/${j.max_attempts} attempts</div>
+        </div>`).join('');
+
+  const pendPanel = `
+    <div class="card" style="padding:1rem">
+      <div style="font-weight:700;font-size:13px;margin-bottom:.75rem"><i class="ti ti-clock-play" style="color:var(--blue);margin-right:5px"></i>Upcoming Jobs (${sm.pending_jobs})</div>
+      <div style="max-height:360px;overflow-y:auto">${pendRows}</div>
+    </div>`;
+
+  // ── Failed jobs ───────────────────────────────────────────────────────────────
+  const failRows = (failed_jobs || []).length === 0
+    ? `<div style="padding:1rem;text-align:center;color:var(--t3);font-size:12px">No failed jobs.</div>`
+    : failed_jobs.map(j => `
+        <div style="padding:.375rem 0;border-bottom:1px solid var(--bd)">
+          <div style="font-size:12px;font-weight:600;color:var(--red)">${j.type}</div>
+          <div style="font-size:11px;color:var(--t3)">Attempts: ${j.attempts}/${j.max_attempts} · ${fmtAgo(j.processed_at)}</div>
+          ${j.last_error ? `<div style="font-size:10px;color:var(--red);opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${String(j.last_error).slice(0, 80)}</div>` : ''}
+        </div>`).join('');
+
+  const failPanel = `
+    <div class="card" style="padding:1rem">
+      <div style="font-weight:700;font-size:13px;margin-bottom:.75rem"><i class="ti ti-alert-triangle" style="color:${sm.failed_jobs > 0 ? 'var(--red)' : 'var(--t3)'};margin-right:5px"></i>Failed Jobs (${sm.failed_jobs})</div>
+      <div style="max-height:360px;overflow-y:auto">${failRows}</div>
+    </div>`;
+
+  // ── Assemble ──────────────────────────────────────────────────────────────────
+  el.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
+      <div class="ptitle" style="margin:0"><i class="ti ti-robot" style="margin-right:6px"></i>Automation Center</div>
+      <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+        <span style="font-size:12px;color:var(--t3)">Updated: ${ts}</span>
+        <button class="bs1" id="ac-run-btn"     style="font-size:12px"><i class="ti ti-player-play"></i> Run Now</button>
+        <button class="bs1" id="ac-print-btn"   style="font-size:12px"><i class="ti ti-printer"></i> Print</button>
+        <button class="bs1" id="ac-refresh-btn" style="font-size:12px"><i class="ti ti-refresh"></i> Refresh</button>
+      </div>
+    </div>
+    ${kpiHtml}
+    ${statusPanel}
+    <div style="display:grid;grid-template-columns:1fr 220px;gap:1rem;margin-bottom:1rem">
+      ${rulesPanel}
+      ${sidePanel}
+    </div>
+    ${escalPanel}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem">
+      ${logPanel}
+      ${pendPanel}
+      ${failPanel}
+    </div>`;
+
+  // ── Event handlers ────────────────────────────────────────────────────────────
+  $('ac-refresh-btn').onclick = () => renderAutomationCenter();
+
+  $('ac-run-btn').onclick = async () => {
+    const btn = $('ac-run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="ti ti-loader-2 spin"></i> Running…';
+    const r = await UFCL.automationRun(STORAGE.user.id);
+    if (r?.ok) {
+      setTimeout(() => renderAutomationCenter(), 2000);
+    } else {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="ti ti-player-play"></i> Run Now';
+      alert(r?.error || 'Failed to trigger automation run');
+    }
+  };
+
+  $('ac-print-btn').onclick = () => _acPrintReport($('page-automation')._acData);
+
+  $('ac-export-btn').onclick = () => _acExportHistoryCsv($('page-automation')._acData?.automation_log || []);
+
+  $('ac-log-filter').onchange = function () {
+    const val = this.value;
+    document.querySelectorAll('#page-automation .ac-log-row').forEach(row => {
+      row.style.display = (!val || row.dataset.rule === val) ? '' : 'none';
+    });
+  };
+}
+
+async function _acToggleRule(ruleKey, enabled) {
+  const r = await UFCL.automationToggle(STORAGE.user.id, ruleKey, enabled);
+  if (r?.ok) renderAutomationCenter();
+  else alert(r?.error || 'Toggle failed');
+}
+
+async function _acEditRule(ruleKey) {
+  const r = await UFCL.automationRule(STORAGE.user.id, ruleKey);
+  if (!r?.ok) return alert(r?.error || 'Failed to load rule');
+  const rule = r.rule;
+  openOverlay(`Edit Rule — ${rule.label}`, null, `
+    <div style="display:grid;gap:.75rem">
+      <label style="font-size:12px;color:var(--t3)">Severity
+        <select id="ov-sev" class="finput" style="display:block;width:100%;margin-top:3px">
+          ${['critical','high','medium','low','info'].map(s =>
+            `<option value="${s}"${s === rule.severity ? ' selected' : ''}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`
+          ).join('')}
+        </select>
+      </label>
+      <label style="font-size:12px;color:var(--t3)">Auto Action
+        <select id="ov-action" class="finput" style="display:block;width:100%;margin-top:3px">
+          ${['notify','draft_request','escalate','log_only'].map(a =>
+            `<option value="${a}"${a === rule.auto_action ? ' selected' : ''}>${a.replace('_', ' ')}</option>`
+          ).join('')}
+        </select>
+      </label>
+      <label style="font-size:12px;color:var(--t3)">Cooldown (hours)
+        <input id="ov-cd" type="number" min="0" class="finput" style="display:block;width:100%;margin-top:3px" value="${rule.cooldown_hours}">
+      </label>
+      <label style="font-size:12px;color:var(--t3)">Notify Roles (comma-separated)
+        <input id="ov-roles" type="text" class="finput" style="display:block;width:100%;margin-top:3px" value="${(rule.notify_roles || []).join(', ')}">
+      </label>
+      <label style="font-size:12px;color:var(--t3)">Threshold (JSON)
+        <textarea id="ov-thr" class="finput" rows="5" style="display:block;width:100%;margin-top:3px;font-family:monospace;font-size:11px">${JSON.stringify(rule.threshold || {}, null, 2)}</textarea>
+      </label>
+    </div>
+    <div class="brow" style="margin-top:1rem">
+      <button class="bp1" id="ovSave"><i class="ti ti-device-floppy"></i> Save</button>
+      <button class="bs1" id="ovCancel">Cancel</button>
+    </div>`,
+    async () => {
+      const sev    = $('ov-sev').value;
+      const action = $('ov-action').value;
+      const cd     = Number($('ov-cd').value);
+      const roles  = $('ov-roles').value.split(',').map(s => s.trim()).filter(Boolean);
+      let thr;
+      try { thr = JSON.parse($('ov-thr').value); }
+      catch {
+        const e = $('ovErr');
+        e.textContent = 'Invalid JSON in threshold field.';
+        e.style.display = 'block';
+        return;
+      }
+      const res = await UFCL.automationUpdate(STORAGE.user.id, ruleKey, {
+        severity: sev, auto_action: action, cooldown_hours: cd,
+        notify_roles: roles, threshold: thr,
+      });
+      if (res?.ok) { closeOverlay(); renderAutomationCenter(); }
+      else {
+        const e = $('ovErr');
+        e.textContent = res?.error || 'Save failed';
+        e.style.display = 'block';
+      }
+    }
+  );
+}
+
+async function _acResolveEsc(escalationId) {
+  const reason = prompt('Resolution reason:');
+  if (!reason) return;
+  const r = await UFCL.escalationResolve(STORAGE.user.id, escalationId, reason);
+  if (r?.ok) renderAutomationCenter();
+  else alert(r?.error || 'Resolve failed');
+}
+
+async function _acAckEsc(escalationId) {
+  const r = await UFCL.escalationAck(STORAGE.user.id, escalationId);
+  if (r?.ok) renderAutomationCenter();
+  else alert(r?.error || 'Acknowledge failed');
+}
+
+// ╔══════════════════════════════════════════════════════════════════════════════╗
+// ║  PHASE 9 — ENTERPRISE PERFORMANCE MANAGEMENT                                ║
+// ╚══════════════════════════════════════════════════════════════════════════════╝
+
+function _epmRagBadge(status) {
+  const m = { 'on-track': ['epm-badge-green','On Track'], 'at-risk': ['epm-badge-amber','At Risk'],
+               'off-track': ['epm-badge-red','Off Track'], 'green': ['epm-badge-green','Green'],
+               'amber': ['epm-badge-amber','Amber'], 'red': ['epm-badge-red','Red'],
+               'no-data': ['epm-badge-grey','No Data'] };
+  const [cls, lbl] = m[status] || ['epm-badge-grey', status];
+  return `<span class="epm-badge ${cls}">${lbl}</span>`;
+}
+
+function _epmScoreDial(score, size = 72) {
+  const r = size / 2 - 6;
+  const c = 2 * Math.PI * r;
+  const pct = Math.min(100, Math.max(0, score));
+  const filled = (pct / 100) * c;
+  const color = pct >= 80 ? '#22c55e' : pct >= 60 ? '#f59e0b' : '#ef4444';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="var(--bdr)" stroke-width="6"/>
+    <circle cx="${size/2}" cy="${size/2}" r="${r}" fill="none" stroke="${color}" stroke-width="6"
+      stroke-dasharray="${filled} ${c}" stroke-dashoffset="${c/4}"
+      stroke-linecap="round" transform="rotate(-90 ${size/2} ${size/2})"/>
+    <text x="${size/2}" y="${size/2+5}" text-anchor="middle" font-size="14" font-weight="600"
+      fill="${color}" font-family="DM Sans">${pct}</text>
+  </svg>`;
+}
+
+function _epmTrendIcon(trend) {
+  return trend === 'improving' ? '<i class="ti ti-trending-up" style="color:#22c55e"></i>'
+    : trend === 'declining'   ? '<i class="ti ti-trending-down" style="color:#ef4444"></i>'
+    : '<i class="ti ti-minus" style="color:#94a3b8"></i>';
+}
+
+function _epmAchBar(pct) {
+  const w = Math.min(100, Math.max(0, pct || 0));
+  const c = w >= 90 ? '#22c55e' : w >= 70 ? '#f59e0b' : '#ef4444';
+  return `<div style="display:flex;align-items:center;gap:6px">
+    <div style="flex:1;height:6px;background:var(--bdr);border-radius:3px;overflow:hidden">
+      <div style="width:${w}%;height:100%;background:${c};border-radius:3px;transition:width .4s"></div>
+    </div>
+    <span style="font-size:11px;font-weight:600;color:${c};width:30px;text-align:right">${w}%</span>
+  </div>`;
+}
+
+let _epmKpiFilter  = '';
+let _epmDeptFilter = '';
+let _epmStatFilter = '';
+
+async function renderEPM() {
+  _epmLastLoad = Date.now();
+  const el = $('page-epm');
+  if (!el) return;
+  el.innerHTML = `<div class="pload"><i class="ti ti-loader-2 spin"></i> Loading Enterprise Performance data…</div>`;
+
+  const [dashRes, execRes, deptRes, planRes, trendRes] = await Promise.all([
+    UFCL.performanceDashboard(STORAGE.user.id),
+    UFCL.executiveScorecard(STORAGE.user.id),
+    UFCL.departmentScorecards(STORAGE.user.id),
+    UFCL.performanceActionPlans(STORAGE.user.id),
+    UFCL.performanceTrends(STORAGE.user.id),
+  ]);
+
+  if (!dashRes?.ok) {
+    el.innerHTML = `<div class="pload" style="color:#ef4444"><i class="ti ti-lock"></i> ${dashRes?.error || 'Access denied'}</div>`;
+    return;
+  }
+
+  const sm     = dashRes.summary;
+  const kpis   = dashRes.kpis || [];
+  const exec   = execRes?.ok ? execRes : null;
+  const depts  = deptRes?.ok ? deptRes.scorecards || [] : [];
+  const plans  = planRes?.ok ? planRes.plans || [] : [];
+  const planSm = planRes?.ok ? planRes.summary : {};
+  const trends = trendRes?.ok ? trendRes.trends : {};
+
+  const now   = new Date().toLocaleString('en-GB', { dateStyle:'medium', timeStyle:'short' });
+  const month = sm.period || new Date().toISOString().slice(0, 7);
+
+  // ── Company Score Gauge ────────────────────────────────────────────────────
+  const cScore    = sm.company_score || 0;
+  const cColor    = cScore >= 80 ? '#22c55e' : cScore >= 60 ? '#f59e0b' : '#ef4444';
+  const cStatus   = cScore >= 80 ? 'Strong' : cScore >= 60 ? 'Moderate' : 'Critical';
+  const cRag      = cScore >= 80 ? 'green' : cScore >= 60 ? 'amber' : 'red';
+
+  // ── Executive Scorecard rows ────────────────────────────────────────────────
+  const execRows = exec ? exec.dimensions.map(d => `
+    <tr>
+      <td><i class="ti ${d.icon}" style="color:${d.status==='green'?'#22c55e':d.status==='amber'?'#f59e0b':'#ef4444'}"></i> ${d.name}</td>
+      <td>${_epmScoreDial(d.score, 48)}</td>
+      <td>${_epmRagBadge(d.status)}</td>
+      <td style="color:var(--t3);font-size:12px">${d.detail}</td>
+    </tr>`).join('') : '';
+
+  // ── Department Scorecard cards ─────────────────────────────────────────────
+  const deptCards = depts.map(d => {
+    const rag = d.risk_level === 'high' ? '#ef4444' : d.risk_level === 'medium' ? '#f59e0b' : '#22c55e';
+    return `<div class="epm-dept-card" style="border-top:3px solid ${d.color||'#2e8b57'}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px">
+          <i class="ti ${d.icon||'ti-chart-bar'}" style="font-size:18px;color:${d.color||'#2e8b57'}"></i>
+          <strong style="font-size:14px">${d.department}</strong>
+        </div>
+        ${_epmScoreDial(d.score, 52)}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <span class="epm-badge epm-badge-green" title="On Track">${d.on_track} <i class="ti ti-check"></i></span>
+        <span class="epm-badge epm-badge-amber" title="At Risk">${d.at_risk} <i class="ti ti-alert-triangle"></i></span>
+        <span class="epm-badge epm-badge-red"   title="Off Track">${d.off_track} <i class="ti ti-x"></i></span>
+      </div>
+      <div style="font-size:11px;color:var(--t3);display:flex;gap:10px">
+        <span>Risk: <strong style="color:${rag}">${d.risk_level}</strong></span>
+        <span>Actions: <strong>${d.open_actions}</strong> open</span>
+        ${_epmTrendIcon(d.trend)}
+      </div>
+    </div>`;
+  }).join('');
+
+  // ── KPI Table ──────────────────────────────────────────────────────────────
+  const depts_unique = [...new Set(kpis.map(k => k.department))].sort();
+  const filteredKPIs = kpis.filter(k => {
+    const q = _epmKpiFilter.toLowerCase();
+    if (q && !k.name.toLowerCase().includes(q) && !k.department.toLowerCase().includes(q)) return false;
+    if (_epmDeptFilter && k.department !== _epmDeptFilter) return false;
+    if (_epmStatFilter && k.status !== _epmStatFilter) return false;
+    return true;
+  });
+
+  const kpiRows = filteredKPIs.map(k => `
+    <tr>
+      <td><strong>${k.name}</strong><div style="font-size:11px;color:var(--t3)">${k.description||''}</div></td>
+      <td>${k.department}</td>
+      <td style="font-size:12px;color:var(--t3)">${k.owner||'—'}</td>
+      <td style="text-align:right"><strong>${k.current !== null ? Number(k.current).toLocaleString() : '—'}</strong> <span style="color:var(--t3);font-size:11px">${k.unit}</span></td>
+      <td style="text-align:right;color:var(--t3)">${Number(k.target).toLocaleString()} ${k.unit}</td>
+      <td style="min-width:120px">${_epmAchBar(k.achievement)}</td>
+      <td>${_epmRagBadge(k.status)}</td>
+      <td>${_epmTrendIcon(k.trend)}</td>
+      <td style="font-size:11px;color:var(--t3)">${k.review_freq}</td>
+    </tr>`).join('');
+
+  // ── Action Plans ───────────────────────────────────────────────────────────
+  const prioColor = { critical:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' };
+  const planRows = plans.slice(0, 20).map(p => `
+    <tr>
+      <td><strong>${p.problem}</strong><div style="font-size:11px;color:var(--t3)">${p.kpi_name||'General'}</div></td>
+      <td>${p.responsible_dept}</td>
+      <td><span class="epm-badge" style="background:${prioColor[p.priority]||'#6b7280'}20;color:${prioColor[p.priority]||'#6b7280'};border:1px solid ${prioColor[p.priority]||'#6b7280'}40">${p.priority}</span></td>
+      <td>${p.due_date ? new Date(p.due_date).toLocaleDateString('en-GB') : '—'}</td>
+      <td>${_epmRagBadge(p.status === 'draft' ? 'no-data' : p.status === 'approved' || p.status === 'in_progress' ? 'amber' : p.status === 'completed' ? 'green' : 'no-data')}<span style="font-size:11px;margin-left:4px">${p.status.replace(/_/g,' ')}</span></td>
+      <td style="font-size:11px;color:var(--t3)">${p.auto_generated ? '<i class="ti ti-robot" title="Auto-generated"></i>' : '<i class="ti ti-user"></i>'}</td>
+    </tr>`).join('');
+
+  // ── Trend Sparklines ───────────────────────────────────────────────────────
+  function miniChart(rows, label, color) {
+    if (!rows || !rows.length) return `<div class="epm-mini-chart"><div style="color:var(--t3);font-size:12px">No data</div><div class="epm-chart-lbl">${label}</div></div>`;
+    const vals = rows.map(r => Number(r.value) || 0);
+    const mx   = Math.max(...vals, 1);
+    const mn   = Math.min(...vals, 0);
+    const rng  = mx - mn || 1;
+    const W = 160, H = 48, p = 4;
+    const pts = vals.map((v, i) => {
+      const x = p + (i / Math.max(vals.length - 1, 1)) * (W - 2*p);
+      const y = H - p - ((v - mn) / rng) * (H - 2*p);
+      return `${x},${y}`;
+    }).join(' ');
+    const lastVal = vals[vals.length - 1];
+    return `<div class="epm-mini-chart">
+      <svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="${pts.split(' ').pop().split(',')[0]}" cy="${pts.split(' ').pop().split(',')[1]}" r="3" fill="${color}"/>
+      </svg>
+      <div style="display:flex;justify-content:space-between;margin-top:2px">
+        <div class="epm-chart-lbl">${label}</div>
+        <div style="font-size:11px;font-weight:600;color:${color}">${lastVal.toLocaleString()}</div>
+      </div>
+    </div>`;
+  }
+
+  const trendBlock = `
+    <div class="epm-trend-grid">
+      ${miniChart(trends.revenue,    'Revenue (weekly)',     '#2e8b57')}
+      ${miniChart(trends.production, 'Production (weekly)',  '#7C3AED')}
+      ${miniChart(trends.harvest,    'Harvest (weekly)',     '#15803D')}
+      ${miniChart(trends.fuel,       'Fuel consumed (daily)','#f59e0b')}
+      ${miniChart(trends.stock,      'Stock issues (daily)', '#2563EB')}
+      ${miniChart(trends.approvals,  'Approvals (weekly)',   '#EA580C')}
+    </div>`;
+
+  el.innerHTML = `
+  <style>
+    .epm-hdr { display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem; flex-wrap:wrap; gap:10px }
+    .epm-score-hero { display:flex; align-items:center; gap:1.5rem; background:var(--surf); border:1px solid var(--bdr); border-radius:14px; padding:1.25rem 1.5rem; margin-bottom:1.25rem }
+    .epm-score-big { font-size:64px; font-weight:700; line-height:1; color:${cColor} }
+    .epm-score-info { flex:1 }
+    .epm-score-info h2 { font-size:1.1rem; margin:0 0 4px }
+    .epm-kpi-row { display:flex; gap:.75rem; flex-wrap:wrap; margin-bottom:1.25rem }
+    .epm-kpi-tile { flex:1; min-width:120px; background:var(--surf); border:1px solid var(--bdr); border-radius:10px; padding:.9rem 1rem; text-align:center }
+    .epm-kpi-tile .kn { font-size:1.8rem; font-weight:700 }
+    .epm-kpi-tile .kl { font-size:11px; color:var(--t3); margin-top:2px }
+    .epm-section { background:var(--surf); border:1px solid var(--bdr); border-radius:12px; padding:1.25rem; margin-bottom:1.25rem }
+    .epm-section h3 { font-size:.95rem; font-weight:600; margin:0 0 1rem; display:flex; align-items:center; gap:.5rem }
+    .epm-dept-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px }
+    .epm-dept-card { background:var(--bg); border:1px solid var(--bdr); border-radius:10px; padding:1rem }
+    .epm-badge { display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px }
+    .epm-badge-green { background:#22c55e20; color:#16a34a; border:1px solid #22c55e40 }
+    .epm-badge-amber { background:#f59e0b20; color:#b45309; border:1px solid #f59e0b40 }
+    .epm-badge-red   { background:#ef444420; color:#dc2626; border:1px solid #ef444440 }
+    .epm-badge-grey  { background:var(--bdr); color:var(--t3); border:1px solid var(--bdr) }
+    .epm-filters { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:.75rem }
+    .epm-filters input, .epm-filters select { padding:6px 10px; border:1px solid var(--bdr); border-radius:8px; background:var(--bg); color:var(--t1); font-size:13px }
+    .epm-trend-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:12px }
+    .epm-mini-chart { background:var(--bg); border:1px solid var(--bdr); border-radius:8px; padding:10px }
+    .epm-chart-lbl { font-size:11px; color:var(--t3) }
+    .epm-plans-summary { display:flex; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem }
+  </style>
+
+  <div class="epm-hdr">
+    <div>
+      <div class="ptitle"><i class="ti ti-chart-radar"></i> Enterprise Performance Management</div>
+      <div class="psub">Period: ${month} · Refreshed: ${now}</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="sbtn2" id="epm-refresh-btn"><i class="ti ti-refresh"></i> Refresh</button>
+      <button class="sbtn2" id="epm-export-btn"><i class="ti ti-file-download"></i> Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Company Score Hero -->
+  <div class="epm-score-hero">
+    <div>${_epmScoreDial(cScore, 96)}</div>
+    <div class="epm-score-info">
+      <h2>Company Performance Score</h2>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">
+        <div class="epm-score-big">${cScore}</div>
+        <div>
+          ${_epmRagBadge(cRag)}
+          <div style="font-size:13px;color:var(--t3);margin-top:4px">${cStatus} performance across all departments</div>
+        </div>
+      </div>
+      <div style="font-size:12px;color:var(--t3)">
+        ${sm.on_track} on-track &nbsp;·&nbsp; ${sm.at_risk} at-risk &nbsp;·&nbsp; ${sm.off_track} off-track
+        &nbsp;·&nbsp; ${sm.total_kpis} KPIs across ${sm.departments} departments
+        &nbsp;·&nbsp; ${sm.open_plans} open improvement plans
+      </div>
+    </div>
+  </div>
+
+  <!-- Executive Scorecard -->
+  ${exec ? `
+  <div class="epm-section">
+    <h3><i class="ti ti-shield-star"></i> Executive Scorecard
+      <span style="margin-left:auto">${_epmRagBadge(exec.overall.status)} <strong style="margin-left:6px">${exec.overall.score}</strong> overall</span>
+    </h3>
+    <table class="dtable" style="font-size:13px">
+      <thead><tr><th>Dimension</th><th>Score</th><th>Status</th><th>Detail</th></tr></thead>
+      <tbody>${execRows}</tbody>
+    </table>
+  </div>` : ''}
+
+  <!-- Department Scorecards -->
+  <div class="epm-section">
+    <h3><i class="ti ti-building-community"></i> Department Scorecards</h3>
+    <div class="epm-dept-grid">${deptCards || '<div style="color:var(--t3)">No department data</div>'}</div>
+  </div>
+
+  <!-- KPI Dashboard -->
+  <div class="epm-section">
+    <h3><i class="ti ti-target-arrow"></i> KPI Dashboard <span style="font-size:12px;font-weight:400;margin-left:6px;color:var(--t3)">${filteredKPIs.length} of ${kpis.length} KPIs shown</span></h3>
+    <div class="epm-filters">
+      <input id="epm-search" type="text" placeholder="Search KPIs…" value="${_epmKpiFilter}" style="min-width:180px">
+      <select id="epm-dept-filter">
+        <option value="">All Departments</option>
+        ${depts_unique.map(d => `<option value="${d}" ${_epmDeptFilter===d?'selected':''}>${d}</option>`).join('')}
+      </select>
+      <select id="epm-stat-filter">
+        <option value="">All Statuses</option>
+        <option value="on-track"  ${_epmStatFilter==='on-track'?'selected':''}>On Track</option>
+        <option value="at-risk"   ${_epmStatFilter==='at-risk'?'selected':''}>At Risk</option>
+        <option value="off-track" ${_epmStatFilter==='off-track'?'selected':''}>Off Track</option>
+      </select>
+    </div>
+    <div class="tscroll">
+      <table class="dtable" style="font-size:13px">
+        <thead><tr>
+          <th>KPI Name</th><th>Department</th><th>Owner</th>
+          <th style="text-align:right">Current</th><th style="text-align:right">Target</th>
+          <th style="min-width:130px">Achievement</th><th>Status</th><th>Trend</th><th>Frequency</th>
+        </tr></thead>
+        <tbody id="epm-kpi-tbody">${kpiRows || '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No KPIs match your filters</td></tr>'}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Performance Trends -->
+  <div class="epm-section">
+    <h3><i class="ti ti-chart-line"></i> Performance Trends <span style="font-size:12px;font-weight:400;margin-left:6px;color:var(--t3)">Last 12 weeks</span></h3>
+    ${trendBlock}
+  </div>
+
+  <!-- Action Plans -->
+  <div class="epm-section">
+    <h3><i class="ti ti-list-check"></i> Improvement Action Plans</h3>
+    <div class="epm-plans-summary">
+      <span class="epm-badge epm-badge-grey">${planSm.draft||0} Draft</span>
+      <span class="epm-badge epm-badge-amber">${planSm.pending_approval||0} Pending Approval</span>
+      <span class="epm-badge epm-badge-green">${planSm.approved||0} Approved</span>
+      <span class="epm-badge epm-badge-amber">${planSm.in_progress||0} In Progress</span>
+      <span class="epm-badge epm-badge-green">${planSm.completed||0} Completed</span>
+    </div>
+    ${plans.length ? `<div class="tscroll"><table class="dtable" style="font-size:13px">
+      <thead><tr><th>Problem / KPI</th><th>Department</th><th>Priority</th><th>Due Date</th><th>Status</th><th>Source</th></tr></thead>
+      <tbody>${planRows}</tbody>
+    </table></div>` : `<div style="color:var(--t3);padding:1rem;text-align:center"><i class="ti ti-check"></i> No improvement plans — all KPIs within acceptable range</div>`}
+  </div>`;
+
+  // Wire up controls
+  $('epm-refresh-btn').onclick = () => renderEPM();
+  $('epm-export-btn').onclick  = async () => {
+    const hdr  = 'KPI Key,Name,Department,Owner,Target,Current,Unit,Achievement %,Status,Trend,Review Freq';
+    const rows = kpis.map(k =>
+      [k.kpi_key, `"${k.name}"`, k.department, `"${k.owner||''}"`,
+       k.target, k.current, k.unit, k.achievement, k.status, k.trend, k.review_freq].join(',')
+    );
+    const csv      = [hdr, ...rows].join('\n');
+    const filename = `ufcl_epm_${month}.csv`;
+    const res = await UFCL.performanceExport(STORAGE.user.id, csv, filename);
+    if (res?.ok) alert(`Saved: ${res.filePath}`);
+    else alert(res?.error || 'Export failed');
+  };
+
+  const searchEl = $('epm-search');
+  const deptEl   = $('epm-dept-filter');
+  const statEl   = $('epm-stat-filter');
+
+  searchEl.oninput = () => { _epmKpiFilter  = searchEl.value; _epmRefilter(kpis); };
+  deptEl.onchange  = () => { _epmDeptFilter = deptEl.value;   _epmRefilter(kpis); };
+  statEl.onchange  = () => { _epmStatFilter = statEl.value;   _epmRefilter(kpis); };
+}
+
+function _epmRefilter(kpis) {
+  const filtered = kpis.filter(k => {
+    const q = _epmKpiFilter.toLowerCase();
+    if (q && !k.name.toLowerCase().includes(q) && !k.department.toLowerCase().includes(q)) return false;
+    if (_epmDeptFilter && k.department !== _epmDeptFilter) return false;
+    if (_epmStatFilter && k.status !== _epmStatFilter) return false;
+    return true;
+  });
+  const prioColor = { critical:'#ef4444', high:'#f97316', medium:'#f59e0b', low:'#22c55e' };
+  const tbody = $('epm-kpi-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = filtered.length
+    ? filtered.map(k => `
+      <tr>
+        <td><strong>${k.name}</strong><div style="font-size:11px;color:var(--t3)">${k.description||''}</div></td>
+        <td>${k.department}</td>
+        <td style="font-size:12px;color:var(--t3)">${k.owner||'—'}</td>
+        <td style="text-align:right"><strong>${k.current !== null ? Number(k.current).toLocaleString() : '—'}</strong> <span style="color:var(--t3);font-size:11px">${k.unit}</span></td>
+        <td style="text-align:right;color:var(--t3)">${Number(k.target).toLocaleString()} ${k.unit}</td>
+        <td style="min-width:120px">${_epmAchBar(k.achievement)}</td>
+        <td>${_epmRagBadge(k.status)}</td>
+        <td>${_epmTrendIcon(k.trend)}</td>
+        <td style="font-size:11px;color:var(--t3)">${k.review_freq}</td>
+      </tr>`).join('')
+    : '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:2rem">No KPIs match your filters</td></tr>';
+}
 

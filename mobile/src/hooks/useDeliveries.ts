@@ -3,6 +3,16 @@ import { get, post } from '../api/client';
 import { EP } from '../api/endpoints';
 import { DeliveryListResponse, DeliveryStatus } from '../types/api';
 
+interface CreateDeliveryPayload {
+  driver_name:      string;
+  vehicle_id?:      number;
+  sales_order_id?:  number;
+  qty_dispatched?:  number;
+  delivery_date?:   string;
+  route?:           string;
+  notes?:           string;
+}
+
 export function useDeliveryList() {
   return useQuery<DeliveryListResponse>({
     queryKey:  ['delivery-list'],
@@ -20,6 +30,17 @@ export function useDeliveryStatusUpdate() {
   }
 
   return { updateStatus };
+}
+
+export function useDeliveryCreate() {
+  const qc = useQueryClient();
+
+  async function createDelivery(payload: CreateDeliveryPayload): Promise<void> {
+    await post(EP.DELIVERY_CREATE, payload);
+    await qc.invalidateQueries({ queryKey: ['delivery-list'] });
+  }
+
+  return { createDelivery };
 }
 
 export function usePODCreate() {

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAuthStore } from '../stores/authStore';
+import { useOfflineStore } from '../stores/offlineStore';
+import { startNetworkMonitor, stopNetworkMonitor } from '../services/networkMonitor';
 import { UserRole } from '../types/auth';
 import { ComingSoonScreen } from '../screens/shared/ComingSoonScreen';
 
@@ -14,10 +16,24 @@ import { OperationsNavigator }     from './OperationsNavigator';
 import { LogisticsNavigator }      from './LogisticsNavigator';
 import { SalesNavigator }          from './SalesNavigator';
 import { StorekeeperNavigator }    from './StorekeeperNavigator';
-import { VatNavigator }            from './VatNavigator';
+import { VatNavigator }                  from './VatNavigator';
+import { HarvestSupervisorNavigator }   from './HarvestSupervisorNavigator';
+import { SawmillSupervisorNavigator }   from './SawmillSupervisorNavigator';
+import { PolesSupervisorNavigator }     from './PolesSupervisorNavigator';
+import { VatSupervisorNavigator }       from './VatSupervisorNavigator';
+import { FinanceNavigator }             from './FinanceNavigator';
 
 export function MainNavigator() {
-  const role = useAuthStore((s) => s.user?.role) as UserRole | undefined;
+  const role      = useAuthStore((s) => s.user?.role) as UserRole | undefined;
+  const loadQueue = useOfflineStore((s) => s.loadQueue);
+
+  // Services are started here — after the user is authenticated — not at app
+  // startup. This guarantees the Login screen renders with zero dependencies.
+  useEffect(() => {
+    loadQueue();
+    startNetworkMonitor();
+    return () => stopNetworkMonitor();
+  }, [loadQueue]);
 
   switch (role) {
     case 'admin':
@@ -57,8 +73,22 @@ export function MainNavigator() {
     case 'vat-leader':
       return <VatNavigator />;
 
+    case 'harvesting-supervisor':
+      return <HarvestSupervisorNavigator />;
+
+    case 'sawmill-supervisor':
+      return <SawmillSupervisorNavigator />;
+
+    case 'poles-supervisor':
+      return <PolesSupervisorNavigator />;
+
+    case 'vat-supervisor':
+      return <VatSupervisorNavigator />;
+
+    case 'finance':
+      return <FinanceNavigator />;
+
     default:
-      // 'finance' or unknown role
       return <ComingSoonScreen />;
   }
 }

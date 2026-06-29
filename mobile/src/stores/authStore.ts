@@ -69,8 +69,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Online path: verify token is still valid against the server.
         const data = await meApi();
         if (data.ok) {
-          await saveUserCache(data);          // refresh cache with latest user data
-          set({ token, user: data, isAuthenticated: true, isOfflineSession: false });
+          await saveUserCache(data.user);     // refresh cache with latest user data
+          set({ token, user: data.user, isAuthenticated: true, isOfflineSession: false });
         } else {
           // Server responded but rejected the session (unusual — normally a 401)
           await deleteToken();
@@ -114,8 +114,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const data = await meApi();
       if (data.ok) {
-        await saveUserCache(data);
-        set({ user: data, isOfflineSession: false });
+        await saveUserCache(data.user);
+        set({ user: data.user, isOfflineSession: false });
       }
     } catch (err: unknown) {
       const status = (err as { response?: { status?: number } })?.response?.status;

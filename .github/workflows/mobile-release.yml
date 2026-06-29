@@ -1,0 +1,264 @@
+name: Mobile — Build & Release APK
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-release.yml'
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Version name override (e.g. 1.0.2) — leave blank to use package.json'
+        required: false
+        default: ''
+      mandatory:
+        description: 'Force mandatory update (true / false)'
+        required: false
+        default: 'false'
+      release_notes:
+        description: 'Release notes — comma-separated (e.g. "Bug fixes,New harvest screen")'
+        required: false
+        default: 'Bug fixes,Performance improvements'
+
+jobs:
+  build-release:
+    name: Build & Release APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # full history — needed for commit-count versionCode
+
+      # ── 2. Java 17 ───────────────────────────────────────────────────────────
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ── 3. Node.js ───────────────────────────────────────────────────────────
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      # ── 4. npm install ───────────────────────────────────────────────────────
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      # ── 5. Decode keystore ───────────────────────────────────────────────────
+      - name: Decode release keystore
+        run: |
+          mkdir -p mobile/release
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > mobile/release/ufcl-release.jks
+
+      # ── 6. Write keystore.properties ─────────────────────────────────────────
+      - name: Write keystore.properties
+        run: |
+          cat > mobile/android/keystore.properties << EOF
+          storePassword=${{ secrets.KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=../../release/ufcl-release.jks
+          EOF
+
+      # ── 7. Resolve version ───────────────────────────────────────────────────
+      - name: Resolve version numbers
+        id: ver
+        working-directory: mobile
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          VER="${{ github.event.inputs.version_name }}"
+          [ -z "$VER" ] && VER="$PKG"
+          CODE=$(git rev-list --count HEAD)
+          DATE=$(date +%Y-%m-%d)
+          echo "name=$VER"  >> $GITHUB_OUTPUT
+          echo "code=$CODE" >> $GITHUB_OUTPUT
+          echo "date=$DATE" >> $GITHUB_OUTPUT
+          echo "tag=v$VER"  >> $GITHUB_OUTPUT
+          echo "apk=UFCL-production-${VER}.apk" >> $GITHUB_OUTPUT
+
+      # ── 8. Build release APK ─────────────────────────────────────────────────
+      - name: Build release APK
+        working-directory: mobile/android
+        env:
+          CI: true
+          APP_ENV: production
+          APP_PACKAGE_ID: com.ufcl.mobile
+          VERSION_NAME: ${{ steps.ver.outputs.name }}
+          VERSION_CODE: ${{ steps.ver.outputs.code }}
+          EXPO_PUBLIC_API_URL: https://192.168.1.5
+        run: ./gradlew assembleRelease --no-daemon --stacktrace
+
+      # ── 9. Locate & rename APK ───────────────────────────────────────────────
+      - name: Locate and rename APK
+        id: apk
+        run: |
+          SRC=$(find mobile/android -name "app-release.apk" | head -1)
+          echo "Found: $SRC"
+          mv "$SRC" "${{ steps.ver.outputs.apk }}"
+          echo "path=${{ steps.ver.outputs.apk }}" >> $GITHUB_OUTPUT
+
+      # ── 10. Compute checksums ─────────────────────────────────────────────────
+      # apk.sha256 — for IT manual verification (openssl dgst -sha256 / sha256sum)
+      # apk.md5    — used by the mobile app via FileSystem.getInfoAsync({md5:true})
+      - name: Compute SHA-256 and MD5 checksums
+        run: |
+          SHA256=$(sha256sum "${{ steps.ver.outputs.apk }}" | awk '{print $1}')
+          MD5=$(md5sum      "${{ steps.ver.outputs.apk }}" | awk '{print $1}')
+          echo "$SHA256" > apk.sha256
+          echo "$MD5"    > apk.md5
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "md5=$MD5"       >> $GITHUB_OUTPUT
+          echo "SHA-256 : $SHA256"
+          echo "MD5     : $MD5"
+        id: checksum
+
+      # ── 11. Generate version metadata ─────────────────────────────────────────
+      # Two versions of version.json are produced:
+      #   version.json         → uploaded to GitHub Release (APK URL = GitHub CDN)
+      #   version-server.json  → deployed to company server (APK URL = LAN server)
+      - name: Generate version metadata
+        run: |
+          REPO="${{ github.repository }}"
+          VER="${{ steps.ver.outputs.name }}"
+          CODE="${{ steps.ver.outputs.code }}"
+          DATE="${{ steps.ver.outputs.date }}"
+          MANDATORY="${{ github.event.inputs.mandatory || 'false' }}"
+          NOTES_RAW="${{ github.event.inputs.release_notes || 'Bug fixes,Performance improvements' }}"
+          SHA256="${{ steps.checksum.outputs.sha256 }}"
+          MD5="${{ steps.checksum.outputs.md5 }}"
+
+          GH_APK_URL="https://github.com/${REPO}/releases/download/v${VER}/UFCL-production-${VER}.apk"
+          SRV_APK_URL="https://192.168.1.5/downloads/UFCL-production.apk"
+
+          node -e "
+            const fs = require('fs');
+            const notes = process.env.NOTES.split(',').map(s=>s.trim()).filter(Boolean);
+            const base = {
+              version:     process.env.VER,
+              versionCode: parseInt(process.env.CODE),
+              releaseDate: process.env.DATE,
+              mandatory:   process.env.MANDATORY === 'true',
+              sha256:      process.env.SHA256,
+              md5:         process.env.MD5,
+              notes
+            };
+            // GitHub Release version.json — APK served from GitHub CDN
+            fs.writeFileSync('version.json',
+              JSON.stringify({ ...base, apkUrl: process.env.GH_APK_URL }, null, 2));
+            // Company server version.json — APK served from LAN server
+            fs.writeFileSync('version-server.json',
+              JSON.stringify({ ...base, apkUrl: process.env.SRV_APK_URL }, null, 2));
+            console.log('GitHub  version.json:', JSON.parse(fs.readFileSync('version.json','utf8')));
+            console.log('Server  version.json:', JSON.parse(fs.readFileSync('version-server.json','utf8')));
+          " VER="$VER" CODE="$CODE" DATE="$DATE" MANDATORY="$MANDATORY" \
+            SHA256="$SHA256" MD5="$MD5" NOTES="$NOTES_RAW" \
+            GH_APK_URL="$GH_APK_URL" SRV_APK_URL="$SRV_APK_URL"
+
+      # ── 12. Create GitHub Release ────────────────────────────────────────────
+      # Keeps GitHub as the authoritative build archive.
+      # APK URL in this version.json points to GitHub CDN (fallback for off-site users).
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: UFCL Mobile ${{ steps.ver.outputs.tag }}
+          body: |
+            ## UFCL Mobile ${{ steps.ver.outputs.tag }}
+
+            **Release Date:** ${{ steps.ver.outputs.date }}
+            **Version Code:** ${{ steps.ver.outputs.code }}
+            **Package:** com.ufcl.mobile
+            **SHA-256:** ${{ steps.checksum.outputs.sha256 }}
+
+            ### Release Notes
+            ${{ github.event.inputs.release_notes || 'Bug fixes and performance improvements' }}
+
+            ---
+            The company server distributes this update automatically to all devices on the LAN.
+            For manual installation, download `UFCL-production-${{ steps.ver.outputs.name }}.apk`.
+          files: |
+            ${{ steps.ver.outputs.apk }}
+            version.json
+            apk.sha256
+            apk.md5
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 13. Deploy to company server ──────────────────────────────────────────
+      # Copies the APK, both checksums, and the server-specific version.json
+      # into the mobile-api/updates/ folder on 192.168.1.5.
+      # The Express server serves these files via /version.json and /downloads/*.
+      #
+      # Required GitHub secrets:
+      #   DEPLOY_SSH_KEY   — private key for the deploy user on 192.168.1.5
+      #   DEPLOY_USER      — SSH username (e.g. ubuntu, ufcl-deploy)
+      #   DEPLOY_PATH      — absolute path to mobile-api/updates/ on the server
+      #                      (e.g. /opt/ufcl-api/updates)
+      - name: Deploy APK to company server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     192.168.1.5
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          source:   "${{ steps.ver.outputs.apk }},apk.sha256,apk.md5"
+          target:   "${{ secrets.DEPLOY_PATH }}"
+          strip_components: 0
+
+      - name: Install version.json on company server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host:     192.168.1.5
+          username: ${{ secrets.DEPLOY_USER }}
+          key:      ${{ secrets.DEPLOY_SSH_KEY }}
+          # Atomically rename version-server.json → version.json so devices
+          # never read a partial file.  Also rename the APK to the fixed filename.
+          script: |
+            cd "${{ secrets.DEPLOY_PATH }}"
+            # Rename versioned APK to the fixed filename the server serves
+            mv -f "UFCL-production-${{ steps.ver.outputs.name }}.apk" UFCL-production.apk
+            # Write the server version.json atomically
+            cat > version.json.tmp << 'JSONEOF'
+            ${{ toJSON(fromJSON('{}')) }}
+            JSONEOF
+            # Simpler: scp already put the file; write it via heredoc
+            # (version-server.json content is regenerated here from outputs)
+            node -e "
+              const fs = require('fs');
+              const meta = {
+                version:     '${{ steps.ver.outputs.name }}',
+                versionCode: ${{ steps.ver.outputs.code }},
+                releaseDate: '${{ steps.ver.outputs.date }}',
+                mandatory:   ${{ github.event.inputs.mandatory || 'false' }},
+                sha256:      '${{ steps.checksum.outputs.sha256 }}',
+                md5:         '${{ steps.checksum.outputs.md5 }}',
+                apkUrl:      'https://192.168.1.5/downloads/UFCL-production.apk',
+                notes:       '${{ github.event.inputs.release_notes || 'Bug fixes,Performance improvements' }}'.split(',').map(s=>s.trim()).filter(Boolean)
+              };
+              fs.writeFileSync('version.json.tmp', JSON.stringify(meta, null, 2));
+              fs.renameSync('version.json.tmp', 'version.json');
+              console.log('version.json updated:', meta.version, 'code', meta.versionCode);
+            "
+            ls -lh UFCL-production.apk version.json apk.sha256 apk.md5
+
+      # ── 14. Upload artifact (30-day retention) ───────────────────────────────
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.ver.outputs.apk }}
+          path: |
+            ${{ steps.ver.outputs.apk }}
+            apk.sha256
+            apk.md5
+          retention-days: 30

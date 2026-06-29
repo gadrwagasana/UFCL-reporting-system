@@ -6,6 +6,6 @@ export async function loginApi(creds: LoginRequest): Promise<LoginResponse> {
   return post<LoginResponse>(EP.AUTH_LOGIN, creds);
 }
 
-export async function meApi(): Promise<User & { ok: true }> {
-  return get<User & { ok: true }>(EP.AUTH_ME);
+export async function meApi(): Promise<{ ok: true; user: User }> {
+  return get<{ ok: true; user: User }>(EP.AUTH_ME);
 }

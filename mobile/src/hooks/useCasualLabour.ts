@@ -11,13 +11,16 @@ export function useCasualLabour() {
   });
 }
 
+interface LabourItem { role: string; quantity: number }
+
 interface CreateCasualLabourPayload {
-  start_date:   string;
-  end_date:     string;
-  task:         string;
-  num_casuals:  number;
-  description?: string;
-  comments?:    string;
+  start_date:    string;
+  end_date:      string;
+  task:          string;
+  num_casuals:   number;
+  labour_items?: LabourItem[];
+  description?:  string;
+  comments?:     string;
 }
 
 export function useCasualLabourCreate() {

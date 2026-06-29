@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>UFCL Mobile — Phase 13 UAT Execution Guide</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f1f5f9; color: #1e293b; font-size: 14px; line-height: 1.55; }
+
+/* ── Page Header ─────────────────────────────────────────────────────────── */
+.page-header { background: linear-gradient(135deg,#1a3c5e 0%,#1e4d7b 100%);
+  color:#fff; padding:28px 40px; }
+.page-header h1 { font-size:24px; font-weight:700; }
+.page-header p  { color:#93c5fd; margin-top:5px; font-size:13px; }
+.header-meta { display:flex; gap:20px; margin-top:14px; flex-wrap:wrap; }
+.header-meta span { background:rgba(255,255,255,.12); border-radius:6px;
+  padding:4px 12px; font-size:12px; font-weight:600; }
+
+/* ── Nav ─────────────────────────────────────────────────────────────────── */
+.nav { background:#1e3a5f; padding:0 40px; display:flex; gap:0; overflow-x:auto;
+  position:sticky; top:0; z-index:100; box-shadow:0 2px 8px rgba(0,0,0,.3); }
+.nav a { color:#93c5fd; text-decoration:none; padding:11px 15px; font-size:12px;
+  font-weight:600; white-space:nowrap; border-bottom:3px solid transparent; display:block; }
+.nav a:hover { color:#fff; border-bottom-color:#60a5fa; }
+
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+.container { max-width:980px; margin:0 auto; padding:28px 20px; }
+
+/* ── Severity Legend ─────────────────────────────────────────────────────── */
+.legend { background:#fff; border-radius:10px; border:1px solid #e2e8f0;
+  padding:20px 24px; margin-bottom:32px; }
+.legend h3 { font-size:13px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; color:#64748b; margin-bottom:14px; }
+.sev-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+.sev-card { border-radius:8px; padding:14px 16px; }
+.sev-critical { background:#fef2f2; border-left:4px solid #dc2626; }
+.sev-major    { background:#fffbeb; border-left:4px solid #d97706; }
+.sev-minor    { background:#f0fdf4; border-left:4px solid #16a34a; }
+.sev-card h4  { font-size:13px; font-weight:700; margin-bottom:6px; }
+.sev-critical h4 { color:#dc2626; }
+.sev-major    h4 { color:#d97706; }
+.sev-minor    h4 { color:#16a34a; }
+.sev-card ul  { padding-left:14px; font-size:12px; color:#475569; margin:4px 0; }
+.sev-card .action { font-size:11px; font-weight:700; margin-top:8px;
+  padding:3px 8px; border-radius:4px; display:inline-block; }
+.sev-critical .action { background:#fecaca; color:#991b1b; }
+.sev-major    .action { background:#fde68a; color:#92400e; }
+.sev-minor    .action { background:#bbf7d0; color:#14532d; }
+
+/* ── Pre-test setup box ──────────────────────────────────────────────────── */
+.setup-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px;
+  padding:16px 20px; margin-bottom:32px; }
+.setup-box h3 { font-size:13px; font-weight:700; color:#1e40af;
+  text-transform:uppercase; letter-spacing:.06em; margin-bottom:10px; }
+.setup-box ol { padding-left:18px; color:#1e40af; font-size:13px; }
+.setup-box ol li { margin-bottom:6px; }
+.setup-box code { background:#dbeafe; border-radius:4px; padding:1px 6px;
+  font-family:monospace; font-size:12px; }
+
+/* ── Section ─────────────────────────────────────────────────────────────── */
+.section { margin-bottom:40px; }
+.section-hd {
+  background:#1a3c5e; color:#fff;
+  padding:13px 18px; border-radius:10px 10px 0 0;
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+}
+.section-hd-left h2 { font-size:17px; font-weight:700; }
+.section-hd-left p  { font-size:12px; color:#93c5fd; margin-top:2px; }
+.role-chip { background:rgba(255,255,255,.18); border-radius:20px;
+  padding:3px 12px; font-size:11px; font-weight:700; letter-spacing:.04em; }
+
+/* ── Test table ──────────────────────────────────────────────────────────── */
+.test-body { background:#fff; border:1px solid #e2e8f0; border-top:none;
+  border-radius:0 0 10px 10px; overflow:hidden; }
+
+.t-row {
+  display:grid;
+  grid-template-columns: 32px 1fr 1fr 88px 80px;
+  border-bottom:1px solid #f1f5f9;
+  align-items:stretch;
+}
+.t-row:last-child { border-bottom:none; }
+.t-head { background:#f8fafc; border-bottom:2px solid #e2e8f0; }
+
+.tc { padding:10px 13px; font-size:13px; border-right:1px solid #f1f5f9; }
+.tc:last-child { border-right:none; }
+.tc-num  { color:#94a3b8; font-weight:700; font-size:11px; text-align:center; }
+.tc-act  { font-weight:500; color:#0f172a; }
+.tc-exp  { color:#475569; font-size:12px; }
+.tc-sev  { text-align:center; }
+.tc-res  { text-align:center; }
+.t-head .tc { font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; color:#64748b; padding:7px 13px; }
+
+/* Divider / Note rows */
+.div-row { grid-column:1/-1; background:#eff6ff; border-bottom:1px solid #dbeafe;
+  padding:7px 13px; font-size:12px; font-weight:700; color:#1d4ed8;
+  letter-spacing:.03em; }
+.iso-row { grid-column:1/-1; background:#fef3c7; border-bottom:1px solid #fde68a;
+  padding:7px 13px; font-size:12px; font-weight:700; color:#92400e; }
+.note-row { grid-column:1/-1; background:#f0fdf4; border-bottom:1px solid #bbf7d0;
+  padding:6px 13px; font-size:11px; color:#14532d; }
+
+/* Severity badges */
+.badge { display:inline-block; border-radius:4px; padding:2px 8px;
+  font-size:10px; font-weight:700; letter-spacing:.04em; }
+.b-c { background:#fecaca; color:#991b1b; }
+.b-m { background:#fde68a; color:#92400e; }
+.b-n { background:#bbf7d0; color:#14532d; }
+
+/* Pass / Fail */
+.pass-cb { display:inline-flex; align-items:center; gap:4px; font-size:11px;
+  font-weight:700; cursor:pointer; color:#16a34a; }
+.fail-cb { display:inline-flex; align-items:center; gap:4px; font-size:11px;
+  font-weight:700; cursor:pointer; color:#dc2626; }
+.pass-cb input, .fail-cb input { width:14px; height:14px; cursor:pointer;
+  accent-color:#16a34a; }
+.fail-cb input { accent-color:#dc2626; }
+.tc-res { display:flex; flex-direction:column; gap:4px; align-items:center;
+  justify-content:center; }
+
+/* ── Sign-off ─────────────────────────────────────────────────────────────── */
+.signoff { margin-top:12px; background:#fff; border:1px solid #e2e8f0;
+  border-radius:10px; padding:18px 20px; }
+.signoff-title { font-weight:700; font-size:14px; color:#0f172a; margin-bottom:14px; }
+.signoff-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+.sf-field label { display:block; font-size:10px; font-weight:700; color:#64748b;
+  text-transform:uppercase; letter-spacing:.06em; margin-bottom:3px; }
+.sf-field input, .sf-field textarea { width:100%; border:none; border-bottom:1px solid #cbd5e1;
+  font-size:13px; color:#0f172a; background:transparent; outline:none; padding:3px 0;
+  resize:none; font-family:inherit; }
+.sf-verdict { margin-top:14px; display:flex; gap:20px; align-items:center; }
+.sf-verdict span { font-size:12px; font-weight:700; color:#64748b; }
+.sv-opt { display:inline-flex; align-items:center; gap:6px;
+  font-size:14px; font-weight:700; cursor:pointer; }
+.sv-opt.pass { color:#16a34a; }
+.sv-opt.fail { color:#dc2626; }
+.sv-opt.cond { color:#d97706; }
+.sv-opt input { width:15px; height:15px; cursor:pointer; }
+
+/* ── Bug Report Section ──────────────────────────────────────────────────── */
+.bug-section { background:#fff; border:1px solid #e2e8f0; border-radius:10px;
+  margin-bottom:32px; overflow:hidden; }
+.bug-section-hd { background:#0f172a; color:#fff; padding:13px 18px; font-size:15px; font-weight:700; }
+.bug-form { padding:20px; }
+.bug-row { display:grid; grid-template-columns:80px 1fr 120px 140px 100px;
+  gap:0; border-bottom:1px solid #f1f5f9; }
+.bug-row.bug-head { background:#f8fafc; border-bottom:2px solid #e2e8f0; }
+.bc { padding:8px 12px; font-size:12px; border-right:1px solid #f1f5f9; }
+.bc:last-child { border-right:none; }
+.bug-head .bc { font-size:10px; font-weight:700; text-transform:uppercase;
+  letter-spacing:.07em; color:#64748b; }
+.bc input, .bc select { width:100%; border:none; font-size:12px; background:transparent;
+  outline:none; color:#0f172a; font-family:inherit; }
+.bc select { cursor:pointer; }
+.add-bug { margin-top:12px; background:#1a3c5e; color:#fff; border:none;
+  border-radius:6px; padding:8px 18px; font-size:13px; font-weight:600; cursor:pointer; }
+.add-bug:hover { background:#1e4d7b; }
+
+/* ── Master Table ────────────────────────────────────────────────────────── */
+.master-table { width:100%; border-collapse:collapse; font-size:13px; }
+.master-table th { text-align:left; padding:9px 14px; background:#f8fafc;
+  border-bottom:2px solid #e2e8f0; font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:.06em; color:#64748b; }
+.master-table td { padding:9px 14px; border-bottom:1px solid #f1f5f9; }
+.master-table tr:last-child td { border-bottom:none; }
+.master-table input[type=radio] { width:14px; height:14px; cursor:pointer; }
+.master-table input[type=text]  { border:none; border-bottom:1px solid #cbd5e1;
+  width:120px; font-size:12px; background:transparent; outline:none; }
+
+@media print {
+  .nav { display:none; }
+  .section, .bug-section { page-break-inside:avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>UFCL Mobile — Phase 13 UAT Execution Guide</h1>
+  <p>Real-world testing with actual departmental users. Complete every step. Record every finding.</p>
+  <div class="header-meta">
+    <span>Version: 1.0.0</span>
+    <span>Phase: 13 — User Acceptance Testing</span>
+    <span>Platform: Android</span>
+    <span>Network: UFCL LAN (192.168.1.5)</span>
+  </div>
+</div>
+
+<div class="nav">
+  <a href="#legend">Severity</a>
+  <a href="#setup">Setup</a>
+  <a href="#ceo">CEO</a>
+  <a href="#harvest-leader">Harvest Leader</a>
+  <a href="#harvest-sup">Harvest Sup.</a>
+  <a href="#sawmill">Sawmill</a>
+  <a href="#poles">Poles</a>
+  <a href="#vat">VAT</a>
+  <a href="#logistics">Logistics</a>
+  <a href="#mechanician">Mechanician</a>
+  <a href="#other">Others</a>
+  <a href="#bugs">Bug Log</a>
+  <a href="#signoff">Sign-Off</a>
+</div>
+
+<div class="container">
+
+<!-- ── Severity Legend ─────────────────────────────────────────────────── -->
+<div class="legend" id="legend">
+  <h3>Bug Severity Classification</h3>
+  <div class="sev-grid">
+    <div class="sev-card sev-critical">
+      <h4>CRITICAL</h4>
+      <ul>
+        <li>Cannot login or session lost</li>
+        <li>Data loss or corruption</li>
+        <li>App crash</li>
+        <li>Wrong role permissions</li>
+        <li>Wrong workshop data visible</li>
+      </ul>
+      <span class="action">Fix immediately — blocks launch</span>
+    </div>
+    <div class="sev-card sev-major">
+      <h4>MAJOR</h4>
+      <ul>
+        <li>Workflow blocked or unusable</li>
+        <li>Incorrect calculations shown</li>
+        <li>Offline sync failure</li>
+        <li>Approval chain broken</li>
+        <li>Missing required data in list</li>
+      </ul>
+      <span class="action">Fix before production</span>
+    </div>
+    <div class="sev-card sev-minor">
+      <h4>MINOR</h4>
+      <ul>
+        <li>Layout / alignment issue</li>
+        <li>Wrong colour or icon</li>
+        <li>Typo in label or message</li>
+        <li>Cosmetic difference from design</li>
+      </ul>
+      <span class="action">Fix in v1.1 — does not block</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── Pre-test Setup ──────────────────────────────────────────────────── -->
+<div class="setup-box" id="setup">
+  <h3>IT Setup — Complete Before Handing to Testers</h3>
+  <ol>
+    <li>Install the release APK on each test device. Verify the app opens without errors.</li>
+    <li>Create one test account per role being tested. Confirm each can login.</li>
+    <li>For workshop isolation test: create <code>harvest_sup_A</code> (Workshop A) and <code>harvest_sup_B</code> (Workshop B).
+      Then, as admin or harvest leader, create 3 harvest entries tagged to Workshop A and 3 to Workshop B.</li>
+    <li>For sawmill calculations: pre-create a sawmill production entry with known values
+      (e.g., logs_received=100, ready_for_production=80). Confirm the expected timber volume formula output.</li>
+    <li>For the approval chain test: submit one material request and one casual labour entry as a harvest leader
+      before the CEO/Operations tester begins their session.</li>
+    <li>For POD test: create a delivery order in <em>Delivered</em> status before the logistics tester starts.</li>
+    <li>Confirm the server is responding: <code>curl https://192.168.1.5/api/ready</code></li>
+    <li>Confirm backups are running: <code>tail -3 /opt/ufcl-backups/backup.log</code></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ CEO / ADMIN -->
+<div class="section" id="ceo">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>CEO / Admin</h2>
+      <p>Overview dashboard · Approvals · Logout &amp; re-login</p>
+    </div>
+    <span class="role-chip">ceo · admin</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div>
+      <div class="tc">Action</div>
+      <div class="tc">Expected result</div>
+      <div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Authentication</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Open UFCL app on device</div>
+      <div class="tc tc-exp">Splash screen loads (UFCL branding), transitions to Login</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Enter CEO username and correct password, tap Login</div>
+      <div class="tc tc-exp">Navigates to CEO Overview with production KPI cards visible</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Enter wrong password, tap Login</div>
+      <div class="tc tc-exp">Error message "Invalid username or password" — does NOT log in</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Dashboard</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">View CEO Overview tab — all KPI cards</div>
+      <div class="tc tc-exp">Harvest, sawmill, poles, delivery metrics load within 5 seconds. Numbers are not all zero or error.</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Pull to refresh the overview</div>
+      <div class="tc tc-exp">Data refreshes; spinner shows briefly; updated values appear</div>
+      <div class="tc tc-sev"><span class="badge b-n">MINOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Approvals</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Tap Approvals tab</div>
+      <div class="tc tc-exp">List of pending requests shown. Each shows: submitter name, type, date, amount/quantity</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">7</div>
+      <div class="tc tc-act">Tap a material request → tap Approve</div>
+      <div class="tc tc-exp">Status changes to Approved; item disappears from pending list; visible in submitter's My Requests as Approved</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">8</div>
+      <div class="tc tc-act">Tap a casual labour entry → tap Reject → enter a rejection reason</div>
+      <div class="tc tc-exp">Status changes to Rejected with reason saved; visible in submitter's My Requests as Rejected with comment</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Offline Mode</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">9</div>
+      <div class="tc tc-act">Enable airplane mode → close and reopen app</div>
+      <div class="tc tc-exp">Offline banner visible. Overview shows cached data. App does NOT crash.</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">10</div>
+      <div class="tc tc-act">Disable airplane mode (reconnect)</div>
+      <div class="tc tc-exp">Offline banner disappears; data refreshes automatically</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Session Restore</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">11</div>
+      <div class="tc tc-act">Close the app completely (force-stop). Reopen with network ON.</div>
+      <div class="tc tc-exp">Returns directly to CEO Overview — does NOT show Login screen or ComingSoon screen</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Logout</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">12</div>
+      <div class="tc tc-act">Tap Profile → Logout</div>
+      <div class="tc tc-exp">Returns to Login screen; subsequent app open requires login</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">CEO / Admin — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester name</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device (model + Android version)</label><input type="text" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments / Issues</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-ceo" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-ceo" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-ceo" /> CONDITIONAL PASS</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ HARVESTING LEADER -->
+<div class="section" id="harvest-leader">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Harvesting Leader</h2>
+      <p>Create harvest · Edit · Log transport · Material &amp; Labour · Offline sync</p>
+    </div>
+    <span class="role-chip">harvesting-leader</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Harvest — Create</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as harvesting-leader; verify navigation tabs</div>
+      <div class="tc tc-exp">Tabs: Harvest, Log Transport, Materials, Labour, My Requests, Profile</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Tap Harvest tab → tap + (Add)</div>
+      <div class="tc tc-exp">Create Harvest form opens with: date picker, compartment, volume m³, worker count, notes fields</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Fill all fields with valid data, tap Submit</div>
+      <div class="tc tc-exp">Entry appears in list. Detail shows exactly the values entered. No data loss.</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Submit a harvest entry with a required field left empty</div>
+      <div class="tc tc-exp">Validation error shown; entry NOT submitted</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Log Transport — Create</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Tap Log Transport tab → tap + → fill: vehicle, volume, destination, date → Submit</div>
+      <div class="tc tc-exp">Transport entry created; visible in list with all fields correct</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Material Request &amp; Labour</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Submit a material request (item + quantity + reason)</div>
+      <div class="tc tc-exp">Request created with status "Pending"; visible in My Requests</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">7</div>
+      <div class="tc tc-act">Submit a casual labour entry (workers, date, task type)</div>
+      <div class="tc tc-exp">Entry created with status "Pending"; visible in My Requests</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Offline Mode &amp; Sync</div></div>
+    <div class="t-row"><div class="note-row">Enable airplane mode BEFORE the next two steps.</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">8</div>
+      <div class="tc tc-act">With airplane mode ON: create a harvest entry</div>
+      <div class="tc tc-exp">Entry saved locally with "Queued" indicator; offline banner visible; app does not crash</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">9</div>
+      <div class="tc tc-act">With airplane mode ON: create a material request</div>
+      <div class="tc tc-exp">Request queued locally; both queued items visible in My Requests with "Offline" status</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row"><div class="note-row">Disable airplane mode NOW.</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">10</div>
+      <div class="tc tc-act">Disable airplane mode; wait 10 seconds</div>
+      <div class="tc tc-exp">Offline banner disappears; queued items sync automatically; both appear on server (verify via CEO or admin login)</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Harvesting Leader — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester name</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device</label><input type="text" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments / Issues</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-hl" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-hl" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-hl" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════ HARVEST SUPERVISOR -->
+<div class="section" id="harvest-sup">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Harvest Supervisor</h2>
+      <p>View harvest &amp; log transport · <strong>Workshop isolation verification</strong></p>
+    </div>
+    <span class="role-chip">harvesting-supervisor</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Navigation &amp; Viewing</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as harvesting-supervisor</div>
+      <div class="tc tc-exp">Tabs: Harvest, Log Transport, Profile. No Materials, Labour, or Approvals tabs.</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">View Harvest list</div>
+      <div class="tc tc-exp">Entries load with date, compartment, volume; tap one to see full detail</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">View Log Transport list</div>
+      <div class="tc tc-exp">Transport entries load correctly with vehicle, volume, destination</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="iso-row">⚠ Workshop Isolation Test — IT must complete pre-test setup (step 3 in Setup section) before this block</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Login as <strong>harvest_sup_A</strong> (assigned Workshop A)</div>
+      <div class="tc tc-exp">Login succeeds; harvest list loads</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Count and record harvest entries visible for harvest_sup_A</div>
+      <div class="tc tc-exp">Only Workshop A entries visible (3). Zero Workshop B entries appear in the list.</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Logout; login as <strong>harvest_sup_B</strong> (assigned Workshop B)</div>
+      <div class="tc tc-exp">Login succeeds; harvest list shows only Workshop B entries (3). Zero Workshop A entries appear.</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">7</div>
+      <div class="tc tc-act">With harvest_sup_B logged in: try to access a Workshop A harvest entry directly (if URL/deep link is available)</div>
+      <div class="tc tc-exp">Either the entry is not accessible, or a 403/404 error is returned. No cross-workshop data leakage.</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row"><div class="note-row">Record the number of entries visible for each supervisor in Comments below.</div></div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Harvest Supervisor — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester name</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device</label><input type="text" /></div>
+      <div class="sf-field"><label>Workshop A entry count seen</label><input type="text" placeholder="Expected: 3" /></div>
+      <div class="sf-field"><label>Workshop B entry count seen</label><input type="text" placeholder="Expected: 3" /></div>
+      <div class="sf-field"><label>Cross-contamination found?</label><input type="text" placeholder="Yes / No" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-hs" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-hs" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-hs" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ SAWMILL LEADER/SUP -->
+<div class="section" id="sawmill">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Sawmill Leader / Sawmill Supervisor</h2>
+      <p>Record production · Verify calculations · Review reports</p>
+    </div>
+    <span class="role-chip">sawmill-leader · sawmill-supervisor</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Production Entry — Create</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as sawmill-leader; tap Production list</div>
+      <div class="tc tc-exp">List loads with date, logs received, timber volume per entry</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Tap + to create a daily production entry. Fill: date, logs received = 100, other fields</div>
+      <div class="tc tc-exp">Form accepts all fields; Submit button active</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Submit the entry; tap it to open detail</div>
+      <div class="tc tc-exp">All entered values appear correctly in the detail screen</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Calculation Verification</div></div>
+    <div class="t-row"><div class="note-row">Ask IT for the pre-created entry values to verify the formula (logs_received, ready_for_production, timber_volume).</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Open the pre-created entry (logs_received = 100); check displayed Timber Volume Expected</div>
+      <div class="tc tc-exp">Timber Volume matches the formula output. Record the value shown: __________</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Confirm "Logs Ready for Production" and "Logs Received" counts match entry data</div>
+      <div class="tc tc-exp">Both counts match the submitted values exactly — no rounding or conversion errors</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Sawmill Supervisor (read-only)</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Login as sawmill-supervisor; view production list</div>
+      <div class="tc tc-exp">Production entries visible; no + (Add) button present — supervisor is read-only</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Material &amp; Labour (Leader only)</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">7</div>
+      <div class="tc tc-act">As leader: submit material request and casual labour entry</div>
+      <div class="tc tc-exp">Both created with Pending status; visible in My Requests</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Sawmill — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester (Leader)</label><input type="text" /></div>
+      <div class="sf-field"><label>Tester (Supervisor)</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Timber Volume shown (step 4)</label><input type="text" placeholder="Actual value displayed" /></div>
+      <div class="sf-field"><label>Timber Volume expected</label><input type="text" placeholder="From IT pre-setup" /></div>
+      <div class="sf-field"><label>Calculations correct?</label><input type="text" placeholder="Yes / No" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-saw" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-saw" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-saw" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════ POLES LEADER/SUP -->
+<div class="section" id="poles">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Poles Leader / Poles Supervisor</h2>
+      <p>Production · Purchase · Delivery · QC</p>
+    </div>
+    <span class="role-chip">poles-leader · poles-supervisor</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Production</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as poles-leader; create poles production entry (sizes, quantities, date)</div>
+      <div class="tc tc-exp">Entry saved; visible in list with correct sizes and counts</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Purchase Order</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Create a poles purchase order (supplier, quantity, price)</div>
+      <div class="tc tc-exp">Purchase order created with status Pending (awaiting operations/CEO approval)</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">As CEO: approve the purchase order</div>
+      <div class="tc tc-exp">Status changes to Approved; VAT is calculated and shown on detail</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Delivery</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Create a poles delivery (truck, destination, quantity, date)</div>
+      <div class="tc tc-exp">Delivery recorded and visible in delivery list</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">QC (Leader only)</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Open delivery → tap QC → record pass/fail with notes</div>
+      <div class="tc tc-exp">QC result saved; delivery detail shows QC outcome</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Poles Supervisor (read-only)</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Login as poles-supervisor; view production and deliveries</div>
+      <div class="tc tc-exp">Data visible; no purchase or QC create buttons present</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Poles — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester (Leader)</label><input type="text" /></div>
+      <div class="sf-field"><label>Tester (Supervisor)</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-pol" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-pol" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-pol" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ VAT LEADER/SUP -->
+<div class="section" id="vat">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>VAT Leader / VAT Supervisor</h2>
+      <p>Intake · Processing</p>
+    </div>
+    <span class="role-chip">vat-leader · vat-supervisor</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Intake</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as vat-supervisor; tap Inbound tab</div>
+      <div class="tc tc-exp">List of pending stock transfers shown with size, quantity available</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Tap a transfer → tap Intake → enter quantity received → Submit</div>
+      <div class="tc tc-exp">Intake recorded; available quantity decremented accordingly; entry appears in Processed tab</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Try to intake more than the available quantity</div>
+      <div class="tc tc-exp">Validation error shown; submission blocked</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Processing</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Tap Processed tab (VAT Entries)</div>
+      <div class="tc tc-exp">List of completed batches with date, size, batch count; detail shows individual records</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">VAT — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device</label><input type="text" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-vat" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-vat" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-vat" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ LOGISTICS -->
+<div class="section" id="logistics">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Logistics</h2>
+      <p>Delivery orders · Proof of Delivery · Vehicle fuel</p>
+    </div>
+    <span class="role-chip">logistics · logistics-officer</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Delivery</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as logistics; view Deliveries list</div>
+      <div class="tc tc-exp">List loads with order number, customer, status, date</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Create a delivery order (customer, vehicle, quantity, date)</div>
+      <div class="tc tc-exp">Order created with status Pending</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Update delivery to "In Transit" then "Delivered"</div>
+      <div class="tc tc-exp">Status updates correctly at each step; timestamps recorded</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Proof of Delivery (POD)</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Open the pre-created Delivered order → tap Capture POD</div>
+      <div class="tc tc-exp">POD capture screen opens; can record receiver name, confirmation, notes</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Submit the POD</div>
+      <div class="tc tc-exp">POD saved; delivery detail shows POD confirmed with timestamp</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Vehicle Fuel</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Navigate to Vehicle Fuel; create a fuel log (vehicle, litres, date)</div>
+      <div class="tc tc-exp">Fuel log saved and visible in list; logistics role can create and view vehicle fuel entries</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Logistics — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device</label><input type="text" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-log" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-log" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-log" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ MECHANICIAN -->
+<div class="section" id="mechanician">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Mechanician</h2>
+      <p>Machine fuel logs · Machine daily logs</p>
+    </div>
+    <span class="role-chip">mechanician</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Machine Fuel</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as mechanician; tap Machine Fuel tab</div>
+      <div class="tc tc-exp">Fuel log list loads; shows machine name, date, litres</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Create a machine fuel entry (machine, litres, date, odometer/hours)</div>
+      <div class="tc tc-exp">Entry saved; all fields correct in detail view</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Machine Daily Log</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Tap Machine Logs tab; create a daily log (machine, operator, hours, date, notes)</div>
+      <div class="tc tc-exp">Log saved with all fields; visible in list; detail matches entry</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Permissions</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Confirm no Vehicle Fuel or Harvest tabs are visible</div>
+      <div class="tc tc-exp">Tab bar shows only: Machine Logs, Machine Fuel, My Requests</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Offline</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Enable airplane mode; create a machine fuel entry; re-enable network</div>
+      <div class="tc tc-exp">Entry queued offline; syncs automatically when network restored</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Mechanician — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field"><label>Device</label><input type="text" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-mech" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-mech" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-mech" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ OTHER ROLES -->
+<div class="section" id="other">
+  <div class="section-hd">
+    <div class="section-hd-left">
+      <h2>Other Roles</h2>
+      <p>Supervisor · Operations · Storekeeper · Sales · Finance</p>
+    </div>
+    <span class="role-chip">all remaining roles</span>
+  </div>
+  <div class="test-body">
+    <div class="t-row t-head">
+      <div class="tc">#</div><div class="tc">Action</div>
+      <div class="tc">Expected result</div><div class="tc tc-sev">If Fails</div>
+      <div class="tc tc-res">Result</div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Supervisor</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">1</div>
+      <div class="tc tc-act">Login as supervisor; verify exactly 5 tabs (Today, Materials, Labour, My Requests, Profile)</div>
+      <div class="tc tc-exp">No Vehicle Fuel tab present</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+    <div class="t-row">
+      <div class="tc tc-num">2</div>
+      <div class="tc tc-act">Supervisor: submit material request + casual labour; go offline; sync</div>
+      <div class="tc tc-exp">Both created; offline queue works; sync completes</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Operations</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">3</div>
+      <div class="tc tc-act">Login as operations; approve a material request; reject a casual labour entry</div>
+      <div class="tc tc-exp">Both actions recorded; items move to next stage</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Storekeeper</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">4</div>
+      <div class="tc tc-act">Login as storekeeper; review and approve/reject a material request</div>
+      <div class="tc tc-exp">Review action recorded; storekeeper cannot see other departments' non-material data</div>
+      <div class="tc tc-sev"><span class="badge b-m">MAJOR</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Sales</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">5</div>
+      <div class="tc tc-act">Login as sales; view delivery statuses; confirm no create button</div>
+      <div class="tc tc-exp">Delivery statuses visible; no create delivery button; no access to production screens</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+
+    <div class="t-row"><div class="div-row">Finance</div></div>
+    <div class="t-row">
+      <div class="tc tc-num">6</div>
+      <div class="tc tc-act">Login as finance; confirm read-only view; no approve/reject buttons</div>
+      <div class="tc tc-exp">Financial overview visible; no write actions accessible anywhere</div>
+      <div class="tc tc-sev"><span class="badge b-c">CRITICAL</span></div>
+      <div class="tc tc-res"><label class="pass-cb"><input type="checkbox" />PASS</label><label class="fail-cb"><input type="checkbox" />FAIL</label></div>
+    </div>
+  </div>
+  <div class="signoff">
+    <div class="signoff-title">Other Roles — Sign-Off</div>
+    <div class="signoff-grid">
+      <div class="sf-field"><label>Supervisor tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Operations tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Storekeeper tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Sales tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Finance tester</label><input type="text" /></div>
+      <div class="sf-field"><label>Test date</label><input type="text" placeholder="DD/MM/YYYY" /></div>
+      <div class="sf-field" style="grid-column:1/-1"><label>Comments</label><textarea rows="2"></textarea></div>
+    </div>
+    <div class="sf-verdict">
+      <span>Verdict:</span>
+      <label class="sv-opt pass"><input type="radio" name="v-other" /> PASS</label>
+      <label class="sv-opt fail"><input type="radio" name="v-other" /> FAIL</label>
+      <label class="sv-opt cond"><input type="radio" name="v-other" /> CONDITIONAL</label>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ BUG LOG -->
+<div class="bug-section" id="bugs">
+  <div class="bug-section-hd">Bug Log — Phase 13 UAT</div>
+  <div class="bug-form">
+    <div class="bug-row bug-head">
+      <div class="bc">Bug ID</div>
+      <div class="bc">Description</div>
+      <div class="bc">Department / Step</div>
+      <div class="bc">Severity</div>
+      <div class="bc">Status</div>
+    </div>
+    <div id="bug-rows">
+      <div class="bug-row">
+        <div class="bc"><input type="text" placeholder="BUG-001" /></div>
+        <div class="bc"><input type="text" placeholder="What went wrong?" /></div>
+        <div class="bc"><input type="text" placeholder="e.g. Harvest Leader / Step 3" /></div>
+        <div class="bc">
+          <select>
+            <option value="">— Select —</option>
+            <option>CRITICAL</option>
+            <option>MAJOR</option>
+            <option>MINOR</option>
+          </select>
+        </div>
+        <div class="bc">
+          <select>
+            <option>OPEN</option>
+            <option>FIXED</option>
+            <option>VERIFIED</option>
+            <option>DEFERRED</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button class="add-bug" onclick="addBugRow()">+ Add Row</button>
+    <div style="margin-top:10px; font-size:12px; color:#64748b;">
+      Tip: Print this page or export as PDF once all bugs are logged.
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ MASTER SIGN-OFF -->
+<div class="section" id="signoff">
+  <div class="section-hd" style="background:#0f4c21;">
+    <div class="section-hd-left">
+      <h2>Master Sign-Off — UFCL Mobile v1.0.0</h2>
+      <p>All rows must show PASS before production launch is authorised</p>
+    </div>
+  </div>
+  <div class="test-body">
+    <div style="padding:20px;">
+
+      <table class="master-table">
+        <thead>
+          <tr>
+            <th>Department</th>
+            <th style="text-align:center">PASS</th>
+            <th style="text-align:center">FAIL</th>
+            <th style="text-align:center">CONDITIONAL</th>
+            <th>Critical bugs</th>
+            <th>Major bugs</th>
+            <th>Tester</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>CEO / Admin</td>
+            <td style="text-align:center"><input type="radio" name="ms-ceo" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-ceo" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-ceo" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Harvesting Leader</td>
+            <td style="text-align:center"><input type="radio" name="ms-hl" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-hl" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-hl" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Harvest Supervisor + Workshop Isolation</td>
+            <td style="text-align:center"><input type="radio" name="ms-hs" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-hs" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-hs" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Sawmill Leader + Supervisor</td>
+            <td style="text-align:center"><input type="radio" name="ms-saw" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-saw" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-saw" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Poles Leader + Supervisor</td>
+            <td style="text-align:center"><input type="radio" name="ms-pol" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-pol" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-pol" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>VAT Leader + Supervisor</td>
+            <td style="text-align:center"><input type="radio" name="ms-vat" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-vat" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-vat" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Logistics</td>
+            <td style="text-align:center"><input type="radio" name="ms-log" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-log" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-log" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Mechanician</td>
+            <td style="text-align:center"><input type="radio" name="ms-mech" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-mech" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-mech" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+          <tr><td>Supervisor + Operations + Storekeeper + Sales + Finance</td>
+            <td style="text-align:center"><input type="radio" name="ms-oth" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-oth" /></td>
+            <td style="text-align:center"><input type="radio" name="ms-oth" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" placeholder="0" /></td>
+            <td><input type="text" /></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="margin-top:24px; display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Critical Bugs</div>
+          <input type="text" placeholder="Must be 0 before launch" style="border:none;border-bottom:2px solid #dc2626;font-size:15px;font-weight:700;color:#dc2626;width:100%;background:transparent;outline:none;padding:3px 0;" />
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:6px;">Total Major Bugs</div>
+          <input type="text" placeholder="Must be 0 before launch" style="border:none;border-bottom:2px solid #d97706;font-size:15px;font-weight:700;color:#d97706;width:100%;background:transparent;outline:none;padding:3px 0;" />
+        </div>
+      </div>
+
+      <div style="margin-top:24px; padding:16px; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+        <div style="font-size:13px;font-weight:700;color:#14532d;margin-bottom:12px;">
+          Launch Authorisation — sign only when Total Critical = 0 AND Total Major = 0
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;">
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:3px;">IT Lead</div>
+            <input type="text" style="border:none;border-bottom:1px solid #16a34a;width:100%;font-size:13px;background:transparent;outline:none;padding:3px 0;" />
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:3px;">CEO / Admin</div>
+            <input type="text" style="border:none;border-bottom:1px solid #16a34a;width:100%;font-size:13px;background:transparent;outline:none;padding:3px 0;" />
+          </div>
+          <div>
+            <div style="font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;margin-bottom:3px;">Launch date</div>
+            <input type="text" placeholder="DD/MM/YYYY" style="border:none;border-bottom:1px solid #16a34a;width:100%;font-size:13px;background:transparent;outline:none;padding:3px 0;" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<script>
+let bugCount = 1;
+function addBugRow() {
+  bugCount++;
+  const id = 'BUG-' + String(bugCount).padStart(3, '0');
+  const row = document.createElement('div');
+  row.className = 'bug-row';
+  row.innerHTML = `
+    <div class="bc"><input type="text" value="${id}" /></div>
+    <div class="bc"><input type="text" placeholder="What went wrong?" /></div>
+    <div class="bc"><input type="text" placeholder="e.g. Harvest Leader / Step 3" /></div>
+    <div class="bc">
+      <select>
+        <option value="">— Select —</option>
+        <option>CRITICAL</option>
+        <option>MAJOR</option>
+        <option>MINOR</option>
+      </select>
+    </div>
+    <div class="bc">
+      <select>
+        <option>OPEN</option>
+        <option>FIXED</option>
+        <option>VERIFIED</option>
+        <option>DEFERRED</option>
+      </select>
+    </div>`;
+  document.getElementById('bug-rows').appendChild(row);
+}
+</script>
+</body>
+</html>

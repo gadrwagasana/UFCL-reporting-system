@@ -20,9 +20,9 @@ import { Colors, Spacing, Typography, Radius, Shadow, Layout } from '../../theme
 type NavProp = NativeStackNavigationProp<MaterialRequestsStackParamList, 'MaterialRequestCreate'>;
 
 const PRIORITY_OPTIONS: SelectOption[] = [
-  { label: 'Normal',   value: 'normal' },
-  { label: 'Urgent',   value: 'urgent' },
-  { label: 'Critical', value: 'critical' },
+  { label: 'Normal', value: 'normal' },
+  { label: 'High',   value: 'high' },
+  { label: 'Urgent', value: 'urgent' },
 ];
 
 export function MaterialRequestCreateScreen() {
@@ -35,7 +35,7 @@ export function MaterialRequestCreateScreen() {
   const [itemId,    setItemId]    = useState<number | null>(null);
   const [qty,       setQty]       = useState('');
   const [reason,    setReason]    = useState('');
-  const [priority,  setPriority]  = useState<'normal' | 'urgent' | 'critical'>('normal');
+  const [priority,  setPriority]  = useState<'normal' | 'high' | 'urgent'>('normal');
   const [submitting, setSubmitting] = useState(false);
   const [errors,    setErrors]    = useState<Record<string, string>>({});
 

@@ -8,7 +8,12 @@ export function SplashScreen() {
   const restoreSession = useAuthStore((s) => s.restoreSession);
 
   useEffect(() => {
-    restoreSession();
+    restoreSession().catch(() => {
+      // restoreSession has an inner try/finally and should never reject.
+      // This is a final safety net: if it somehow does, force isLoading=false
+      // so the app always reaches the Login screen rather than hanging.
+      useAuthStore.setState({ isLoading: false });
+    });
   }, [restoreSession]);
 
   return (

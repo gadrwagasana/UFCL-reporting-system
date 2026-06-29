@@ -247,6 +247,41 @@ async function ensureSchema() {
   await pool.query(`alter table notifications add column if not exists for_user_id bigint references app_users(id) on delete cascade`);
   await pool.query(`create index if not exists idx_notif_for_user on notifications(for_user_id) where for_user_id is not null`);
   await pool.query(`alter table pending_edits add column if not exists old_snapshot jsonb`);
+  // Time-based governance: track which approval level is required and whether system auto-generated the request
+  await pool.query(`alter table pending_edits add column if not exists required_level text not null default 'manager'`);
+  await pool.query(`alter table pending_edits add column if not exists auto_generated boolean not null default false`);
+  await pool.query(`alter table deletion_requests add column if not exists required_level text not null default 'manager'`);
+  // Step 3: SLA tracking columns for escalation engine
+  await pool.query(`alter table pending_edits add column if not exists first_reminder_at timestamptz`);
+  await pool.query(`alter table pending_edits add column if not exists escalated_at timestamptz`);
+  await pool.query(`alter table pending_edits add column if not exists escalation_level text`);
+  await pool.query(`alter table deletion_requests add column if not exists first_reminder_at timestamptz`);
+  await pool.query(`alter table deletion_requests add column if not exists escalated_at timestamptz`);
+  await pool.query(`alter table deletion_requests add column if not exists escalation_level text`);
+  await pool.query(`create index if not exists idx_pending_edits_sla on pending_edits(status, required_level, submitted_at) where status='Pending'`);
+  await pool.query(`create index if not exists idx_deletion_req_sla  on deletion_requests(status, required_level, requested_at) where status='pending'`);
+  // Step 4: Persistent job queue — crash-safe scheduling for escalations, notifications, audit replay
+  await pool.query(`
+    create table if not exists workflow_jobs (
+      id              bigserial primary key,
+      type            text        not null,
+      payload         jsonb       not null default '{}',
+      status          text        not null default 'pending'
+                      check (status in ('pending','processing','done','failed')),
+      run_at          timestamptz not null default now(),
+      attempts        int         not null default 0,
+      max_attempts    int         not null default 5,
+      last_error      text,
+      idempotency_key text        unique,
+      created_at      timestamptz not null default now(),
+      processed_at    timestamptz
+    )
+  `);
+  await pool.query(`create index if not exists idx_wfjobs_runnable
+    on workflow_jobs(run_at, status, attempts)
+    where status in ('pending','failed')`);
+  await pool.query(`create index if not exists idx_wfjobs_idem
+    on workflow_jobs(idempotency_key) where idempotency_key is not null`);
   // Machine fuel logs — support company vehicles alongside machines
   await pool.query(`alter table machine_fuel_logs add column if not exists vehicle_id bigint references vehicles(id)`);
 
@@ -661,21 +696,30 @@ async function seedMachineKpiDefinitions() {
 async function updateRolePermissions() {
   const permissionsByRole = {
     admin: ['dashboard', 'ceo', 'users', 'audit', 'export', 'notifications', 'changes',
-            'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'sales', 'products',
+            'secgov', 'executive', 'bi', 'automation', 'epm',
+            'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'sales', 'products', 'customers',
             'inventory', 'logistics', 'logistics-dashboard',
-            'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'vehicles', 'deliveries', 'dispatch',
-            'harvest', 'timber-inventory', 'transport',
+            'workshop-overview', 'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'material-requests',
+            'vehicles', 'deliveries', 'dispatch', 'transport', 'transport-jobs',
+            'harvest', 'timber-inventory',
             'machines', 'machine-logs', 'machine-kpi',
             'compartments', 'log-transport', 'value-added-timber',
             'machine-fuel', 'casual-requests', 'casuals',
             'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'sage'],
     ceo: ['dashboard', 'ceo', 'weekly-cost', 'weekly-perf', 'monthly', 'kpi', 'audit', 'export', 'users', 'notifications', 'changes',
-          'daily-harvest', 'timber-inventory', 'vehicles', 'deliveries', 'dispatch', 'transport',
-          'logistics-dashboard', 'machines', 'machine-kpi', 'compartments', 'log-transport', 'value-added-timber',
-          'casual-requests', 'casuals', 'stock-transfers'],
-    operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products',
+          'secgov', 'executive', 'bi', 'automation', 'epm',
+          'daily-harvest', 'value-added-timber', 'timber-inventory', 'products', 'customers', 'sales',
+          'vehicles', 'deliveries', 'dispatch', 'transport', 'transport-jobs',
+          'logistics-dashboard', 'workshop-overview',
+          'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'material-requests',
+          'machines', 'machine-logs', 'machine-kpi', 'machine-fuel',
+          'compartments', 'log-transport',
+          'casual-requests', 'casuals'],
+    operations: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest', 'products', 'sales', 'customers',
                  'weekly-cost', 'weekly-perf', 'inventory', 'audit', 'export', 'notifications', 'changes',
-                 'timber-inventory', 'harvest', 'stock-items', 'stock-movements', 'stock-transfers', 'transport',
+                 'secgov', 'executive', 'bi', 'automation', 'epm',
+                 'timber-inventory', 'harvest', 'workshop-overview',
+                 'stock-items', 'stock-movements', 'stock-transfers', 'material-requests', 'transport',
                  'machines', 'machine-logs', 'machine-kpi',
                  'compartments', 'log-transport', 'value-added-timber',
                  'machine-fuel', 'casual-requests', 'casuals'],
@@ -685,33 +729,37 @@ async function updateRolePermissions() {
                 'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'vehicles', 'deliveries', 'dispatch', 'transport',
                 'machines', 'log-transport', 'machine-fuel',
                 'casual-requests', 'casuals', 'material-requests'],
-    supervisor: ['dashboard', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
+    supervisor: ['dashboard', 'bi', 'daily', 'daily-timber', 'daily-poles', 'daily-harvest',
                  'audit', 'export', 'notifications', 'changes', 'harvest', 'timber-inventory',
                  'machine-logs', 'compartments', 'log-transport', 'value-added-timber',
                  'machine-fuel', 'casual-requests', 'casuals',
                  'workshop-overview', 'material-requests', 'stock-transfers'],
-    storekeeper: ['dashboard', 'logistics-dashboard', 'workshop-overview', 'inventory', 'audit', 'export', 'notifications',
+    storekeeper: ['dashboard', 'bi', 'logistics-dashboard', 'workshop-overview', 'inventory', 'audit', 'export', 'notifications',
                   'warehouses', 'stock-items', 'stock-movements', 'stock-transfers', 'material-requests'],
     'logistics-officer': ['dashboard', 'logistics-dashboard', 'workshop-overview', 'inventory',
                           'warehouses', 'stock-items', 'stock-movements', 'stock-transfers',
                           'vehicles', 'deliveries', 'transport', 'material-requests',
                           'notifications', 'audit', 'export'],
-    'storekeeper-assistant': ['dashboard', 'workshop-overview', 'stock-movements', 'machine-fuel',
+    'storekeeper-assistant': ['dashboard', 'bi', 'workshop-overview', 'stock-movements', 'machine-fuel',
                                'material-requests', 'notifications'],
     'mechanician': ['dashboard', 'material-requests', 'notifications'],
     // Phase 2 — Operations leaders (all workshop-restricted, no approval rights)
-    'harvesting-leader': ['dashboard', 'daily-harvest', 'harvest', 'log-transport', 'compartments',
+    'harvesting-leader': ['dashboard', 'bi', 'daily-harvest', 'harvest', 'log-transport', 'compartments',
                           'casual-requests', 'workshop-overview',
                           'notifications', 'audit', 'export'],
-    'sawmill-leader':    ['dashboard', 'daily-timber', 'timber-inventory', 'machine-logs', 'machine-fuel',
+    'sawmill-leader':    ['dashboard', 'bi', 'daily-timber', 'timber-inventory', 'machine-logs', 'machine-fuel',
                           'material-requests', 'casual-requests', 'workshop-overview',
                           'notifications', 'audit', 'export'],
-    'poles-leader':      ['dashboard', 'daily-poles', 'machine-logs', 'machine-fuel',
+    'poles-leader':      ['dashboard', 'bi', 'daily-poles', 'machine-logs', 'machine-fuel',
                           'material-requests', 'casual-requests', 'workshop-overview',
                           'notifications', 'audit', 'export'],
-    'vat-leader':        ['dashboard', 'value-added-timber', 'timber-inventory',
+    'vat-leader':        ['dashboard', 'bi', 'value-added-timber', 'timber-inventory',
                           'material-requests', 'casual-requests', 'workshop-overview',
                           'notifications', 'audit', 'export'],
+    'harvesting-supervisor': ['dashboard', 'bi', 'daily-harvest', 'log-transport',
+                              'notifications', 'audit', 'export'],
+    'sawmill-supervisor':    ['dashboard', 'bi', 'daily-timber',
+                              'notifications', 'audit', 'export'],
     // Phase 2 — Sales roles (all workshop-restricted, no approval rights)
     'sales-staff':       ['dashboard', 'sales', 'deliveries', 'products',
                           'notifications', 'audit', 'export'],
@@ -770,6 +818,28 @@ async function seedNewLogisticsRoles() {
       label: 'Value-Added Timber Leader',
       description: 'Leads value-added timber processing at Nyanza Workshop. Records VAT entries and views timber inventory. No access to harvesting, poles, or sales modules.',
     },
+    // Phase 3 — Department Supervisors (Gatare)
+    {
+      role: 'harvesting-supervisor',
+      label: 'Harvesting Supervisor',
+      description: 'Supervises harvesting operations at Gatare Workshop. Records harvest and log transport entries. No material requests, casual labour, or QC access.',
+    },
+    {
+      role: 'sawmill-supervisor',
+      label: 'Sawmill Supervisor',
+      description: 'Supervises sawmill production at Gatare Workshop. Records daily timber entries. No material requests, casual labour, or QC access.',
+    },
+    // Phase 3 — Department Supervisors (Nyanza)
+    {
+      role: 'poles-supervisor',
+      label: 'Poles Supervisor',
+      description: 'Supervises poles production at Nyanza Workshop. Records daily poles entries and creates deliveries. No QC, purchase, or request access.',
+    },
+    {
+      role: 'vat-supervisor',
+      label: 'VAT Supervisor',
+      description: 'Supervises value-added timber processing at Nyanza Workshop. Records VAT entries. No material requests or casual labour access.',
+    },
     // Phase 2 — Sales roles
     {
       role: 'sales-staff',
@@ -795,9 +865,160 @@ async function seedNewLogisticsRoles() {
   }
 }
 
+// Phase 1 — Audit log schema enhancement.
+// Adds 9 new columns to audit_log and applies immutability rules.
+// All statements are idempotent: safe to run on an existing production database.
+async function auditLogEnhancement() {
+  // New descriptive columns — all nullable so existing rows are unaffected
+  await pool.query(`alter table audit_log add column if not exists username      text`);
+  await pool.query(`alter table audit_log add column if not exists full_name     text`);
+  await pool.query(`alter table audit_log add column if not exists module        text`);
+  await pool.query(`alter table audit_log add column if not exists action_type   text`); // CREATE / UPDATE / DELETE / APPROVE / REJECT / LOGIN / LOGOUT / EXPORT
+  await pool.query(`alter table audit_log add column if not exists record_id     text`);
+  await pool.query(`alter table audit_log add column if not exists before_values jsonb`);
+  await pool.query(`alter table audit_log add column if not exists after_values  jsonb`);
+  await pool.query(`alter table audit_log add column if not exists ip_address    text`);
+  await pool.query(`alter table audit_log add column if not exists reason        text`);
+
+  // Immutability: silently block any application-level UPDATE or DELETE on audit rows.
+  // CREATE OR REPLACE RULE is idempotent — safe to run multiple times.
+  await pool.query(`
+    create or replace rule audit_log_no_update
+    as on update to audit_log do instead nothing
+  `);
+  await pool.query(`
+    create or replace rule audit_log_no_delete
+    as on delete to audit_log do instead nothing
+  `);
+}
+
+// Phase 8 — seed default automation rules (idempotent via ON CONFLICT DO NOTHING)
+async function seedAutomationRules() {
+  // ── Phase 8 Part 3 additions: severity, auto_action, extended thresholds ──────
+  // ADD COLUMN IF NOT EXISTS so this is safe to run on existing installs.
+  await pool.query(`
+    ALTER TABLE automation_rules
+      ADD COLUMN IF NOT EXISTS severity    text NOT NULL DEFAULT 'medium',
+      ADD COLUMN IF NOT EXISTS auto_action text NOT NULL DEFAULT 'notify'
+  `);
+
+  const rules = [
+    {
+      rule_key:       'stock_low',
+      label:          'Stock Shortage Alert',
+      description:    'Detects items with fewer than 7 days of stock remaining. Creates a draft material request and notifies the logistics team.',
+      cooldown_hours: 4,
+      notify_roles:   ['admin', 'operations', 'logistics'],
+      threshold:      { days: 7 },
+      severity:       'critical',
+      auto_action:    'draft_request',
+    },
+    {
+      rule_key:       'maintenance_due',
+      label:          'Machine Maintenance Due',
+      description:    'Alerts when a machine maintenance schedule is overdue or due within 3 days.',
+      cooldown_hours: 8,
+      notify_roles:   ['admin', 'operations'],
+      // hours_at_* = time at each escalation level before advancing (Phase 8 Part 4)
+      threshold:      { days: 3,
+                        hours_at_leader: 4, hours_at_manager: 8, hours_at_director: 24,
+                        ceo_reminder_hours: 4 },
+      severity:       'high',
+      auto_action:    'notify',
+    },
+    {
+      rule_key:       'delivery_overdue',
+      label:          'Delivery Overdue',
+      description:    'Notifies the logistics team when a delivery order is past its due date.',
+      cooldown_hours: 4,
+      notify_roles:   ['logistics', 'admin'],
+      threshold:      { hours_at_leader: 2, hours_at_manager: 4, hours_at_director: 12,
+                        ceo_reminder_hours: 2 },
+      severity:       'high',
+      auto_action:    'notify',
+    },
+    {
+      rule_key:       'workflow_failure',
+      label:          'Workflow Job Failure',
+      description:    'Alerts admin when workflow jobs have failed in the past 24 hours.',
+      cooldown_hours: 2,
+      notify_roles:   ['admin'],
+      // notify_*_threshold used by _schedWorkflowScan; hours_at_* by escalation engine
+      threshold:      { notify_failed_threshold: 10, notify_stuck_threshold: 3,
+                        hours_at_leader: 2, hours_at_manager: 4, hours_at_director: 12,
+                        ceo_reminder_hours: 2 },
+      severity:       'high',
+      auto_action:    'notify',
+    },
+    {
+      rule_key:       'security_alert',
+      label:          'Security Alert — Failed Logins',
+      description:    'Notifies CEO and admin when repeated failed login attempts are detected (possible brute-force).',
+      cooldown_hours: 1,
+      notify_roles:   ['ceo', 'admin'],
+      // min_fails_15m / min_overrides_15m used by _schedSecurityScan (15-min window)
+      threshold:      { min_fails: 3, min_fails_15m: 5, min_overrides_15m: 3,
+                        hours_at_leader: 1, hours_at_manager: 2, hours_at_director: 4,
+                        ceo_reminder_hours: 1 },
+      severity:       'critical',
+      auto_action:    'notify',
+    },
+    {
+      rule_key:       'approval_escalate',
+      label:          'Approval SLA Escalation',
+      description:    'Automatically escalates approval requests that have been pending longer than 48 hours.',
+      cooldown_hours: 12,
+      notify_roles:   ['admin', 'ceo', 'operations'],
+      threshold:      { hours: 48,
+                        hours_at_leader: 4, hours_at_manager: 8, hours_at_director: 24,
+                        ceo_reminder_hours: 4 },
+      severity:       'high',
+      auto_action:    'escalate',
+    },
+    {
+      rule_key:       'fuel_anomaly',
+      label:          'Fuel Consumption Anomaly',
+      description:    'Detects statistically abnormal vehicle fuel consumption (Z-score ≥ 1.5) and notifies operations.',
+      cooldown_hours: 6,
+      notify_roles:   ['admin', 'operations'],
+      threshold:      { min_z: 1.5 },
+      severity:       'medium',
+      auto_action:    'notify',
+    },
+    {
+      rule_key:       'harvest_behind',
+      label:          'Harvest Behind Schedule',
+      description:    'Alerts when an active harvest compartment is estimated to take more than 90 days to complete.',
+      cooldown_hours: 8,
+      notify_roles:   ['admin', 'operations'],
+      threshold:      { days_to_complete: 90 },
+      severity:       'medium',
+      auto_action:    'notify',
+    },
+  ];
+
+  for (const r of rules) {
+    await pool.query(
+      `INSERT INTO automation_rules
+         (rule_key, label, description, cooldown_hours, notify_roles, threshold,
+          severity, auto_action)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+       ON CONFLICT (rule_key) DO UPDATE
+         SET threshold   = EXCLUDED.threshold,
+             severity    = EXCLUDED.severity,
+             auto_action = EXCLUDED.auto_action,
+             updated_at  = now()`,
+      [r.rule_key, r.label, r.description,
+       r.cooldown_hours, r.notify_roles, JSON.stringify(r.threshold),
+       r.severity, r.auto_action]
+    );
+  }
+}
+
 async function migrate() {
   await ensureDatabaseExists();
   await ensureSchema();
+  await auditLogEnhancement();
   await seedIfEmpty();
   await seedRoles();
   await seedExpenseCategories();
@@ -808,6 +1029,126 @@ async function migrate() {
   await seedNewLogisticsRoles();
   await updateRolePermissions();
   await seedWorkshops();
+  // Phase 8 — Intelligent Automation Engine
+  await seedAutomationRules();
+  // Phase 8 Part 5/6 — Scheduler Run Log
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS scheduler_runs (
+      id                    bigserial PRIMARY KEY,
+      started_at            timestamptz NOT NULL DEFAULT now(),
+      completed_at          timestamptz,
+      duration_ms           int,
+      rules_fired           int NOT NULL DEFAULT 0,
+      escalations_processed int NOT NULL DEFAULT 0,
+      errors                int NOT NULL DEFAULT 0,
+      status                text NOT NULL DEFAULT 'running'
+    )
+  `);
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_scheduler_runs_started
+      ON scheduler_runs(started_at DESC)
+  `);
+  console.log('[migrate] scheduler_runs table ready');
+
+  // Phase 9 — Enterprise Performance Management
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS performance_kpis (
+      id           bigserial PRIMARY KEY,
+      kpi_key      text NOT NULL UNIQUE,
+      name         text NOT NULL,
+      department   text NOT NULL,
+      module       text,
+      owner        text,
+      description  text,
+      target_value numeric(14,2) NOT NULL DEFAULT 0,
+      unit         text NOT NULL DEFAULT '%',
+      direction    text NOT NULL DEFAULT 'higher_better',
+      review_freq  text NOT NULL DEFAULT 'monthly',
+      active       boolean NOT NULL DEFAULT true,
+      created_at   timestamptz NOT NULL DEFAULT now(),
+      updated_at   timestamptz
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_perf_kpis_dept ON performance_kpis(department)`);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS performance_action_plans (
+      id                   bigserial PRIMARY KEY,
+      kpi_key              text REFERENCES performance_kpis(kpi_key) ON DELETE SET NULL,
+      problem              text NOT NULL,
+      root_cause           text,
+      recommended_action   text NOT NULL,
+      responsible_dept     text NOT NULL,
+      priority             text NOT NULL DEFAULT 'medium',
+      due_date             date,
+      expected_improvement text,
+      status               text NOT NULL DEFAULT 'draft',
+      auto_generated       boolean NOT NULL DEFAULT false,
+      created_at           timestamptz NOT NULL DEFAULT now(),
+      created_by           bigint REFERENCES app_users(id),
+      approved_by          bigint REFERENCES app_users(id),
+      approved_at          timestamptz
+    )
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_perf_plans_status ON performance_action_plans(status)`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_perf_plans_kpi   ON performance_action_plans(kpi_key)`);
+
+  console.log('[migrate] performance EPM tables ready');
+  await seedPerformanceKpis();
+
+  // Add 'epm' page to admin/ceo/operations in role_definitions
+  const EPM_ROLES = ['admin','ceo','operations'];
+  for (const role of EPM_ROLES) {
+    const { rows } = await pool.query('SELECT permissions FROM role_definitions WHERE role=$1', [role]);
+    if (!rows.length) continue;
+    const perms = Array.isArray(rows[0].permissions) ? rows[0].permissions : [];
+    if (perms.includes('epm')) continue;
+    await pool.query('UPDATE role_definitions SET permissions=$1, updated_at=now() WHERE role=$2',
+      [JSON.stringify([...perms, 'epm']), role]);
+  }
+  console.log('[migrate] epm page permissions updated');
+}
+
+async function seedPerformanceKpis() {
+  const kpis = [
+    // Sales
+    { kpi_key: 'sales-revenue-month',    name: 'Monthly Revenue',            department: 'Sales',      module: 'sales',      owner: 'Sales Manager',    description: 'Total sales revenue created this month',                  target_value: 50000000, unit: 'ZMW', direction: 'higher_better', review_freq: 'monthly'  },
+    { kpi_key: 'sales-orders-month',     name: 'Monthly Sales Orders',       department: 'Sales',      module: 'sales',      owner: 'Sales Manager',    description: 'Number of sales orders created this month',               target_value: 50,       unit: 'orders', direction: 'higher_better', review_freq: 'monthly' },
+    { kpi_key: 'sales-delivery-rate',    name: 'Delivery Completion Rate',   department: 'Sales',      module: 'deliveries', owner: 'Logistics Manager',description: '% of delivery orders with confirmed delivery this month', target_value: 85,       unit: '%',   direction: 'higher_better', review_freq: 'monthly'  },
+    // Harvest
+    { kpi_key: 'harvest-trees-month',    name: 'Monthly Trees Felled',       department: 'Harvest',    module: 'harvest',    owner: 'Harvesting Leader',description: 'Total trees felled this month across all compartments',   target_value: 5000,     unit: 'trees', direction: 'higher_better', review_freq: 'monthly' },
+    { kpi_key: 'harvest-logs-month',     name: 'Monthly Logs Produced',      department: 'Harvest',    module: 'harvest',    owner: 'Harvesting Leader',description: 'Total logs (crosscut + handrolled) produced this month',  target_value: 3000,     unit: 'logs', direction: 'higher_better', review_freq: 'monthly'  },
+    { kpi_key: 'harvest-active-compts',  name: 'Active Compartments',        department: 'Harvest',    module: 'compartments',owner: 'Harvesting Leader',description: 'Number of compartments currently being harvested',        target_value: 5,        unit: 'compts', direction: 'higher_better', review_freq: 'monthly' },
+    // Workshop
+    { kpi_key: 'workshop-timber-month',  name: 'Monthly Timber Production',  department: 'Workshop',   module: 'daily-timber',owner: 'Sawmill Leader',   description: 'Total timber units produced this month',                  target_value: 2000,     unit: 'units', direction: 'higher_better', review_freq: 'monthly' },
+    { kpi_key: 'workshop-poles-month',   name: 'Monthly Poles Production',   department: 'Workshop',   module: 'daily-poles', owner: 'Poles Leader',     description: 'Total poles units produced this month',                   target_value: 1000,     unit: 'units', direction: 'higher_better', review_freq: 'monthly' },
+    { kpi_key: 'workshop-machine-util',  name: 'Machine Utilization Rate',   department: 'Workshop',   module: 'machine-logs',owner: 'Operations',       description: '% of machine capacity used (avg over last 30 days)',     target_value: 75,       unit: '%',   direction: 'higher_better', review_freq: 'weekly'   },
+    // Logistics
+    { kpi_key: 'logistics-stock-avail',  name: 'Stock Availability Rate',    department: 'Logistics',  module: 'stock-items', owner: 'Storekeeper',      description: '% of stock items at or above minimum stock level',        target_value: 85,       unit: '%',   direction: 'higher_better', review_freq: 'weekly'   },
+    { kpi_key: 'logistics-mat-fulfil',   name: 'Material Request Fulfillment',department: 'Logistics', module: 'material-requests',owner: 'Storekeeper', description: '% of material requests approved within 30 days',          target_value: 80,       unit: '%',   direction: 'higher_better', review_freq: 'monthly'  },
+    { kpi_key: 'logistics-transfer-rate',name: 'Stock Transfer Completion',  department: 'Logistics',  module: 'stock-transfers',owner: 'Storekeeper',   description: '% of stock transfers received or dispatched',             target_value: 80,       unit: '%',   direction: 'higher_better', review_freq: 'monthly'  },
+    // HR
+    { kpi_key: 'hr-casual-pending',      name: 'Pending Casual Requests',    department: 'HR',         module: 'casual-requests',owner: 'Operations',    description: 'Number of unanswered casual labour requests (lower better)',target_value: 5,       unit: 'requests', direction: 'lower_better', review_freq: 'weekly'   },
+    { kpi_key: 'hr-casual-active',       name: 'Active Casual Workers',      department: 'HR',         module: 'casuals',    owner: 'Operations',       description: 'Number of casual workers currently active on the system',  target_value: 20,       unit: 'workers', direction: 'higher_better', review_freq: 'monthly' },
+    // Security / Governance
+    { kpi_key: 'security-sla-compliance',name: 'Approval SLA Compliance',   department: 'Security',   module: 'secgov',     owner: 'Admin',            description: '% of approval requests resolved within 48 hours',        target_value: 90,       unit: '%',   direction: 'higher_better', review_freq: 'monthly'  },
+    { kpi_key: 'security-failed-logins', name: 'Failed Logins (24h)',        department: 'Security',   module: 'audit',      owner: 'Admin',            description: 'Number of failed login attempts in last 24 hours (lower better)', target_value: 3, unit: 'attempts', direction: 'lower_better', review_freq: 'daily'  },
+    // Operations / Machines
+    { kpi_key: 'ops-machine-avail',      name: 'Machine Availability Rate',  department: 'Operations', module: 'machines',   owner: 'Operations',       description: '% of active machines in Available or In Use status',     target_value: 80,       unit: '%',   direction: 'higher_better', review_freq: 'weekly'   },
+    { kpi_key: 'ops-maintenance-compl',  name: 'Maintenance Compliance',     department: 'Operations', module: 'machines',   owner: 'Operations',       description: '% of active machines with no overdue scheduled maintenance', target_value: 90,    unit: '%',   direction: 'higher_better', review_freq: 'monthly'  },
+    // Finance
+    { kpi_key: 'finance-fuel-efficiency',name: 'Fuel Efficiency',            department: 'Finance',    module: 'machine-fuel',owner: 'Operations',      description: 'Production units per litre of fuel consumed (last 30d)', target_value: 0.5,      unit: 'u/L', direction: 'higher_better', review_freq: 'monthly'  },
+    { kpi_key: 'finance-pending-approv', name: 'Pending Approvals',          department: 'Finance',    module: 'secgov',     owner: 'Admin',            description: 'Total pending edit + deletion approval requests (lower better)', target_value: 10, unit: 'items', direction: 'lower_better', review_freq: 'weekly'  },
+  ];
+
+  for (const k of kpis) {
+    await pool.query(`
+      INSERT INTO performance_kpis (kpi_key,name,department,module,owner,description,target_value,unit,direction,review_freq)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+      ON CONFLICT (kpi_key) DO NOTHING
+    `, [k.kpi_key,k.name,k.department,k.module,k.owner,k.description,k.target_value,k.unit,k.direction,k.review_freq]);
+  }
+  console.log('[migrate] performance KPIs seeded');
 }
 
 if (require.main === module) {

@@ -1,3 +1,4 @@
 {
-    "claudeCode.useTerminal": false
+    "claudeCode.useTerminal": false,
+    "java.configuration.updateBuildConfiguration": "automatic"
 }

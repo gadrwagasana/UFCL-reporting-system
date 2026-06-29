@@ -8,28 +8,29 @@ import { PolesPurchaseStack }      from './PolesPurchaseStack';
 import { PolesDeliveryStack }      from './PolesDeliveryStack';
 import { PolesQCStack }            from './PolesQCStack';
 import { MaterialRequestsStack }   from './MaterialRequestsStack';
-import { CasualLabourStack }       from './CasualLabourStack';
 import { MyRequestsScreen }        from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }           from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator<PolesTabParamList>();
 
 const tabIcons: Record<keyof PolesTabParamList, [string, string]> = {
-  PolesList:     ['podium',           'podium-outline'],
-  PolesPurchase: ['cart',             'cart-outline'],
-  PolesDelivery: ['cube',             'cube-outline'],
-  PolesQC:       ['shield-checkmark', 'shield-checkmark-outline'],
-  MyRequests:    ['list',             'list-outline'],
-  Profile:       ['person',           'person-outline'],
+  PolesList:       ['podium',           'podium-outline'],
+  PolesPurchase:   ['cart',             'cart-outline'],
+  PolesDelivery:   ['cube',             'cube-outline'],
+  PolesQC:         ['shield-checkmark', 'shield-checkmark-outline'],
+  MaterialRequest: ['layers',           'layers-outline'],
+  MyRequests:      ['list',             'list-outline'],
+  Profile:         ['person',           'person-outline'],
 };
 
 const tabLabels: Record<keyof PolesTabParamList, string> = {
-  PolesList:     'Production',
-  PolesPurchase: 'Purchase',
-  PolesDelivery: 'Delivery',
-  PolesQC:       'QC',
-  MyRequests:    'My Requests',
-  Profile:       'Profile',
+  PolesList:       'Production',
+  PolesPurchase:   'Purchase',
+  PolesDelivery:   'Delivery',
+  PolesQC:         'QC',
+  MaterialRequest: 'Materials',
+  MyRequests:      'My Requests',
+  Profile:         'Profile',
 };
 
 export function PolesNavigator() {
@@ -48,12 +49,13 @@ export function PolesNavigator() {
         title: tabLabels[route.name as keyof PolesTabParamList],
       })}
     >
-      <Tab.Screen name="PolesList"     component={PolesProductionStack} options={{ title: 'Production' }} />
-      <Tab.Screen name="PolesPurchase" component={PolesPurchaseStack}   options={{ title: 'Purchase' }} />
-      <Tab.Screen name="PolesDelivery" component={PolesDeliveryStack}   options={{ title: 'Delivery' }} />
-      <Tab.Screen name="PolesQC"       component={PolesQCStack}         options={{ title: 'QC' }} />
-      <Tab.Screen name="MyRequests"    component={MyRequestsScreen}     options={{ title: 'My Requests' }} />
-      <Tab.Screen name="Profile"       component={ProfileScreen}        options={{ title: 'Profile' }} />
+      <Tab.Screen name="PolesList"       component={PolesProductionStack} options={{ title: 'Production' }} />
+      <Tab.Screen name="PolesPurchase"   component={PolesPurchaseStack}   options={{ title: 'Purchase' }} />
+      <Tab.Screen name="PolesDelivery"   component={PolesDeliveryStack}   options={{ title: 'Delivery' }} />
+      <Tab.Screen name="PolesQC"         component={PolesQCStack}         options={{ title: 'QC' }} />
+      <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
+      <Tab.Screen name="MyRequests"      component={MyRequestsScreen}     options={{ title: 'My Requests' }} />
+      <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
 }

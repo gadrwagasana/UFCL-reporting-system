@@ -20,7 +20,7 @@ const variants = {
   production: {
     appName:      'UFCL Production',
     packageId:    'com.ufcl.mobile',
-    apiUrl:       process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.5:3001',
+    apiUrl:       process.env.EXPO_PUBLIC_API_URL ?? 'https://192.168.1.5',
     versionCode:  1,
   },
 };

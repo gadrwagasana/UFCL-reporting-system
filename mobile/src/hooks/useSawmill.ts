@@ -13,6 +13,8 @@ export function useSawmillList() {
 
 interface CreateSawmillPayload {
   date:               string;    // YYYY-MM-DD — API field is `date`, not `log_date`
+  supervisor?:        string;
+  operators?:         string;
   machine?:           string;
   product_size?:      string;
   timber_kiln_dried?: number;

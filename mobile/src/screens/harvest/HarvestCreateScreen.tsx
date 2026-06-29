@@ -30,6 +30,7 @@ export function HarvestCreateScreen() {
   const [species,     setSpecies]     = useState('');
   const [quantity,    setQuantity]    = useState('');
   const [comptId,     setComptId]     = useState('');
+  const [subName,     setSubName]     = useState('');
   const [logsCrosscut,    setLogsCrosscut]    = useState('');
   const [logsHandrolled,  setLogsHandrolled]  = useState('');
   const [notes,       setNotes]       = useState('');
@@ -54,6 +55,7 @@ export function HarvestCreateScreen() {
       species:         species.trim(),
       quantity:        qty,
       ...(comptId           && { compt_id: Number(comptId) }),
+      ...(subName           && { sub_name: subName }),
       ...(logsCrosscut.trim()   && { logs_crosscut:   Number(logsCrosscut) }),
       ...(logsHandrolled.trim() && { logs_handrolled: Number(logsHandrolled) }),
       ...(notes.trim()      && { notes: notes.trim() }),
@@ -117,7 +119,12 @@ export function HarvestCreateScreen() {
           <FormSelect
             label="Compartment"
             value={comptId}
-            onChange={(v) => setComptId(String(v))}
+            onChange={(v) => {
+              const id = String(v);
+              setComptId(id);
+              const found = (comptData?.rows ?? []).find((c) => String(c.id) === id);
+              setSubName(found?.sub_name ?? '');
+            }}
             options={[{ label: '— None —', value: '' }, ...compartmentOptions]}
             placeholder="Select compartment"
           />

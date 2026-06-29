@@ -127,11 +127,22 @@ export interface MetaVehicle {
   status:            string;
 }
 
+export interface SalesOrderOption {
+  id:                   number;
+  order_number:         string;
+  customer_name:        string;
+  price_tax_type:       string;
+  quantity:             number;
+  qty_dispatched_total: number;
+  qty_accepted_total:   number;
+  qty_remaining:        number;
+}
+
 export interface DeliveryListResponse {
   ok:          true;
   rows:        DeliveryOrder[];
   vehicles:    MetaVehicle[];
-  salesOrders: unknown[];
+  salesOrders: SalesOrderOption[];
 }
 
 // ─── Vehicle Fuel Logs ────────────────────────────────────────────────────────

@@ -8,6 +8,8 @@ const express   = require('express');
 const rateLimit = require('express-rate-limit');
 const helmet    = require('helmet');
 const { authenticate } = require('./middleware/auth');
+const logger  = require('./lib/logger');
+const metrics = require('./lib/metrics');
 
 const app  = express();
 const PORT = process.env.MOBILE_API_PORT || 3001;
@@ -54,6 +56,16 @@ const loginLimiter = rateLimit({
   message:               { ok: false, error: 'Too many login attempts — try again in 15 minutes' },
 });
 
+// Update endpoint limiter — 30 req/hour per device IP.
+// One version check every 2 min is already generous; this prevents scraping.
+const updateLimiter = rateLimit({
+  windowMs:        60 * 60 * 1_000,
+  max:             30,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message:         { ok: false, error: 'Too many update requests — try again later' },
+});
+
 const apiLimiter = rateLimit({
   windowMs:        60 * 1_000,
   max:             300,
@@ -78,12 +90,45 @@ app.use((req, res, next) => {
   next();
 });
 
-// ── Health check — no JWT, no rate limit ─────────────────────────────────────
-// Registered before apiLimiter so health checks never consume rate limit quota.
+// ── Request tracking — must be before routes ──────────────────────────────────
+// Observes every completed response:
+//   • Counts by status code bucket (5xx, 401, 403, 429)
+//   • Records duration for avg/p95 metrics
+//   • Logs slow requests (> 1 s) with method, path, and status
 
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, uptime: process.uptime(), ts: new Date().toISOString() });
+const SLOW_THRESHOLD_MS = parseInt(process.env.SLOW_REQUEST_MS || '1000', 10);
+
+app.use((req, res, next) => {
+  req._startMs = Date.now();
+  res.on('finish', () => {
+    const ms = Date.now() - req._startMs;
+    metrics.inc('requests_total');
+    metrics.recordDuration(ms);
+    if (res.statusCode >= 500)  metrics.inc('requests_5xx');
+    if (res.statusCode === 401) metrics.inc('auth_invalid_token');
+    if (res.statusCode === 403) metrics.inc('permission_denied');
+    if (res.statusCode === 429) metrics.inc('rate_limit_hits');
+    if (ms >= SLOW_THRESHOLD_MS) {
+      metrics.recordSlowRequest(req.method, req.path, ms, res.statusCode);
+      logger.warn('slow_request', { method: req.method, path: req.path, ms, status: res.statusCode });
+    }
+  });
+  next();
 });
+
+// ── Health / ready / metrics — no JWT, no rate limit ─────────────────────────
+// Registered before apiLimiter so monitoring never consumes rate limit quota.
+// /api/health is backward-compatible with the original { ok, uptime, ts } shape.
+
+app.use('/api', require('./routes/health'));
+
+// ── Public update distribution — no JWT required ──────────────────────────────
+// /version.json and /downloads/* are intentionally unauthenticated:
+// the mobile app must be able to check for updates before login.
+// Isolated from /api/* — no existing route or middleware is affected.
+
+app.use(['/version.json', '/downloads'], updateLimiter);
+app.use(require('./routes/updates'));
 
 // ── General rate limit on all remaining /api/* routes ────────────────────────
 
@@ -119,6 +164,11 @@ app.use('/api/vat',              require('./routes/vat'));
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));
 
+// ── Monitoring dashboard (static HTML, no JWT) ────────────────────────────────
+// Served at /dashboard.html — admin opens in browser, fetches /api/metrics with token.
+
+app.use(express.static(path.join(__dirname, 'public')));
+
 // ── 404 catch-all ─────────────────────────────────────────────────────────────
 
 app.use((req, res) => {
@@ -128,9 +178,33 @@ app.use((req, res) => {
 // ── Global error handler ──────────────────────────────────────────────────────
 
 app.use((err, req, res, _next) => {
+  logger.error('request_error', { method: req.method, path: req.path, message: err.message });
   console.error('[server]', err.message);
   res.status(500).json({ ok: false, error: 'Internal server error' });
 });
+
+// ── Process-level safety nets ─────────────────────────────────────────────────
+// Catch unhandled errors so they appear in structured logs before the process exits.
+
+process.on('uncaughtException', (err) => {
+  logger.error('uncaught_exception', { message: err.message, stack: err.stack });
+  console.error('[fatal]', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  logger.error('unhandled_rejection', { reason: String(reason) });
+  console.error('[rejected]', reason);
+});
+
+// Graceful shutdown — flush logs before exiting
+function shutdown(signal) {
+  logger.info('server_shutdown', { signal });
+  console.log(`[server] shutting down (${signal})`);
+  process.exit(0);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT',  () => shutdown('SIGINT'));
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
@@ -139,4 +213,12 @@ app.listen(PORT, HOST, () => {
   console.log(`  DB host  : ${process.env.PGHOST}:${process.env.PGPORT}`);
   console.log(`  Proxy    : ${process.env.API_BEHIND_PROXY === 'true' ? 'yes (trust X-Real-IP)' : 'no'}`);
   console.log(`  JWT exp  : 8h`);
+  console.log(`  Logs     : ${logger.dir}`);
+  logger.info('server_start', {
+    host:         HOST,
+    port:         PORT,
+    db_host:      process.env.PGHOST,
+    db_port:      process.env.PGPORT,
+    behind_proxy: process.env.API_BEHIND_PROXY === 'true',
+  });
 });

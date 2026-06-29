@@ -7,20 +7,20 @@ let _unsubscribe: (() => void) | null = null;
 
 export function startNetworkMonitor(): void {
   if (_unsubscribe) return;
-
-  _unsubscribe = NetInfo.addEventListener((state) => {
-    const online    = state.isConnected === true && state.isInternetReachable !== false;
-    const prevOnline = useOfflineStore.getState().isOnline;
-    useOfflineStore.getState().setOnline(online);
-
-    if (online && !prevOnline) {
-      // Flush any queued offline writes first, then revalidate the session.
-      // Revalidation refreshes the user profile and catches tokens that expired
-      // while the device was offline (logout if 401, no-op if still valid).
-      syncQueue();
-      useAuthStore.getState().revalidateSession();
-    }
-  });
+  try {
+    _unsubscribe = NetInfo.addEventListener((state) => {
+      const online     = state.isConnected === true && state.isInternetReachable !== false;
+      const prevOnline = useOfflineStore.getState().isOnline;
+      useOfflineStore.getState().setOnline(online);
+      if (online && !prevOnline) {
+        syncQueue();
+        useAuthStore.getState().revalidateSession();
+      }
+    });
+  } catch {
+    // NetInfo native module unavailable at startup — app runs in always-online
+    // mode. Offline queue will not auto-sync; user can still log in and work.
+  }
 }
 
 export function stopNetworkMonitor(): void {

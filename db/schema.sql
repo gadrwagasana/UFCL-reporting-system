@@ -749,3 +749,112 @@ create table if not exists deletion_requests (
 create index if not exists idx_deletion_requests_status on deletion_requests(status);
 create index if not exists idx_deletion_requests_table  on deletion_requests(table_name, record_id);
 
+-- ── Phase 6A: Notification Centre Enhancement ─────────────────────────────────
+-- Adds related-record linkage and category classification to the notifications
+-- table. All three columns are nullable so existing rows remain valid — NULL
+-- simply means the notification predates Phase 6 or has no specific record link.
+alter table notifications add column if not exists related_module text;
+alter table notifications add column if not exists related_id     text;
+alter table notifications add column if not exists category       text;
+
+-- Composite covering indexes for the two most common filter+sort patterns:
+--   • WHERE type = $1       ORDER BY created_at DESC
+--   • WHERE category = $1   ORDER BY created_at DESC
+-- The existing single-column idx_notifications_created_at is preserved for
+-- unfiltered chronological sorts (e.g. "show all" view).
+create index if not exists idx_notifications_type
+  on notifications(type, created_at desc);
+
+create index if not exists idx_notifications_category
+  on notifications(category, created_at desc);
+
+-- ── Phase 8 — Intelligent Automation Engine ──────────────────────────────────
+
+create table if not exists automation_rules (
+  id             bigserial primary key,
+  rule_key       text unique not null,
+  label          text not null,
+  description    text,
+  enabled        boolean not null default true,
+  cooldown_hours int not null default 4,
+  notify_roles   text[] not null default '{}'::text[],
+  threshold      jsonb not null default '{}'::jsonb,
+  severity       text not null default 'medium',
+  auto_action    text not null default 'notify',
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now()
+);
+
+create table if not exists automation_log (
+  id             bigserial primary key,
+  rule_key       text not null,
+  related_module text,
+  related_id     text,
+  action_taken   text not null,
+  fired_at       timestamptz not null default now(),
+  meta           jsonb not null default '{}'::jsonb
+);
+
+create index if not exists idx_automation_log_rule_fired
+  on automation_log(rule_key, fired_at desc);
+create index if not exists idx_automation_log_fired
+  on automation_log(fired_at desc);
+
+-- ── Phase 8 Part 4 — Escalation Engine ───────────────────────────────────────
+-- One active escalation per entity (enforced by partial unique index).
+-- History is append-only — every level change is recorded immutably.
+create table if not exists escalations (
+  id              bigserial primary key,
+  entity_type     text not null,            -- maintenance | delivery | workflow | security | approval_edit | approval_del
+  entity_id       text not null,            -- string key for the entity (schedule_id, order_id, job_type, _global, etc.)
+  entity_ref      text,                     -- human-readable label shown in notifications
+  triggered_by    text not null,            -- automation_rules.rule_key that triggered this
+  current_level   text not null default 'leader',   -- leader | manager | director | ceo
+  status          text not null default 'active',   -- active | resolved | cancelled
+  resolved_reason text,
+  notified_at     timestamptz not null default now(), -- timestamp of last notification at current level
+  escalated_at    timestamptz not null default now(), -- timestamp when first created
+  resolved_at     timestamptz,
+  created_at      timestamptz not null default now(),
+  updated_at      timestamptz not null default now()
+);
+
+-- Only one *active* escalation per entity at a time.
+create unique index if not exists uidx_escalations_active
+  on escalations (entity_type, entity_id)
+  where status = 'active';
+
+create index if not exists idx_escalations_status_type
+  on escalations (status, entity_type, created_at desc);
+
+-- Append-only audit trail of every level transition for each escalation.
+create table if not exists escalation_history (
+  id              bigserial primary key,
+  escalation_id   bigint not null references escalations(id) on delete cascade,
+  from_level      text,                     -- null on initial creation
+  to_level        text not null,            -- 'resolved' or a level name
+  reason          text not null,
+  actor           text not null default 'system',
+  meta            jsonb not null default '{}',
+  created_at      timestamptz not null default now()
+);
+
+create index if not exists idx_escalation_history_esc
+  on escalation_history (escalation_id, created_at desc);
+
+-- ── Phase 8 Part 5/6 — Scheduler Run Log ─────────────────────────────────────
+-- Records every 15-minute tick with timing, error count, and per-task results.
+-- Drives the Automation Center health indicators and activity chart.
+create table if not exists scheduler_runs (
+  id                    bigserial primary key,
+  started_at            timestamptz not null default now(),
+  completed_at          timestamptz,
+  duration_ms           int,
+  rules_fired           int not null default 0,
+  escalations_processed int not null default 0,
+  errors                int not null default 0,
+  status                text not null default 'running'   -- running | completed
+);
+create index if not exists idx_scheduler_runs_started
+  on scheduler_runs(started_at desc);
+

@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>UFCL ERP — CEO Role UAT Package</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:11pt;color:#1a1a1a;background:#f4f6f8}
+  .cover{background:linear-gradient(135deg,#2c1654 0%,#6a2d82 60%,#a0416b 100%);color:#fff;padding:60px 50px;min-height:220px;page-break-after:always}
+  .cover h1{font-size:28pt;font-weight:700;letter-spacing:1px;margin-bottom:8px}
+  .cover h2{font-size:16pt;font-weight:300;margin-bottom:30px;opacity:.85}
+  .cover-meta{display:flex;gap:50px;margin-top:20px;font-size:10pt;opacity:.9}
+  .cover-meta div{display:flex;flex-direction:column;gap:4px}
+  .cover-meta strong{font-size:9pt;text-transform:uppercase;letter-spacing:.5px;opacity:.7}
+  .toc{background:#fff;margin:20px;padding:30px 40px;border-radius:8px;page-break-after:always}
+  .toc h3{font-size:14pt;color:#2c1654;margin-bottom:16px;border-bottom:2px solid #6a2d82;padding-bottom:8px}
+  .toc ol{padding-left:20px;line-height:2.1}
+  .toc a{color:#6a2d82;text-decoration:none;font-size:10.5pt}
+  .role-info{background:#f3eafd;border-left:4px solid #6a2d82;padding:14px 20px;border-radius:0 6px 6px 0;margin-bottom:20px;font-size:9.5pt}
+  .role-info strong{color:#2c1654}
+  .section{background:#fff;margin:20px;border-radius:8px;overflow:hidden}
+  .section-header{padding:14px 24px;display:flex;align-items:center;gap:12px}
+  .section-header h2{font-size:13pt;font-weight:700;color:#fff}
+  .section-header .sec-num{background:rgba(255,255,255,.22);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11pt;color:#fff;flex-shrink:0}
+  .s1  .section-header{background:#2c1654}
+  .s2  .section-header{background:#5b2d8a}
+  .s3  .section-header{background:#0a6e4e}
+  .s4  .section-header{background:#b5500a}
+  .s5  .section-header{background:#8b1a4a}
+  .s6  .section-header{background:#1a4a6e}
+  .s7  .section-header{background:#6e3a00}
+  .s8  .section-header{background:#3a3a6e}
+  .s9  .section-header{background:#4a1a6e}
+  .s10 .section-header{background:#1a5c3a}
+  .s11 .section-header{background:#6e1a1a}
+  .s12 .section-header{background:#1a3a3a}
+  .section-body{padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+  .tc{border:1px solid #d8dce2;border-radius:6px;overflow:hidden;page-break-inside:avoid}
+  .tc-header{display:flex;justify-content:space-between;align-items:center;background:#f5f0fc;padding:8px 14px;border-bottom:1px solid #d8dce2}
+  .tc-id{font-weight:700;font-size:10pt;color:#2c1654;font-family:monospace}
+  .tc-title{font-weight:600;font-size:10.5pt;color:#2c3e50}
+  .tc-table{width:100%;border-collapse:collapse;font-size:9.5pt}
+  .tc-table tr{border-bottom:1px solid #eaecef}
+  .tc-table tr:last-child{border-bottom:none}
+  .tc-table td{padding:7px 12px;vertical-align:top;line-height:1.45}
+  .tc-table td:first-child{width:160px;font-weight:600;color:#555;background:#fafbfc;white-space:nowrap}
+  .tc-table ol,.tc-table ul{padding-left:16px;margin:0}
+  .tc-table li{margin-bottom:2px}
+  .blank{background:#fffde7;min-height:22px;border-radius:3px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:8.5pt;font-weight:600}
+  .badge-high{background:#fde8e8;color:#b00}
+  .badge-med{background:#fff3cd;color:#856404}
+  .badge-low{background:#d4edda;color:#155724}
+  .badge-block{background:#fde8e8;color:#8b0000;border:1px solid #f5c6cb}
+  .restrict-note{background:#fff8f8;border:1px solid #f5c6cb;border-radius:4px;padding:8px 12px;font-size:9pt;color:#721c24;margin-top:6px}
+  .permit-note{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:8px 12px;font-size:9pt;color:#166534;margin-top:6px}
+  .summary-table{width:100%;border-collapse:collapse;font-size:10pt}
+  .summary-table th{background:#2c1654;color:#fff;padding:8px 12px;text-align:left}
+  .summary-table td{padding:7px 12px;border-bottom:1px solid #eaecef;vertical-align:top}
+  .summary-table tr:nth-child(even) td{background:#f9fafb}
+  .verdict-box{background:#f3eafd;border:2px solid #6a2d82;border-radius:8px;padding:20px;text-align:center;margin:16px 0}
+  .verdict-box h3{color:#2c1654;font-size:14pt;margin-bottom:6px}
+  .verdict-box p{color:#6a2d82;font-size:10pt}
+  .sign-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;margin:20px}
+  .sign-box{border:1px solid #ccc;border-radius:6px;padding:16px;text-align:center}
+  .sign-line{border-bottom:1px solid #666;margin:30px 10px 6px;height:1px}
+  .sign-label{font-size:9pt;color:#666}
+  @media print{
+    body{background:#fff}
+    .section,.toc,.sign-row{margin:0;border-radius:0}
+    .tc{page-break-inside:avoid}
+    .cover{page-break-after:always}
+    .toc{page-break-after:always}
+    @page{margin:1.5cm 1.8cm;size:A4}
+  }
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="cover">
+  <h1>UFCL ERP System</h1>
+  <h2>CEO Role — User Acceptance Testing Package</h2>
+  <div class="cover-meta">
+    <div><strong>Document Type</strong>UAT Test Package</div>
+    <div><strong>Role Under Test</strong>Chief Executive Officer (ceo)</div>
+    <div><strong>System Version</strong>v1.3.0</div>
+    <div><strong>Prepared By</strong>QA Engineering</div>
+    <div><strong>Date</strong>June 2026</div>
+    <div><strong>Total Test Cases</strong>53</div>
+  </div>
+</div>
+
+<!-- TABLE OF CONTENTS -->
+<div class="toc">
+  <h3>Table of Contents</h3>
+  <div class="role-info">
+    <strong>Role Profile — CEO:</strong> Cross-workshop role with no workshop restriction. Full visibility across Headquarters, Gatare Workshop, Nyanza Workshop, and Showroom. Read-only on operational data entry modules. Can approve/reject requests via the Changes module. Access to KPI, financial reports, audit logs, and executive dashboards. <strong>User management is intentionally reserved for Admin only.</strong>
+  </div>
+  <ol>
+    <li><a href="#s1">Login and Executive Dashboard (CEO-01 – CEO-04)</a></li>
+    <li><a href="#s2">Company-Wide Visibility (CEO-05 – CEO-08)</a></li>
+    <li><a href="#s3">Production Oversight (CEO-09 – CEO-15)</a></li>
+    <li><a href="#s4">Logistics Oversight (CEO-16 – CEO-20)</a></li>
+    <li><a href="#s5">Sales Oversight (CEO-21 – CEO-25)</a></li>
+    <li><a href="#s6">Financial and KPI Monitoring (CEO-26 – CEO-30)</a></li>
+    <li><a href="#s7">Approval Workflows (CEO-31 – CEO-35)</a></li>
+    <li><a href="#s8">User and Security Oversight (CEO-36 – CEO-40)</a></li>
+    <li><a href="#s9">Workshop Isolation Validation (CEO-41 – CEO-44)</a></li>
+    <li><a href="#s10">Reports and Exports (CEO-45 – CEO-49)</a></li>
+    <li><a href="#s11">Negative Testing (CEO-50 – CEO-53)</a></li>
+    <li><a href="#s12">Final Sign-Off Summary</a></li>
+  </ol>
+</div>
+
+<!-- ══════════════ SECTION 1 ══════════════ -->
+<div class="section s1" id="s1">
+  <div class="section-header"><div class="sec-num">1</div><h2>Login and Executive Dashboard</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-01</span><span class="tc-title">Successful CEO login</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO account authenticates and loads a session with the correct role.</td></tr>
+        <tr><td>Preconditions</td><td>Admin has created a CEO user account. Application is running.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open the UFCL ERP application.</li>
+          <li>Enter username: <strong>ceo.ufcl</strong></li>
+          <li>Enter password: <strong>UFCL@1234</strong></li>
+          <li>Click Login.</li>
+        </ol></td></tr>
+        <tr><td>Sample Data</td><td>Username: ceo.ufcl | Password: UFCL@1234</td></tr>
+        <tr><td>Expected Result</td><td>Login succeeds. Session stores role = <em>ceo</em>. Executive dashboard or main dashboard loads automatically.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-02</span><span class="tc-title">Invalid credentials are rejected</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the system rejects a wrong password for the CEO account.</td></tr>
+        <tr><td>Preconditions</td><td>Application is on the login screen.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Enter username: <strong>ceo.ufcl</strong></li>
+          <li>Enter password: <strong>WrongPass!</strong></li>
+          <li>Click Login.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Login rejected with "Invalid credentials" message. No session is started.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-03</span><span class="tc-title">Executive dashboard loads with KPI summary</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO dashboard loads with company-wide executive metrics.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as ceo.ufcl. At least some production and sales records exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Observe the dashboard after login.</li>
+          <li>Confirm summary cards or charts are displayed (production, sales, stock, machine activity).</li>
+          <li>Navigate to the CEO or KPI module if a dedicated executive page exists.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Dashboard shows company-wide totals. No "no data" error on first load. At least one KPI metric or summary card is visible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-04</span><span class="tc-title">CEO navigation shows executive modules only</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO sees their intended navigation set and does NOT see admin-only modules (e.g., User Management).</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Scan the full navigation sidebar.</li>
+          <li>List all visible modules.</li>
+          <li>Confirm presence of: Dashboard, CEO/KPI, Weekly Cost, Reports, Audit, Machines, Logistics Dashboard, Production modules, Sales, Notifications.</li>
+          <li>Confirm ABSENCE of: Users / User Management module.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Executive and reporting modules are visible. The Users module is not accessible from the CEO navigation.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 2 ══════════════ -->
+<div class="section s2" id="s2">
+  <div class="section-header"><div class="sec-num">2</div><h2>Company-Wide Visibility</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-05</span><span class="tc-title">CEO sees data from all four workshop locations</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO has unrestricted visibility across all company locations.</td></tr>
+        <tr><td>Preconditions</td><td>Records exist for at least Gatare Workshop and Nyanza Workshop.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open Daily Timber — set filter to All Workshops — confirm Gatare records appear.</li>
+          <li>Open Daily Poles — confirm Nyanza records appear.</li>
+          <li>Open Sales — confirm Showroom records appear.</li>
+          <li>Open Stock Movements — confirm records from multiple locations are present.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Data from Headquarters, Gatare Workshop, Nyanza Workshop, and Showroom is all accessible without restriction or error.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-06</span><span class="tc-title">Workshop filter dropdown is available to CEO</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO sees a workshop selector (not a static restriction badge) in the page banner.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to any data module (e.g., Daily Timber).</li>
+          <li>Identify the workshop control in the top banner.</li>
+          <li>Confirm it is a <strong>selectable dropdown</strong>, not a read-only label or badge.</li>
+          <li>Switch from "All Workshops" to "Gatare Workshop" and confirm data updates.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Dropdown visible with options: All Workshops, Headquarters, Gatare Workshop, Nyanza Workshop, Showroom. Changing selection filters data immediately.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-07</span><span class="tc-title">Cross-workshop performance comparison</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can view side-by-side or sequential workshop data to compare performance.</td></tr>
+        <tr><td>Preconditions</td><td>Production records from both Gatare and Nyanza exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open the KPI or Workshop Overview module.</li>
+          <li>Set filter to Gatare Workshop — note production totals.</li>
+          <li>Set filter to Nyanza Workshop — note production totals.</li>
+          <li>Confirm both sets of figures are correct and distinguishable.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Gatare and Nyanza figures load correctly for each filter selection. No data from one workshop bleeds into the other when filtered.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-08</span><span class="tc-title">Legacy NULL-workshop records visible to CEO</span><span class="badge badge-low">Normal</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that pre-migration records with no workshop stamp are visible to the CEO (backward compatibility check).</td></tr>
+        <tr><td>Preconditions</td><td>At least one record with workshop_id = NULL exists in the system (legacy data). Skip if database is fully fresh.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Set workshop filter to "All Workshops".</li>
+          <li>Navigate to a module that may contain legacy records.</li>
+          <li>Confirm records with no workshop stamp are displayed alongside assigned-workshop records.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Legacy NULL-workshop records are included in the "All Workshops" view without causing errors.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 3 ══════════════ -->
+<div class="section s3" id="s3">
+  <div class="section-header"><div class="sec-num">3</div><h2>Production Oversight</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-09</span><span class="tc-title">View harvesting records (read-only)</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can view harvest logs from all workshops without being able to create or edit entries.</td></tr>
+        <tr><td>Preconditions</td><td>Harvest records exist for Gatare Workshop.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Harvest or Daily Harvest module.</li>
+          <li>Confirm records are listed with date, workshop, logs, and volume.</li>
+          <li>Confirm there is NO Add/Create button visible to the CEO, OR if it is visible, attempt to use it and expect access to be restricted.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Harvest records load and display correctly. CEO can view all records. Data entry is either hidden or blocked.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-10</span><span class="tc-title">View daily timber production records</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO can view daily sawmill production logs across workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Daily timber records exist for at least one workshop.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Daily Timber.</li>
+          <li>Set filter to All Workshops.</li>
+          <li>Confirm all records load with: date, workshop, logs processed, timber volume (m³).</li>
+          <li>Apply filter to Gatare only — confirm data narrows correctly.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>All timber production records visible. Filtering by workshop works correctly. CEO cannot submit new production entries.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-11</span><span class="tc-title">View daily poles production records</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO can view Nyanza poles production records.</td></tr>
+        <tr><td>Preconditions</td><td>Poles production records exist for Nyanza Workshop.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Daily Poles.</li>
+          <li>Confirm Nyanza production entries are displayed.</li>
+          <li>Check pole count, size categories, and dates are readable.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Daily poles records load with workshop stamp, pole count, and production date. No creation form accessible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-12</span><span class="tc-title">View value-added timber (VAT) records</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can view VAT processing records.</td></tr>
+        <tr><td>Preconditions</td><td>VAT records exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Value-Added Timber.</li>
+          <li>Confirm records show: date, workshop, process type, input and output volumes.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>VAT records load and are readable. Workshop filter applies correctly.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-13</span><span class="tc-title">View machine activity summaries</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can view machine logs and activity summaries for all workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Machines are registered. At least one machine daily log exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Machines or Machine Logs.</li>
+          <li>Confirm machine list shows machines from all workshops.</li>
+          <li>Open a machine record — confirm daily log history is visible.</li>
+          <li>Navigate to Machine KPI — confirm utilisation metrics load.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Machine registry, daily logs, and KPI metrics are all accessible. CEO can view but not necessarily add logs (unless also permitted).</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-14</span><span class="tc-title">View log transport records</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO can view log transport trips from all workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Log transport records exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Log Transport.</li>
+          <li>Confirm trips are listed with: date, workshop, compartment, log count, volume, vehicle.</li>
+          <li>Apply workshop filter — confirm filtering works.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>All transport records visible. Workshop filter functions correctly. No data entry options appear for CEO.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-15</span><span class="tc-title">Production report totals are workshop-accurate</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify that production totals shown to the CEO match the records entered per workshop.</td></tr>
+        <tr><td>Preconditions</td><td>Known production records exist: e.g., 30 logs processed at Gatare, 120 poles at Nyanza.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open the production report or KPI dashboard.</li>
+          <li>Note total timber volume for Gatare Workshop.</li>
+          <li>Note total poles for Nyanza Workshop.</li>
+          <li>Cross-check figures against entries made in Section 3 tests.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Dashboard totals match the sum of individual records entered. No double-counting or missing workshop data.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 4 ══════════════ -->
+<div class="section s4" id="s4">
+  <div class="section-header"><div class="sec-num">4</div><h2>Logistics Oversight</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-16</span><span class="tc-title">View inventory levels across all warehouses</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO can view current stock-on-hand for all warehouses.</td></tr>
+        <tr><td>Preconditions</td><td>Stock levels exist for Gatare Workshop and Nyanza Workshop warehouses.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Inventory or Stock Items.</li>
+          <li>Confirm all warehouses appear in the inventory view.</li>
+          <li>Check that Gatare Workshop shows: Diesel Fuel, Engine Oil, Band Saw Blade, CCA Chemical.</li>
+          <li>Check that Nyanza Workshop shows: Diesel Fuel, Engine Oil, Safety Gloves.</li>
+        </ol></td></tr>
+        <tr><td>Sample Data</td><td>Gatare: Diesel 500L, Oil 40L, Blades 5, CCA 200kg | Nyanza: Diesel 400L, Oil 25L, Gloves 50</td></tr>
+        <tr><td>Expected Result</td><td>All stock levels visible per warehouse. CEO can view quantities but cannot adjust stock directly.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-17</span><span class="tc-title">Monitor stock movement history</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can review the stock movement log (IN/OUT transactions).</td></tr>
+        <tr><td>Preconditions</td><td>Stock movements have been recorded.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Stock Movements.</li>
+          <li>Confirm list shows: item name, warehouse, type (IN/OUT), quantity, date, reference.</li>
+          <li>Filter by Gatare Workshop — confirm only Gatare movements appear.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Full movement history visible. Workshop filter operates correctly. CEO has no Add Movement button or it is disabled.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-18</span><span class="tc-title">Review stock transfers between workshops</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can view the stock transfer log.</td></tr>
+        <tr><td>Preconditions</td><td>At least one stock transfer has been created (e.g., Diesel from Gatare to Nyanza).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Stock Transfers.</li>
+          <li>Confirm the list shows: item, from warehouse, to warehouse, quantity, date, status.</li>
+          <li>Verify the Diesel transfer (100L, Gatare → Nyanza) is listed.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Transfer history visible and accurate. CEO cannot initiate new transfers from this view.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-19</span><span class="tc-title">View warehouse balances on logistics dashboard</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the logistics dashboard shows per-warehouse stock balance summaries.</td></tr>
+        <tr><td>Preconditions</td><td>Stock data exists. Materialized views are current.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Logistics Dashboard.</li>
+          <li>Confirm warehouse summary cards show current stock quantities per location.</li>
+          <li>Verify figures match the stock level data from CEO-16.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Dashboard accurately reflects stock-on-hand per warehouse. Data is consistent with the inventory module.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-20</span><span class="tc-title">Access logistics dashboard overview</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can access the logistics overview page and it loads without errors.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Logistics Dashboard.</li>
+          <li>Confirm the page loads fully.</li>
+          <li>Confirm no permission error or blank page appears.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Logistics dashboard fully accessible to CEO with stock, transfer, and warehouse summary data.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 5 ══════════════ -->
+<div class="section s5" id="s5">
+  <div class="section-header"><div class="sec-num">5</div><h2>Sales Oversight</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-21</span><span class="tc-title">View all sales orders company-wide</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO sees all sales orders from all workshops in one view.</td></tr>
+        <tr><td>Preconditions</td><td>Sales orders exist for at least two workshops (e.g., Gatare and Showroom).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Sales.</li>
+          <li>Set filter to All Workshops.</li>
+          <li>Confirm orders from Gatare and Showroom are both visible.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Complete sales order list displayed. Orders from every workshop visible without restriction.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-22</span><span class="tc-title">View Showroom sales separately</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can isolate and review showroom-specific sales performance.</td></tr>
+        <tr><td>Preconditions</td><td>At least one sales order is linked to the Showroom workshop.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open Sales module.</li>
+          <li>Apply filter: <strong>Showroom</strong>.</li>
+          <li>Confirm only Showroom orders are listed.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Only Showroom-stamped orders appear. Other workshops' orders are hidden while the filter is active.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-23</span><span class="tc-title">Filter sales by each workshop</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the workshop filter on the Sales page works for each available location.</td></tr>
+        <tr><td>Preconditions</td><td>Sales orders exist for multiple workshops.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Filter to <strong>Gatare Workshop</strong> — note order count and totals.</li>
+          <li>Filter to <strong>Nyanza Workshop</strong> — note results.</li>
+          <li>Filter to <strong>Showroom</strong> — note results.</li>
+          <li>Reset to <strong>All Workshops</strong> — confirm combined total matches sum of individual filters.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Each filter returns only that workshop's orders. Combined total = sum of all workshop subtotals.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-24</span><span class="tc-title">Review delivery status for orders</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can track the delivery status of sales orders.</td></tr>
+        <tr><td>Preconditions</td><td>At least one delivery is linked to a sales order (e.g., from Admin UAT ADM-38).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Deliveries.</li>
+          <li>Confirm deliveries are listed with: order reference, customer, delivery date, driver, status.</li>
+          <li>Open a delivery record — confirm detail view loads.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Delivery records accessible to CEO. Status (Scheduled / Delivered / Cancelled) is visible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-25</span><span class="tc-title">View company-wide sales revenue summary</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can see aggregated sales revenue across all workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Sales orders with prices exist. At least one order has been confirmed.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to the Sales dashboard or Reports.</li>
+          <li>Confirm a revenue total or sales value summary is displayed.</li>
+          <li>Cross-check against individual orders: sum of all order values should match the displayed total.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Revenue total displayed. Figures match the sum of individual confirmed sales orders.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 6 ══════════════ -->
+<div class="section s6" id="s6">
+  <div class="section-header"><div class="sec-num">6</div><h2>Financial and KPI Monitoring</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-26</span><span class="tc-title">View KPI dashboard</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO KPI dashboard loads and shows key company performance indicators.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO. Production and machine data exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to KPI or CEO Dashboard.</li>
+          <li>Confirm the following metrics are visible: Production Volume vs Target, Machine Utilisation %, Fuel Consumption, Casual Labour Cost, Revenue.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>KPI page loads successfully. At least one category shows actual vs target comparison. No permission error.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-27</span><span class="tc-title">Review weekly cost report</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can access the weekly cost/expense report.</td></tr>
+        <tr><td>Preconditions</td><td>Weekly expense data has been entered (by Finance or Admin).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Weekly Cost or Financial Reports.</li>
+          <li>Confirm the report loads with cost breakdown by category and week.</li>
+          <li>Verify totals are readable and accurate.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Weekly cost report accessible to CEO. Cost categories and weekly totals are displayed without errors.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-28</span><span class="tc-title">View production targets versus actual performance</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO can monitor production targets and compare them to actual output per workshop.</td></tr>
+        <tr><td>Preconditions</td><td>Production targets have been set. Actual production records exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to KPI or Production Targets report.</li>
+          <li>Select workshop: <strong>Gatare</strong> — confirm timber production vs target.</li>
+          <li>Select workshop: <strong>Nyanza</strong> — confirm poles production vs target.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Target vs Actual view loads per workshop. Gap between target and actual is visible. No data missing.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-29</span><span class="tc-title">View monthly management report</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can access the monthly summary report.</td></tr>
+        <tr><td>Preconditions</td><td>Monthly report data exists or the page aggregates from existing data.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Monthly Reports.</li>
+          <li>Select the current month.</li>
+          <li>Confirm production, sales, costs, and logistics data is summarised for the period.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Monthly report loads with company-wide data. Breakdown by workshop is available.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-30</span><span class="tc-title">Operational performance overview by workshop</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can compare operational performance metrics side-by-side across workshops.</td></tr>
+        <tr><td>Preconditions</td><td>Data exists for at least two workshops.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Workshop Overview or KPI dashboard.</li>
+          <li>Confirm metrics per workshop are displayed: production output, fuel consumed, labour cost, machine hours.</li>
+          <li>Verify figures are numerically correct based on entered data.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Workshop performance data visible and correctly attributed. No figures from one workshop appear under another.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 7 ══════════════ -->
+<div class="section s7" id="s7">
+  <div class="section-header"><div class="sec-num">7</div><h2>Approval Workflows</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-31</span><span class="tc-title">View the pending approvals queue</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO can access the Changes / Approvals module and see items pending review.</td></tr>
+        <tr><td>Preconditions</td><td>At least one pending approval request exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Changes or Approvals.</li>
+          <li>Confirm pending items are listed with: requester, date, action type, status.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Approval queue loads. Items visible with sufficient detail to make a decision.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-32</span><span class="tc-title">Approve a pending request</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can approve a pending request and the change is applied.</td></tr>
+        <tr><td>Preconditions</td><td>A pending change or edit request exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open a pending item from the approvals queue.</li>
+          <li>Review the proposed change.</li>
+          <li>Click Approve.</li>
+          <li>Confirm status changes to "Approved" and the change is applied to the record.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Change approved and applied. Status updated. Audit log records ceo.ufcl as approver with timestamp.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-33</span><span class="tc-title">Reject a request with a comment</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can reject a request and provide a written reason.</td></tr>
+        <tr><td>Preconditions</td><td>A second pending request exists (create one if needed).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open a pending item.</li>
+          <li>Click Reject.</li>
+          <li>Enter comment: <strong>Does not align with current budget cycle — defer to next quarter.</strong></li>
+          <li>Confirm.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Request rejected. Original record unchanged. Comment saved and visible in the request history.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-34</span><span class="tc-title">Review edit requests from operational staff</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO can view the full context of an edit request before deciding.</td></tr>
+        <tr><td>Preconditions</td><td>An edit request has been submitted by an operational user.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open the edit request in the Changes queue.</li>
+          <li>Confirm the current value and proposed new value are both displayed.</li>
+          <li>Confirm the requester, date, and reason are visible.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Full context visible: who requested, what change, why. Current vs proposed values shown clearly.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-35</span><span class="tc-title">Review deletion requests</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can review and approve or reject deletion requests.</td></tr>
+        <tr><td>Preconditions</td><td>A deletion request exists in the queue.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Deletion Requests or Changes.</li>
+          <li>Find a pending deletion request.</li>
+          <li>Review the target record and requester details.</li>
+          <li>Approve or reject the deletion.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Deletion approved: record soft-deleted. Deletion rejected: record unchanged. Both actions recorded in audit log.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 8 ══════════════ -->
+<div class="section s8" id="s8">
+  <div class="section-header"><div class="sec-num">8</div><h2>User and Security Oversight</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-36</span><span class="tc-title">CEO cannot access User Management module</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm user management is restricted to Admin only. CEO has no access to create or edit users.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Look for a Users or User Management menu item in the sidebar.</li>
+          <li>Confirm it is not visible.</li>
+          <li>If visible, click it and confirm access is denied.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Users module is not accessible. No user creation, editing, or deletion options are available to the CEO.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td><div class="restrict-note">Expected: BLOCKED — User management is Admin-only per business rules.</div></td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-37</span><span class="tc-title">CEO can view audit logs</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO has read access to the audit trail for governance and oversight purposes.</td></tr>
+        <tr><td>Preconditions</td><td>Audit log entries exist from previous test actions.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Audit Log.</li>
+          <li>Confirm entries are visible: user, action, table, timestamp.</li>
+          <li>Filter by user = admin — confirm actions from admin session appear.</li>
+          <li>Filter by action type = Approve — confirm approval events are logged.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Audit log fully accessible to CEO. Entries include all system activity. CEO can filter and review but cannot delete audit entries.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td><div class="permit-note">Expected: PERMITTED — CEO has the "audit" permission for governance oversight.</div></td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-38</span><span class="tc-title">CEO cannot create new users</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that even if the CEO can view the user list (if applicable), they cannot create new accounts.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Attempt to navigate to User Creation form directly.</li>
+          <li>Attempt via the API if the UI does not expose it: open browser console → call <code>window.UFCL.usersCreate({...})</code>.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>User creation blocked. API returns permission denied or role check failure.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-39</span><span class="tc-title">CEO cannot modify role definitions</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that role definition management is Admin-only and inaccessible to CEO.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Settings or System Configuration.</li>
+          <li>Check whether Role Definitions or Permission Management is accessible.</li>
+          <li>If it appears, attempt to modify a role's permissions.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Role definitions are not accessible to CEO. No settings or configuration changes are possible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-40</span><span class="tc-title">CEO can view notifications</span><span class="badge badge-low">Normal</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO receives and can view system notifications relevant to their role.</td></tr>
+        <tr><td>Preconditions</td><td>At least one notification has been generated (e.g., stock alert, pending approval).</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Notifications.</li>
+          <li>Confirm notifications are listed with: type, message, date, read/unread status.</li>
+          <li>Click a notification — confirm it navigates to the relevant module.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Notifications visible. Unread count shown. Clicking a notification navigates correctly.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 9 ══════════════ -->
+<div class="section s9" id="s9">
+  <div class="section-header"><div class="sec-num">9</div><h2>Workshop Isolation Validation</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-41</span><span class="tc-title">CEO is not restricted to any single workshop</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the backend does not apply workshop isolation to the CEO user.</td></tr>
+        <tr><td>Preconditions</td><td>ceo.ufcl account has workshop_id = NULL in the database.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Log in as CEO.</li>
+          <li>Open any module that applies workshop filtering (Daily Timber, Harvest, Sales).</li>
+          <li>Confirm no "You are restricted to [Workshop Name]" badge appears.</li>
+          <li>Confirm the workshop control is a dropdown, not a static label.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>CEO is classified as a cross-workshop role. No isolation applied. Full dropdown visible.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-42</span><span class="tc-title">Workshop filter functions correctly for CEO</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the workshop filter dropdown changes the data visible to the CEO on each module page.</td></tr>
+        <tr><td>Preconditions</td><td>Production records exist for at least 2 workshops.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open Daily Timber → select Gatare → verify only Gatare records.</li>
+          <li>Switch to Nyanza → verify Nyanza records load.</li>
+          <li>Switch to All Workshops → verify combined list.</li>
+          <li>Repeat on one additional module (e.g., Sales).</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Filter correctly scopes data on every module tested. No UI errors or blank pages on any filter selection.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-43</span><span class="tc-title">CEO can compare cross-workshop data without errors</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Ensure switching between workshops does not cause data bleed, errors, or stale data.</td></tr>
+        <tr><td>Preconditions</td><td>Data exists for multiple workshops.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Set filter to Gatare — note record count and totals.</li>
+          <li>Immediately switch to Nyanza — note record count and totals.</li>
+          <li>Immediately switch back to All Workshops.</li>
+          <li>Confirm All Workshops total = Gatare total + Nyanza total (+ any other workshops).</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>No data bleeds between filters. Combined total is arithmetically consistent. No loading errors.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-44</span><span class="tc-title">Workshop-restricted user cannot see CEO's view</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm isolation works in the opposite direction — a restricted user should not see what CEO sees.</td></tr>
+        <tr><td>Preconditions</td><td>CEO has viewed records from multiple workshops. A restricted user (e.g., saw.leader at Gatare) exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Log out of CEO.</li>
+          <li>Log in as <strong>saw.leader</strong> (Gatare workshop).</li>
+          <li>Open Daily Timber.</li>
+          <li>Confirm ONLY Gatare records appear.</li>
+          <li>Confirm Nyanza records created in this test session are NOT visible.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>saw.leader sees only Gatare records. Cross-workshop isolation is enforced on the backend, not just the UI.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 10 ══════════════ -->
+<div class="section s10" id="s10">
+  <div class="section-header"><div class="sec-num">10</div><h2>Reports and Exports</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-45</span><span class="tc-title">Export production summary report</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can export production data for board-level reporting.</td></tr>
+        <tr><td>Preconditions</td><td>Production records exist. Export functionality is enabled.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to the production report or relevant module.</li>
+          <li>Apply date range: <strong>this month</strong>.</li>
+          <li>Click Export.</li>
+          <li>Confirm file is downloaded and opens correctly.</li>
+          <li>Verify data in the file matches on-screen totals.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Export completes without error. File contains correct production data matching the on-screen report.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-46</span><span class="tc-title">Export logistics and stock report</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can export a stock or inventory report.</td></tr>
+        <tr><td>Preconditions</td><td>Stock level data exists for at least two warehouses.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open Inventory or Stock Items module.</li>
+          <li>Click Export.</li>
+          <li>Open exported file and verify: item names, warehouses, quantities.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Exported file accurately reflects current inventory levels per warehouse.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-47</span><span class="tc-title">Export sales summary report</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO can export a company-wide sales report.</td></tr>
+        <tr><td>Preconditions</td><td>Sales orders exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Open Sales module → set filter: All Workshops.</li>
+          <li>Click Export.</li>
+          <li>Confirm file includes: order ID, customer, product, quantity, value, workshop, date.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>All orders exported with correct data fields. Revenue totals match on-screen figures.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-48</span><span class="tc-title">KPI dashboard loads without errors</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the KPI dashboard renders correctly with no blank charts, missing data, or JavaScript errors.</td></tr>
+        <tr><td>Preconditions</td><td>Machine logs, production data, and sales records exist.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to KPI Dashboard.</li>
+          <li>Open browser developer console (F12) and check for JavaScript errors.</li>
+          <li>Confirm all chart areas render data (no empty/grey boxes).</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>No console errors. All chart sections display data or a meaningful "no data" placeholder.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-49</span><span class="tc-title">Export audit log for compliance review</span><span class="badge badge-low">Normal</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify CEO can export the audit trail for compliance or governance documentation.</td></tr>
+        <tr><td>Preconditions</td><td>Audit log has entries from multiple users and actions.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Audit Log.</li>
+          <li>Apply date filter: today.</li>
+          <li>Click Export.</li>
+          <li>Verify the exported file contains: user, action, table, old/new values, timestamp.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Audit export completes. File is complete and suitable for compliance review.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 11 ══════════════ -->
+<div class="section s11" id="s11">
+  <div class="section-header"><div class="sec-num">11</div><h2>Negative Testing</h2></div>
+  <div class="section-body">
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-50</span><span class="tc-title">CEO cannot create production records</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm the CEO cannot enter new operational production data — this is reserved for operational roles.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Daily Timber.</li>
+          <li>Attempt to click Add or Create if the button is visible.</li>
+          <li>Alternatively, attempt via the API console: <code>window.UFCL.dailyTimberCreate({...})</code></li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>No Add button shown, OR access blocked with permission error. CEO cannot submit a new production entry.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td><div class="restrict-note">Note: Record access is permitted; data entry is not. Document whether the UI hides or disables the button.</div></td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-51</span><span class="tc-title">CEO cannot create or edit stock movements</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Verify the CEO cannot directly adjust stock levels or create stock movements.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO. Stock Movements module is visible.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Navigate to Stock Movements.</li>
+          <li>Attempt to add a new movement (Add button or console API call).</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Stock movement creation is blocked. CEO can view but not modify stock records.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-52</span><span class="tc-title">CEO cannot bypass the approval workflow</span><span class="badge badge-high">Critical</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm CEO must use the approval queue to approve/reject — there is no shortcut to directly edit another user's submitted record.</td></tr>
+        <tr><td>Preconditions</td><td>A pending edit request exists.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Instead of using the Changes queue, navigate directly to the original record that is pending change.</li>
+          <li>Attempt to edit the record directly.</li>
+          <li>Confirm whether direct editing is blocked or allowed.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Direct editing of records pending approval is blocked. All changes must go through the approval workflow. Or: the CEO can edit but the action is logged and considered a separate transaction.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td class="blank">&nbsp;</td></tr>
+      </table>
+    </div>
+
+    <div class="tc">
+      <div class="tc-header"><span class="tc-id">CEO-53</span><span class="tc-title">CEO cannot access Finance / Sage module</span><span class="badge badge-med">High</span></div>
+      <table class="tc-table">
+        <tr><td>Objective</td><td>Confirm that Sage integration or detailed accounting functions are restricted to the Finance role.</td></tr>
+        <tr><td>Preconditions</td><td>Logged in as CEO.</td></tr>
+        <tr><td>Steps</td><td><ol>
+          <li>Look for a Sage or Accounting Integration module in the navigation.</li>
+          <li>Attempt to access it.</li>
+        </ol></td></tr>
+        <tr><td>Expected Result</td><td>Sage / accounting export module is not accessible to CEO. Access denied message shown if navigated to directly.</td></tr>
+        <tr><td>Actual Result</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Pass / Fail</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Notes</td><td><div class="restrict-note">Expected: BLOCKED — "sage" permission belongs to Finance, not CEO.</div></td></tr>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════ SECTION 12 ══════════════ -->
+<div class="section s12" id="s12">
+  <div class="section-header"><div class="sec-num">12</div><h2>Final Sign-Off Summary</h2></div>
+  <div class="section-body">
+
+    <div class="verdict-box">
+      <h3>CEO Role UAT — Test Execution Summary</h3>
+      <p>Complete this table after running all test cases. Sign off only when all Critical items pass and all restricted actions are confirmed blocked.</p>
+    </div>
+
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Test IDs</th>
+          <th>Total</th>
+          <th>Passed</th>
+          <th>Failed</th>
+          <th>Blocked</th>
+          <th>Overall</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>1. Login &amp; Executive Dashboard</td><td>CEO-01 – CEO-04</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>2. Company-Wide Visibility</td><td>CEO-05 – CEO-08</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>3. Production Oversight</td><td>CEO-09 – CEO-15</td><td>7</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>4. Logistics Oversight</td><td>CEO-16 – CEO-20</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>5. Sales Oversight</td><td>CEO-21 – CEO-25</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>6. Financial &amp; KPI Monitoring</td><td>CEO-26 – CEO-30</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>7. Approval Workflows</td><td>CEO-31 – CEO-35</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>8. User &amp; Security Oversight</td><td>CEO-36 – CEO-40</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>9. Workshop Isolation Validation</td><td>CEO-41 – CEO-44</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>10. Reports &amp; Exports</td><td>CEO-45 – CEO-49</td><td>5</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>11. Negative Testing</td><td>CEO-50 – CEO-53</td><td>4</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr style="font-weight:700;background:#f0f3f7"><td>TOTAL</td><td>CEO-01 – CEO-53</td><td>53</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td><td class="blank">&nbsp;</td></tr>
+      </tbody>
+    </table>
+
+    <br>
+
+    <table class="summary-table">
+      <thead>
+        <tr><th colspan="2">Restricted Access Confirmation</th></tr>
+        <tr><th style="width:280px">Action Attempted</th><th>Result (Blocked / Permitted) &amp; Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Access User Management module</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Create a new user account</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Modify role definitions</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Create production records (Daily Timber, Poles, Harvest)</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Create or modify stock movements</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>Access Sage / accounting integration</td><td class="blank">&nbsp;</td></tr>
+      </tbody>
+    </table>
+
+    <br>
+
+    <table class="summary-table">
+      <thead>
+        <tr><th colspan="2">Defects Log</th></tr>
+        <tr><th style="width:110px">Test ID</th><th>Defect Description / Steps to Reproduce / Severity</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>&nbsp;</td><td class="blank" style="min-height:26px">&nbsp;</td></tr>
+        <tr><td>&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>&nbsp;</td><td class="blank">&nbsp;</td></tr>
+        <tr><td>&nbsp;</td><td class="blank">&nbsp;</td></tr>
+      </tbody>
+    </table>
+
+  </div>
+</div>
+
+<!-- SIGN-OFF -->
+<div class="sign-row">
+  <div class="sign-box">
+    <div style="font-weight:600;margin-bottom:4px;font-size:10pt">QA Tester</div>
+    <div class="sign-line"></div>
+    <div class="sign-label">Name &amp; Signature</div>
+    <div class="sign-line" style="margin-top:16px"></div>
+    <div class="sign-label">Date</div>
+  </div>
+  <div class="sign-box">
+    <div style="font-weight:600;margin-bottom:4px;font-size:10pt">CEO / Role Owner</div>
+    <div class="sign-line"></div>
+    <div class="sign-label">Name &amp; Signature</div>
+    <div class="sign-line" style="margin-top:16px"></div>
+    <div class="sign-label">Date</div>
+  </div>
+  <div class="sign-box">
+    <div style="font-weight:600;margin-bottom:4px;font-size:10pt">Project Approver</div>
+    <div class="sign-line"></div>
+    <div class="sign-label">Name &amp; Signature</div>
+    <div class="sign-line" style="margin-top:16px"></div>
+    <div class="sign-label">Date</div>
+  </div>
+</div>
+
+</body>
+</html>

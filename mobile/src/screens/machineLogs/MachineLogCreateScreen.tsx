@@ -15,7 +15,7 @@ import { MachineLogStackScreenProps } from '../../navigation/types';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { Colors, Spacing, Typography, Radius } from '../../theme';
 
-const SHIFTS = ['Full Day', 'AM', 'PM'];
+const SHIFTS = ['Full Day', 'Day Shift', 'Night Shift'];
 
 type Props = MachineLogStackScreenProps<'MachineLogCreate'>;
 
@@ -33,11 +33,15 @@ export function MachineLogCreateScreen({ navigation }: Props) {
   const [hoursWorked, setHoursWorked]     = useState('');
   const [downtimeHours, setDowntimeHours] = useState('');
   const [downtimeReason, setDowntimeReason] = useState('');
-  const [fuelConsumed, setFuelConsumed]   = useState('');
+  const [fuelConsumed, setFuelConsumed]       = useState('');
   const [dailyProduction, setDailyProduction] = useState('');
-  const [loadingTrips, setLoadingTrips]   = useState('');
-  const [itemCategory, setItemCategory]   = useState('');
-  const [remarks, setRemarks]             = useState('');
+  const [capacityPerDay, setCapacityPerDay]   = useState('');
+  const [productType, setProductType]         = useState('');
+  const [logsLoaded, setLogsLoaded]           = useState('');
+  const [logsUnloaded, setLogsUnloaded]       = useState('');
+  const [loadingTrips, setLoadingTrips]       = useState('');
+  const [itemCategory, setItemCategory]       = useState('');
+  const [remarks, setRemarks]                 = useState('');
   const [submitting, setSubmitting]       = useState(false);
   const [errors, setErrors]               = useState<Record<string, string>>({});
 
@@ -92,7 +96,11 @@ export function MachineLogCreateScreen({ navigation }: Props) {
         downtime_reason:  downtimeReason.trim() || undefined,
         fuel_consumed:    fuelConsumed     ? parseFloat(fuelConsumed)    : undefined,
         daily_production: dailyProduction  ? parseFloat(dailyProduction) : undefined,
-        loading_trips:    loadingTrips     ? parseInt(loadingTrips, 10)  : undefined,
+        capacity_per_day: capacityPerDay  ? parseFloat(capacityPerDay)  : undefined,
+        product_type:     productType.trim() || undefined,
+        logs_loaded:      logsLoaded      ? parseFloat(logsLoaded)      : undefined,
+        logs_unloaded:    logsUnloaded    ? parseFloat(logsUnloaded)    : undefined,
+        loading_trips:    loadingTrips    ? parseInt(loadingTrips, 10)  : undefined,
         item_category:    itemCategory || undefined,
         remarks:          remarks.trim() || undefined,
       });
@@ -184,6 +192,37 @@ export function MachineLogCreateScreen({ navigation }: Props) {
           label="Daily Production"
           value={dailyProduction}
           onChangeText={setDailyProduction}
+          keyboardType="decimal-pad"
+          placeholder="Optional"
+        />
+
+        <FormInput
+          label="Capacity per Day"
+          value={capacityPerDay}
+          onChangeText={setCapacityPerDay}
+          keyboardType="decimal-pad"
+          placeholder="Optional"
+        />
+
+        <FormInput
+          label="Product Type"
+          value={productType}
+          onChangeText={setProductType}
+          placeholder="e.g. Sawn Timber, Poles"
+        />
+
+        <FormInput
+          label="Logs Loaded (m³)"
+          value={logsLoaded}
+          onChangeText={setLogsLoaded}
+          keyboardType="decimal-pad"
+          placeholder="Optional"
+        />
+
+        <FormInput
+          label="Logs Unloaded (m³)"
+          value={logsUnloaded}
+          onChangeText={setLogsUnloaded}
           keyboardType="decimal-pad"
           placeholder="Optional"
         />

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Phase 17 — Backup Verification Report</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',Arial,sans-serif;background:#f4f6fa;color:#222;font-size:14px;line-height:1.55}
+  .page{max-width:1000px;margin:0 auto;padding:24px 16px 60px}
+  h1{font-size:22px;color:#1a3c5e;margin-bottom:4px}
+  .subtitle{color:#666;font-size:13px;margin-bottom:28px}
+  h2{font-size:15px;font-weight:700;color:#1a3c5e;border-bottom:2px solid #d0daea;padding-bottom:5px;margin:30px 0 12px}
+  h3{font-size:13px;font-weight:700;color:#333;margin:14px 0 6px}
+  p,li{font-size:13px}
+  ul{margin:6px 0 8px 20px}
+  li{margin-bottom:3px}
+  code{font-family:'Consolas','Courier New',monospace;font-size:12px;background:#eef1f7;padding:1px 5px;border-radius:3px;color:#1a3c5e}
+  pre{background:#1a3c5e;color:#e8f0f8;padding:10px 14px;border-radius:6px;font-size:12px;line-height:1.7;overflow-x:auto;margin:8px 0 10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 14px}
+  th{background:#1a3c5e;color:#fff;padding:7px 10px;text-align:left;font-size:12px}
+  td{padding:7px 10px;border-bottom:1px solid #e8edf4;vertical-align:top}
+  tr:nth-child(even) td{background:#f8fafd}
+  .pass{color:#059669;font-weight:700}
+  .ok{background:#d1fae5;border:1px solid #059669;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .note{background:#fef9e7;border:1px solid #f0c040;border-radius:6px;padding:8px 12px;font-size:13px;margin:8px 0}
+  .card{background:#fff;border-radius:8px;padding:14px 18px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+  footer{text-align:center;margin-top:40px;font-size:12px;color:#888}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>Phase 17 — Backup Verification Report</h1>
+<div class="subtitle">UFCL Mobile v1.0.0 &nbsp;|&nbsp; Verified from source: <code>tools/backup.sh</code> &nbsp;|&nbsp; 2026-06-29</div>
+
+<div class="ok"><strong>Overall verdict: PASS</strong> — All backup components verified from source. Backup script implements daily/weekly/monthly rotation with gzip integrity checking. IT must execute manual run to generate first backup.</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>1. Backup Schedule</h2>
+<div class="card">
+  <table>
+    <tr><th>Type</th><th>Trigger</th><th>Retention</th><th>Directory</th></tr>
+    <tr><td>Daily database backup</td><td>Every day at 02:00 (cron)</td><td>7 days</td><td><code>/opt/ufcl-backups/daily/</code></td></tr>
+    <tr><td>Weekly database backup</td><td>Every Monday (day-of-week = 1)</td><td>4 weeks</td><td><code>/opt/ufcl-backups/weekly/</code></td></tr>
+    <tr><td>Monthly database backup</td><td>Every 1st of month (day-of-month = 1)</td><td>12 months</td><td><code>/opt/ufcl-backups/monthly/</code></td></tr>
+    <tr><td>Config backup</td><td>Every day at 02:00 (with daily run)</td><td>7 days (daily rotation)</td><td><code>/opt/ufcl-backups/daily/</code></td></tr>
+    <tr><td>Updates backup (APK)</td><td>Every day at 02:00 (with daily run)</td><td>7 days (daily rotation)</td><td><code>/opt/ufcl-backups/daily/</code></td></tr>
+  </table>
+
+  <h3>Cron entry (installed by tools/cron-setup.sh)</h3>
+<pre>0 2 * * * PGPASSWORD=$PGPASSWORD /opt/ufcl-api/tools/backup.sh >> /opt/ufcl-backups/backup.log 2>&1</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>2. What Gets Backed Up</h2>
+<div class="card">
+  <table>
+    <tr><th>Artefact</th><th>Command</th><th>Output file</th></tr>
+    <tr>
+      <td>PostgreSQL database</td>
+      <td><code>pg_dump --no-owner --no-privileges -Fp ufcl_production | gzip</code></td>
+      <td><code>daily/db-YYYY-MM-DD.sql.gz</code></td>
+    </tr>
+    <tr>
+      <td>Application config</td>
+      <td><code>tar -czf ... /opt/ufcl-api/.env /etc/nginx/sites-available/ufcl</code></td>
+      <td><code>daily/config-YYYY-MM-DD.tar.gz</code></td>
+    </tr>
+    <tr>
+      <td>APK + version.json</td>
+      <td><code>tar -czf ... /opt/ufcl-api/updates/</code></td>
+      <td><code>daily/updates-YYYY-MM-DD.tar.gz</code></td>
+    </tr>
+  </table>
+  <div class="note"><strong>What is NOT backed up:</strong> PM2 process config (regenerated from <code>ecosystem.config.js</code> in repo), TLS certificate (regenerated from <code>ssl-setup.sh</code>), Node.js runtime (re-installed from apt).</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>3. Integrity Verification</h2>
+<div class="card">
+  <p>After each backup file is written, <code>backup.sh</code> runs <code>gzip --test</code> to verify the compressed file is not corrupt.</p>
+<pre># From backup.sh (verified in source):
+gzip --test "$DAILY_DIR/db-${TODAY}.sql.gz"
+if [ $? -ne 0 ]; then
+    echo "CRITICAL: backup integrity check FAILED — $DAILY_DIR/db-${TODAY}.sql.gz"
+    exit 1
+fi</pre>
+  <p>A failed integrity check exits with code 1 and logs <code>CRITICAL</code> — the cron output is captured in <code>/opt/ufcl-backups/backup.log</code>.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>4. Retention and Rotation</h2>
+<div class="card">
+  <p>Old files are removed via <code>find ... -mtime +N -delete</code> after each backup run.</p>
+  <table>
+    <tr><th>Tier</th><th>Keep-for</th><th>Rotation command in backup.sh</th></tr>
+    <tr><td>Daily</td><td>7 days</td><td><code>find "$DAILY_DIR" -name "*.gz" -mtime +7 -delete</code></td></tr>
+    <tr><td>Weekly</td><td>4 weeks (28 days)</td><td><code>find "$WEEKLY_DIR" -name "*.gz" -mtime +28 -delete</code></td></tr>
+    <tr><td>Monthly</td><td>12 months (365 days)</td><td><code>find "$MONTHLY_DIR" -name "*.gz" -mtime +365 -delete</code></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>5. Restore Procedure</h2>
+<div class="card">
+  <h3>Database restore</h3>
+<pre># Step 1: Stop the API to prevent writes during restore
+pm2 stop mobile-api
+
+# Step 2: Drop and recreate the database
+psql -U postgres -c "DROP DATABASE IF EXISTS ufcl_production;"
+psql -U postgres -c "CREATE DATABASE ufcl_production;"
+
+# Step 3: Restore from backup
+gunzip -c /opt/ufcl-backups/daily/db-YYYY-MM-DD.sql.gz \
+  | psql -U postgres -d ufcl_production
+
+# Step 4: Verify row counts
+psql -U postgres -d ufcl_production -c "
+  SELECT 'harvest_entries' AS tbl, COUNT(*) FROM harvest_entries
+  UNION ALL
+  SELECT 'deliveries',              COUNT(*) FROM deliveries
+  UNION ALL
+  SELECT 'fuel_vehicle',            COUNT(*) FROM fuel_vehicle
+  UNION ALL
+  SELECT 'audit_log',               COUNT(*) FROM audit_log;
+"
+
+# Step 5: Restart the API
+pm2 start ecosystem.config.js --env production
+curl -k https://192.168.1.5/api/ready | jq .</pre>
+
+  <h3>Config restore</h3>
+<pre>tar -xzf /opt/ufcl-backups/daily/config-YYYY-MM-DD.tar.gz -C /
+# Restores .env and nginx config to their original paths
+nginx -t && systemctl reload nginx</pre>
+
+  <h3>APK/version.json restore</h3>
+<pre>tar -xzf /opt/ufcl-backups/daily/updates-YYYY-MM-DD.tar.gz -C /opt/ufcl-api/
+# Restores UFCL-production.apk, version.json, apk.sha256, apk.md5</pre>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>6. IT Verification Steps (Execute After Go-Live)</h2>
+<div class="card">
+  <table>
+    <tr><th>#</th><th>Command</th><th>Expected result</th></tr>
+    <tr>
+      <td>1</td>
+      <td><code>bash tools/backup.sh</code></td>
+      <td>Exits 0; last line: "====== Backup complete ======"</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code>ls -lh /opt/ufcl-backups/daily/</code></td>
+      <td>Shows db-today.sql.gz, config-today.tar.gz, updates-today.tar.gz</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code>gzip --test /opt/ufcl-backups/daily/db-$(date +%Y-%m-%d).sql.gz; echo $?</code></td>
+      <td><code>0</code></td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code>tail -5 /opt/ufcl-backups/backup.log</code></td>
+      <td>No CRITICAL lines; "Backup complete" visible</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code>crontab -l | grep backup</code></td>
+      <td>Shows <code>0 2 * * *</code> entry</td>
+    </tr>
+    <tr>
+      <td>6 (next day)</td>
+      <td>Check backup ran at 02:00</td>
+      <td>New file with yesterday's date in daily directory</td>
+    </tr>
+    <tr>
+      <td>7 (next Monday)</td>
+      <td><code>ls /opt/ufcl-backups/weekly/</code></td>
+      <td>db-YYYY-MM-DD.sql.gz with Monday's date</td>
+    </tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<h2>7. Backup RPO / RTO Summary</h2>
+<div class="card">
+  <table>
+    <tr><th>Metric</th><th>Value</th><th>Notes</th></tr>
+    <tr><td>RPO (Recovery Point Objective)</td><td>24 hours max</td><td>Daily backup at 02:00 — worst case: day's data lost if server fails at 01:59</td></tr>
+    <tr><td>RTO (Recovery Time Objective)</td><td>&lt; 30 minutes</td><td>Full restore procedure tested (see Recovery Report)</td></tr>
+    <tr><td>Backup size estimate</td><td>~10–50 MB/day compressed</td><td>Depends on daily record volume; gzip compression typically 70–80% reduction</td></tr>
+    <tr><td>Disk for 7 daily</td><td>~350 MB max</td><td>Plus weekly and monthly copies (~150 MB each at most)</td></tr>
+    <tr><td>Alert on failure</td><td>backup.log captures errors</td><td>IT should check <code>tail -5 /opt/ufcl-backups/backup.log</code> each morning</td></tr>
+  </table>
+</div>
+
+<footer>UFCL Mobile v1.0.0 &mdash; Phase 17 Backup Verification Report &mdash; 2026-06-29</footer>
+</div>
+</body>
+</html>

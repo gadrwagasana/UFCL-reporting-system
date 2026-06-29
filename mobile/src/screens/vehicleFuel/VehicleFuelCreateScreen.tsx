@@ -14,7 +14,7 @@ import { useVehicleFuelCreate } from '../../hooks/useVehicleFuel';
 import { useDeliveryList }      from '../../hooks/useDeliveries';
 import { VehicleFuelStackScreenProps } from '../../navigation/types';
 import { useOfflineStore } from '../../stores/offlineStore';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
+import { Colors, Spacing, Typography, Radius } from '../../theme';
 
 type Props = VehicleFuelStackScreenProps<'VehicleFuelCreate'>;
 
@@ -120,7 +120,7 @@ export function VehicleFuelCreateScreen({ navigation }: Props) {
         />
 
         <FormInput
-          label="Cost per Litre (TZS)"
+          label="Cost per Litre (RWF)"
           value={costPerLiter}
           onChangeText={setCostPerLiter}
           keyboardType="decimal-pad"
@@ -130,7 +130,7 @@ export function VehicleFuelCreateScreen({ navigation }: Props) {
         {totalCost !== null && (
           <View style={styles.totalCard}>
             <Text style={styles.totalLabel}>Total Cost</Text>
-            <Text style={styles.totalValue}>TZS {totalCost.toLocaleString()}</Text>
+            <Text style={styles.totalValue}>RWF {totalCost.toLocaleString()}</Text>
           </View>
         )}
 
