@@ -74,7 +74,6 @@ jobs:
       # ── 6. Write keystore.properties ─────────────────────────────────────────
       - name: Write keystore.properties
         run: |
-          mkdir -p mobile/android
           cat > mobile/android/keystore.properties << EOF
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
@@ -97,6 +96,10 @@ jobs:
           echo "date=$DATE" >> $GITHUB_OUTPUT
           echo "tag=v$VER"  >> $GITHUB_OUTPUT
           echo "apk=UFCL-production-${VER}.apk" >> $GITHUB_OUTPUT
+
+      # ── 7b. Make gradlew executable (Linux runner; Windows commits lose execute bit) ──
+      - name: Make gradlew executable
+        run: chmod +x mobile/android/gradlew
 
       # ── 8. Build release APK ─────────────────────────────────────────────────
       # EXPO_PUBLIC_API_URL points to the company server on port 3001 (HTTP, no nginx).

@@ -2,8 +2,14 @@ node_modules/
 .expo/
 dist/
 web-build/
-android/
 ios/
+
+# Android build outputs and local config — never commit these
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+android/keystore.properties
 
 # Signing — never commit these
 *.jks
