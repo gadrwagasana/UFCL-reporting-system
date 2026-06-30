@@ -299,14 +299,16 @@ jobs:
             -Destination "${{ secrets.DEPLOY_PATH }}\.env"
 
       # ── 6. Install API dependencies ───────────────────────────────────────────
+      # Install at the DEPLOY_PATH root (not inside mobile-api/) so that
+      # db/pool.js — which lives one level above mobile-api/ — can resolve pg,
+      # dotenv, and all other production dependencies via Node's upward search.
       - name: Install API dependencies
         shell: powershell
         run: |
-          Set-Location "${{ secrets.DEPLOY_PATH }}\mobile-api"
-          npm install --omit=dev
-          # pg must be resolvable from db/pool.js which is one level above mobile-api/
+          Copy-Item "${{ secrets.DEPLOY_PATH }}\mobile-api\package.json" `
+                    "${{ secrets.DEPLOY_PATH }}\package.json" -Force
           Set-Location "${{ secrets.DEPLOY_PATH }}"
-          npm install pg --no-save
+          npm install --omit=dev
 
       # ── 7. Deploy update artifacts ────────────────────────────────────────────
       # Rename the versioned APK to the fixed filename the Express route serves.
