@@ -301,8 +301,12 @@ jobs:
       # ── 6. Install API dependencies ───────────────────────────────────────────
       - name: Install API dependencies
         shell: powershell
-        working-directory: ${{ secrets.DEPLOY_PATH }}\mobile-api
-        run: npm install --omit=dev
+        run: |
+          Set-Location "${{ secrets.DEPLOY_PATH }}\mobile-api"
+          npm install --omit=dev
+          # pg must be resolvable from db/pool.js which is one level above mobile-api/
+          Set-Location "${{ secrets.DEPLOY_PATH }}"
+          npm install pg --no-save
 
       # ── 7. Deploy update artifacts ────────────────────────────────────────────
       # Rename the versioned APK to the fixed filename the Express route serves.
