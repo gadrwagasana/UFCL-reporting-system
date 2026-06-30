@@ -150,6 +150,9 @@ jobs:
           GH_APK_URL="https://github.com/${REPO}/releases/download/v${VER}/UFCL-production-${VER}.apk"
           SRV_APK_URL="http://192.168.1.5:3001/downloads/UFCL-production.apk"
 
+          VER="$VER" CODE="$CODE" DATE="$DATE" MANDATORY="$MANDATORY" \
+          SHA256="$SHA256" MD5="$MD5" NOTES="$NOTES_RAW" \
+          GH_APK_URL="$GH_APK_URL" SRV_APK_URL="$SRV_APK_URL" \
           node -e "
             const fs = require('fs');
             const notes = process.env.NOTES.split(',').map(s=>s.trim()).filter(Boolean);
@@ -168,9 +171,7 @@ jobs:
               JSON.stringify({ ...base, apkUrl: process.env.SRV_APK_URL }, null, 2));
             console.log('version.json :', JSON.parse(fs.readFileSync('version.json','utf8')));
             console.log('version-server.json:', JSON.parse(fs.readFileSync('version-server.json','utf8')));
-          " VER="$VER" CODE="$CODE" DATE="$DATE" MANDATORY="$MANDATORY" \
-            SHA256="$SHA256" MD5="$MD5" NOTES="$NOTES_RAW" \
-            GH_APK_URL="$GH_APK_URL" SRV_APK_URL="$SRV_APK_URL"
+          "
 
       # ── 12. Create GitHub Release ────────────────────────────────────────────
       - name: Create GitHub Release
