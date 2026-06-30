@@ -82,13 +82,18 @@ jobs:
           EOF
 
       # ── 7. Resolve version ───────────────────────────────────────────────────
+      # Version priority: manual input → git tag → root package.json
+      # Using the git tag ensures Desktop and Mobile always share the same version.
       - name: Resolve version numbers
         id: ver
-        working-directory: mobile
         run: |
-          PKG=$(node -p "require('./package.json').version")
+          # 1. Manual override (workflow_dispatch input)
           VER="${{ github.event.inputs.version_name }}"
-          [ -z "$VER" ] && VER="$PKG"
+          # 2. Git tag (strips leading "v": refs/tags/v1.5.0 → 1.5.0)
+          TAG_VER="${GITHUB_REF#refs/tags/v}"
+          [ -z "$VER" ] && [ "$TAG_VER" != "$GITHUB_REF" ] && VER="$TAG_VER"
+          # 3. Root package.json fallback (same file the Desktop workflow uses)
+          [ -z "$VER" ] && VER=$(node -p "require('./package.json').version")
           CODE=$(git rev-list --count HEAD)
           DATE=$(date +%Y-%m-%d)
           echo "name=$VER"  >> $GITHUB_OUTPUT

@@ -63,12 +63,19 @@ jobs:
           printf 'PGHOST=%s\nPGPORT=%s\nPGDATABASE=%s\nPGUSER=%s\nPGPASSWORD=%s\nJWT_SECRET=%s\n' \
             "$PGHOST" "$PGPORT" "$PGDATABASE" "$PGUSER" "$PGPASSWORD" "$JWT_SECRET" > .env
 
-      # ── 5. Extract version from package.json ──────────────────────────────────
+      # ── 5. Resolve version ────────────────────────────────────────────────────
+      # Priority: git tag → package.json. Git tag is the authoritative version
+      # so Desktop and Mobile always produce the same semantic version.
       - name: Resolve version
         id: ver
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          TAG_VER="${GITHUB_REF#refs/tags/v}"
+          if [ "$TAG_VER" != "$GITHUB_REF" ]; then
+            VERSION="$TAG_VER"
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
           echo "name=$VERSION"       >> $GITHUB_OUTPUT
           echo "tag=v$VERSION"       >> $GITHUB_OUTPUT
           echo "Version: $VERSION"
