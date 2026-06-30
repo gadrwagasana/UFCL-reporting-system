@@ -1,11 +1,12 @@
 name: Mobile — Build & Release APK
 
+# Triggers ONLY on a version tag push (e.g. git push origin v1.3.6)
+# or a manual workflow_dispatch.  Pushes to master never trigger this.
+
 on:
   push:
-    branches: [master]
-    paths:
-      - 'mobile/**'
-      - '.github/workflows/mobile-release.yml'
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       version_name:
@@ -22,9 +23,17 @@ on:
         default: 'Bug fixes,Performance improvements'
 
 jobs:
-  build-release:
-    name: Build & Release APK
+  # ── Job 1: Build APK on GitHub-hosted runner ─────────────────────────────────
+  # Runs in the cloud (ubuntu-latest).  Produces the signed APK, checksums,
+  # version metadata, and the GitHub Release.  Outputs are passed to job 2.
+  build-apk:
+    name: Build & Publish APK
     runs-on: ubuntu-latest
+
+    outputs:
+      version-name: ${{ steps.ver.outputs.name }}
+      version-code: ${{ steps.ver.outputs.code }}
+      apk-filename: ${{ steps.ver.outputs.apk }}
 
     steps:
       # ── 1. Checkout ──────────────────────────────────────────────────────────
@@ -86,6 +95,7 @@ jobs:
           echo "apk=UFCL-production-${VER}.apk" >> $GITHUB_OUTPUT
 
       # ── 8. Build release APK ─────────────────────────────────────────────────
+      # EXPO_PUBLIC_API_URL points to the company server on port 3001 (HTTP, no nginx).
       - name: Build release APK
         working-directory: mobile/android
         env:
@@ -94,22 +104,19 @@ jobs:
           APP_PACKAGE_ID: com.ufcl.mobile
           VERSION_NAME: ${{ steps.ver.outputs.name }}
           VERSION_CODE: ${{ steps.ver.outputs.code }}
-          EXPO_PUBLIC_API_URL: https://192.168.1.5
+          EXPO_PUBLIC_API_URL: http://192.168.1.5:3001
         run: ./gradlew assembleRelease --no-daemon --stacktrace
 
       # ── 9. Locate & rename APK ───────────────────────────────────────────────
       - name: Locate and rename APK
-        id: apk
         run: |
           SRC=$(find mobile/android -name "app-release.apk" | head -1)
           echo "Found: $SRC"
           mv "$SRC" "${{ steps.ver.outputs.apk }}"
-          echo "path=${{ steps.ver.outputs.apk }}" >> $GITHUB_OUTPUT
 
       # ── 10. Compute checksums ─────────────────────────────────────────────────
-      # apk.sha256 — for IT manual verification (openssl dgst -sha256 / sha256sum)
-      # apk.md5    — used by the mobile app via FileSystem.getInfoAsync({md5:true})
       - name: Compute SHA-256 and MD5 checksums
+        id: checksum
         run: |
           SHA256=$(sha256sum "${{ steps.ver.outputs.apk }}" | awk '{print $1}')
           MD5=$(md5sum      "${{ steps.ver.outputs.apk }}" | awk '{print $1}')
@@ -119,12 +126,10 @@ jobs:
           echo "md5=$MD5"       >> $GITHUB_OUTPUT
           echo "SHA-256 : $SHA256"
           echo "MD5     : $MD5"
-        id: checksum
 
       # ── 11. Generate version metadata ─────────────────────────────────────────
-      # Two versions of version.json are produced:
-      #   version.json         → uploaded to GitHub Release (APK URL = GitHub CDN)
-      #   version-server.json  → deployed to company server (APK URL = LAN server)
+      # version.json        → GitHub Release  (apkUrl = GitHub CDN)
+      # version-server.json → company server  (apkUrl = LAN server HTTP:3001)
       - name: Generate version metadata
         run: |
           REPO="${{ github.repository }}"
@@ -135,9 +140,8 @@ jobs:
           NOTES_RAW="${{ github.event.inputs.release_notes || 'Bug fixes,Performance improvements' }}"
           SHA256="${{ steps.checksum.outputs.sha256 }}"
           MD5="${{ steps.checksum.outputs.md5 }}"
-
           GH_APK_URL="https://github.com/${REPO}/releases/download/v${VER}/UFCL-production-${VER}.apk"
-          SRV_APK_URL="https://192.168.1.5/downloads/UFCL-production.apk"
+          SRV_APK_URL="http://192.168.1.5:3001/downloads/UFCL-production.apk"
 
           node -e "
             const fs = require('fs');
@@ -151,21 +155,17 @@ jobs:
               md5:         process.env.MD5,
               notes
             };
-            // GitHub Release version.json — APK served from GitHub CDN
             fs.writeFileSync('version.json',
               JSON.stringify({ ...base, apkUrl: process.env.GH_APK_URL }, null, 2));
-            // Company server version.json — APK served from LAN server
             fs.writeFileSync('version-server.json',
               JSON.stringify({ ...base, apkUrl: process.env.SRV_APK_URL }, null, 2));
-            console.log('GitHub  version.json:', JSON.parse(fs.readFileSync('version.json','utf8')));
-            console.log('Server  version.json:', JSON.parse(fs.readFileSync('version-server.json','utf8')));
+            console.log('version.json :', JSON.parse(fs.readFileSync('version.json','utf8')));
+            console.log('version-server.json:', JSON.parse(fs.readFileSync('version-server.json','utf8')));
           " VER="$VER" CODE="$CODE" DATE="$DATE" MANDATORY="$MANDATORY" \
             SHA256="$SHA256" MD5="$MD5" NOTES="$NOTES_RAW" \
             GH_APK_URL="$GH_APK_URL" SRV_APK_URL="$SRV_APK_URL"
 
       # ── 12. Create GitHub Release ────────────────────────────────────────────
-      # Keeps GitHub as the authoritative build archive.
-      # APK URL in this version.json points to GitHub CDN (fallback for off-site users).
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -196,69 +196,129 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ── 13. Deploy to company server ──────────────────────────────────────────
-      # Copies the APK, both checksums, and the server-specific version.json
-      # into the mobile-api/updates/ folder on 192.168.1.5.
-      # The Express server serves these files via /version.json and /downloads/*.
-      #
-      # Required GitHub secrets:
-      #   DEPLOY_SSH_KEY   — private key for the deploy user on 192.168.1.5
-      #   DEPLOY_USER      — SSH username (e.g. ubuntu, ufcl-deploy)
-      #   DEPLOY_PATH      — absolute path to mobile-api/updates/ on the server
-      #                      (e.g. /opt/ufcl-api/updates)
-      - name: Deploy APK to company server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host:     192.168.1.5
-          username: ${{ secrets.DEPLOY_USER }}
-          key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          source:   "${{ steps.ver.outputs.apk }},apk.sha256,apk.md5"
-          target:   "${{ secrets.DEPLOY_PATH }}"
-          strip_components: 0
-
-      - name: Install version.json on company server
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host:     192.168.1.5
-          username: ${{ secrets.DEPLOY_USER }}
-          key:      ${{ secrets.DEPLOY_SSH_KEY }}
-          # Atomically rename version-server.json → version.json so devices
-          # never read a partial file.  Also rename the APK to the fixed filename.
-          script: |
-            cd "${{ secrets.DEPLOY_PATH }}"
-            # Rename versioned APK to the fixed filename the server serves
-            mv -f "UFCL-production-${{ steps.ver.outputs.name }}.apk" UFCL-production.apk
-            # Write the server version.json atomically
-            cat > version.json.tmp << 'JSONEOF'
-            ${{ toJSON(fromJSON('{}')) }}
-            JSONEOF
-            # Simpler: scp already put the file; write it via heredoc
-            # (version-server.json content is regenerated here from outputs)
-            node -e "
-              const fs = require('fs');
-              const meta = {
-                version:     '${{ steps.ver.outputs.name }}',
-                versionCode: ${{ steps.ver.outputs.code }},
-                releaseDate: '${{ steps.ver.outputs.date }}',
-                mandatory:   ${{ github.event.inputs.mandatory || 'false' }},
-                sha256:      '${{ steps.checksum.outputs.sha256 }}',
-                md5:         '${{ steps.checksum.outputs.md5 }}',
-                apkUrl:      'https://192.168.1.5/downloads/UFCL-production.apk',
-                notes:       '${{ github.event.inputs.release_notes || 'Bug fixes,Performance improvements' }}'.split(',').map(s=>s.trim()).filter(Boolean)
-              };
-              fs.writeFileSync('version.json.tmp', JSON.stringify(meta, null, 2));
-              fs.renameSync('version.json.tmp', 'version.json');
-              console.log('version.json updated:', meta.version, 'code', meta.versionCode);
-            "
-            ls -lh UFCL-production.apk version.json apk.sha256 apk.md5
-
-      # ── 14. Upload artifact (30-day retention) ───────────────────────────────
-      - name: Upload APK artifact
+      # ── 13. Upload artifacts for deploy job ──────────────────────────────────
+      # The deploy-server job runs on the self-hosted runner (on 192.168.1.5)
+      # and downloads these artifacts to copy them to the local update folder.
+      - name: Upload release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.ver.outputs.apk }}
+          name: mobile-release-${{ steps.ver.outputs.name }}
           path: |
             ${{ steps.ver.outputs.apk }}
             apk.sha256
             apk.md5
-          retention-days: 30
+            version-server.json
+          retention-days: 7
+
+  # ── Job 2: Deploy to company server via self-hosted runner ────────────────────
+  # This job runs ON 192.168.1.5 via the GitHub Actions self-hosted runner.
+  # Because it runs locally on the server, it can:
+  #   • copy files to the local filesystem
+  #   • run npm install
+  #   • start / restart PM2
+  # No SSH over the internet is needed — the runner IS the server.
+  #
+  # Self-hosted runner setup (one-time, on the Windows server):
+  #   GitHub → repo → Settings → Actions → Runners → New self-hosted runner
+  #   Select Windows → follow the installer commands
+  #   Label the runner:  ufcl-server
+  #   Install as a Windows service so it starts on reboot
+  deploy-server:
+    name: Deploy to company server
+    runs-on: [self-hosted, UFCL-server]
+    needs: build-apk
+
+    steps:
+      # ── 1. Checkout ───────────────────────────────────────────────────────────
+      # Gives the runner access to mobile-api/ and db/ source code.
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Download APK + metadata from build job ─────────────────────────────
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: mobile-release-${{ needs.build-apk.outputs.version-name }}
+          path: artifacts
+
+      # ── 3. Write server .env ─────────────────────────────────────────────────
+      # Required secrets (GitHub → repo → Settings → Secrets → Actions):
+      #   PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD  — PostgreSQL connection
+      #   JWT_SECRET     — token signing key
+      #   DEPLOY_PATH    — absolute path on this server, e.g. C:\ufcl-api
+      - name: Write server .env
+        shell: powershell
+        run: |
+          $lines = @(
+            "PGHOST=${{ secrets.PGHOST }}",
+            "PGPORT=${{ secrets.PGPORT }}",
+            "PGDATABASE=${{ secrets.PGDATABASE }}",
+            "PGUSER=${{ secrets.PGUSER }}",
+            "PGPASSWORD=${{ secrets.PGPASSWORD }}",
+            "JWT_SECRET=${{ secrets.JWT_SECRET }}",
+            "MOBILE_API_PORT=3001",
+            "API_BIND_HOST=0.0.0.0",
+            "UPDATES_DIR=${{ secrets.DEPLOY_PATH }}\updates"
+          )
+          $lines | Set-Content -Path ".env.server" -Encoding utf8NoBOM
+
+      # ── 4. Create directory structure ─────────────────────────────────────────
+      - name: Create deployment directories
+        shell: powershell
+        run: |
+          New-Item -Force -ItemType Directory -Path "${{ secrets.DEPLOY_PATH }}\mobile-api"
+          New-Item -Force -ItemType Directory -Path "${{ secrets.DEPLOY_PATH }}\db\services"
+          New-Item -Force -ItemType Directory -Path "${{ secrets.DEPLOY_PATH }}\updates"
+
+      # ── 5. Copy API server code ───────────────────────────────────────────────
+      # mobile-api/node_modules is gitignored so only source files are copied.
+      # db/ files are copied alongside mobile-api/ so relative imports resolve.
+      - name: Deploy API server code
+        shell: powershell
+        run: |
+          Copy-Item -Force -Recurse -Path "mobile-api\*" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\mobile-api\"
+          Copy-Item -Force -Path "db\pool.js" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\db\pool.js"
+          Copy-Item -Force -Path "db\migrate.js" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\db\migrate.js"
+          Copy-Item -Force -Path "db\services\data.js" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\db\services\data.js"
+          Copy-Item -Force -Path "db\services\auth.js" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\db\services\auth.js"
+          # .env lives one level above mobile-api/ (where server.js looks for it)
+          Copy-Item -Force -Path ".env.server" `
+            -Destination "${{ secrets.DEPLOY_PATH }}\.env"
+
+      # ── 6. Install API dependencies ───────────────────────────────────────────
+      - name: Install API dependencies
+        shell: powershell
+        working-directory: ${{ secrets.DEPLOY_PATH }}\mobile-api
+        run: npm install --omit=dev
+
+      # ── 7. Deploy update artifacts ────────────────────────────────────────────
+      # Rename the versioned APK to the fixed filename the Express route serves.
+      # Replace version.json atomically via rename.
+      - name: Deploy update artifacts
+        shell: powershell
+        run: |
+          $dst = "${{ secrets.DEPLOY_PATH }}\updates"
+          Move-Item -Force `
+            "artifacts\${{ needs.build-apk.outputs.apk-filename }}" `
+            "$dst\UFCL-production.apk"
+          Copy-Item -Force "artifacts\apk.sha256"          "$dst\apk.sha256"
+          Copy-Item -Force "artifacts\apk.md5"             "$dst\apk.md5"
+          Move-Item -Force "artifacts\version-server.json" "$dst\version.json"
+
+      # ── 8. Start or restart PM2 ───────────────────────────────────────────────
+      - name: Restart API via PM2
+        shell: powershell
+        run: |
+          $list = pm2 list 2>&1 | Out-String
+          if ($list -match "ufcl-api") {
+            pm2 restart ufcl-api --update-env
+          } else {
+            pm2 start "${{ secrets.DEPLOY_PATH }}\mobile-api\server.js" --name ufcl-api
+          }
+          pm2 save
+          pm2 list

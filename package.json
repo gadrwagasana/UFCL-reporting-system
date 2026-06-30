@@ -10,8 +10,7 @@
     "setup": "node tools/setup.js",
     "migrate": "node db/migrate.js",
     "lint": "node -e \"console.log('No lint configured yet')\"",
-    "dist": "electron-builder --publish never",
-    "publish": "electron-builder --publish always"
+    "dist": "electron-builder --publish never"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",

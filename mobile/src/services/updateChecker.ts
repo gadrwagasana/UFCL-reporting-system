@@ -5,7 +5,7 @@ import * as SecureStore from 'expo-secure-store';
 // ── Config ────────────────────────────────────────────────────────────────────
 // Company server is the primary update source — fast LAN delivery.
 // All devices on-site will resolve this IP.
-export const UPDATE_SERVER      = 'https://192.168.1.5';
+export const UPDATE_SERVER      = 'http://192.168.1.5:3001';
 const        VERSION_URL        = `${UPDATE_SERVER}/version.json`;
 const        FETCH_TIMEOUT      = 10_000; // ms
 const        IGNORED_KEY        = 'ufcl_update_ignored_versionCode';

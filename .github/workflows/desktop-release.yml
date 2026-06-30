@@ -1,0 +1,130 @@
+name: Desktop — Build & Release Windows Installer
+
+# Triggers ONLY on a version tag push (e.g. git push origin v1.3.6)
+# or a manual workflow_dispatch.  Pushes to master never trigger this.
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build only — skip GitHub Release upload (true / false)'
+        required: false
+        default: 'false'
+
+jobs:
+  build-windows:
+    name: Build Windows installer
+    runs-on: windows-latest
+
+    steps:
+      # ── 1. Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Node.js ───────────────────────────────────────────────────────────
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # ── 3. Install dependencies ───────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      # ── 4. Write production .env ──────────────────────────────────────────────
+      # electron-builder bundles .env into extraResources so the packaged app
+      # can connect to the production database without any manual setup.
+      # All values come from GitHub repository secrets — never hardcoded.
+      #
+      # Required secrets (Settings → Secrets → Actions):
+      #   PGHOST       — PostgreSQL server hostname / IP
+      #   PGPORT       — PostgreSQL port (usually 5432)
+      #   PGDATABASE   — database name
+      #   PGUSER       — database user
+      #   PGPASSWORD   — database password
+      #   JWT_SECRET   — secret key used by the mobile API for token signing
+      - name: Write production .env
+        shell: bash
+        env:
+          PGHOST:      ${{ secrets.PGHOST }}
+          PGPORT:      ${{ secrets.PGPORT }}
+          PGDATABASE:  ${{ secrets.PGDATABASE }}
+          PGUSER:      ${{ secrets.PGUSER }}
+          PGPASSWORD:  ${{ secrets.PGPASSWORD }}
+          JWT_SECRET:  ${{ secrets.JWT_SECRET }}
+        run: |
+          printf 'PGHOST=%s\nPGPORT=%s\nPGDATABASE=%s\nPGUSER=%s\nPGPASSWORD=%s\nJWT_SECRET=%s\n' \
+            "$PGHOST" "$PGPORT" "$PGDATABASE" "$PGUSER" "$PGPASSWORD" "$JWT_SECRET" > .env
+
+      # ── 5. Extract version from package.json ──────────────────────────────────
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "name=$VERSION"       >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION"       >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      # ── 6. Build installer (no publish) ───────────────────────────────────────
+      # electron-builder --publish never  →  builds .exe + latest.yml + .blockmap
+      # into dist/ without touching GitHub.  The upload step below handles GitHub.
+      - name: Build Windows installer
+        run: npm run dist
+        env:
+          # Suppress electron-builder's own GitHub publish attempt
+          # (we upload via softprops in the next step instead)
+          ELECTRON_BUILDER_PUBLISH: never
+
+      # ── 7. List dist output ───────────────────────────────────────────────────
+      - name: List build artifacts
+        shell: bash
+        run: ls -lh dist/
+
+      # ── 8. Publish to GitHub Release ──────────────────────────────────────────
+      # Uploads the installer (.exe), the auto-update manifest (latest.yml),
+      # and the binary diff map (.blockmap) to the GitHub Release for this tag.
+      # electron-updater on end-user machines reads latest.yml from this release
+      # to decide whether to prompt for an update.
+      #
+      # softprops/action-gh-release creates the release if it does not yet exist,
+      # or appends to it if the mobile workflow already created it for the same tag.
+      - name: Publish to GitHub Release
+        if: github.event.inputs.dry_run != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name:   ${{ steps.ver.outputs.tag }}
+          name:       UFCL ${{ steps.ver.outputs.tag }}
+          draft:      false
+          prerelease: false
+          make_latest: true
+          body: |
+            ## UFCL Desktop ${{ steps.ver.outputs.tag }}
+
+            **Platform:** Windows (NSIS installer)
+            **Auto-update:** enabled — existing installations will be notified automatically.
+
+            ### Install / Upgrade
+            Download `UFCL Reporting Setup ${{ steps.ver.outputs.name }}.exe` and run it.
+            Existing installs will receive an in-app update prompt within minutes of this release.
+          files: |
+            dist/*.exe
+            dist/latest.yml
+            dist/*.blockmap
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 9. Upload build artifact (30-day retention) ───────────────────────────
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-${{ steps.ver.outputs.name }}
+          path: |
+            dist/*.exe
+            dist/latest.yml
+            dist/*.blockmap
+          retention-days: 30
