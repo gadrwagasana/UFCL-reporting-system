@@ -74,7 +74,7 @@ jobs:
       # ── 6. Write keystore.properties ─────────────────────────────────────────
       - name: Write keystore.properties
         run: |
-          cat > mobile/android/keystore.properties << EOF
+          cat > mobile/android/keystore.properties << 'EOF'
           storePassword=${{ secrets.KEYSTORE_PASSWORD }}
           keyPassword=${{ secrets.KEY_PASSWORD }}
           keyAlias=${{ secrets.KEY_ALIAS }}
