@@ -311,18 +311,25 @@ jobs:
           npm install --omit=dev
 
       # ── 7. Deploy update artifacts ────────────────────────────────────────────
-      # Rename the versioned APK to the fixed filename the Express route serves.
-      # Replace version.json atomically via rename.
+      # Stop PM2 first so Express releases its file handle on the APK.
+      # Without this, Windows denies overwrite of a file open by another process.
       - name: Deploy update artifacts
         shell: powershell
         run: |
+          # Stop API so the APK file is not held open by Express
+          $list = pm2 list 2>&1 | Out-String
+          if ($list -match "ufcl-api") { pm2 stop ufcl-api }
+
           $dst = "${{ secrets.DEPLOY_PATH }}\updates"
-          Move-Item -Force `
+          # Grant write access in case of ACL restrictions
+          icacls "$dst" /grant "BUILTIN\Administrators:(OI)(CI)F" | Out-Null
+
+          Copy-Item -Force `
             "artifacts\${{ needs.build-apk.outputs.apk-filename }}" `
             "$dst\UFCL-production.apk"
           Copy-Item -Force "artifacts\apk.sha256"          "$dst\apk.sha256"
           Copy-Item -Force "artifacts\apk.md5"             "$dst\apk.md5"
-          Move-Item -Force "artifacts\version-server.json" "$dst\version.json"
+          Copy-Item -Force "artifacts\version-server.json" "$dst\version.json"
 
       # ── 8. Start or restart PM2 ───────────────────────────────────────────────
       - name: Restart API via PM2
