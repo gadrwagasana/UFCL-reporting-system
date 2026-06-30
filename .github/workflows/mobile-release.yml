@@ -268,7 +268,7 @@ jobs:
             "API_BIND_HOST=0.0.0.0",
             "UPDATES_DIR=${{ secrets.DEPLOY_PATH }}\updates"
           )
-          $lines | Set-Content -Path ".env.server" -Encoding utf8NoBOM
+          [System.IO.File]::WriteAllLines(".env.server", $lines, [System.Text.UTF8Encoding]::new($false))
 
       # ── 4. Create directory structure ─────────────────────────────────────────
       - name: Create deployment directories
