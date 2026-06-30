@@ -25,7 +25,10 @@ apply plugin: "com.facebook.react.rootproject"
 
 allprojects {
     // Redirect build outputs outside OneDrive to avoid file-locking issues during sync
-    buildDir = new File("C:/Users/hp/AppData/Local/Temp/ufcl-build/${project.name}")
+    // CI uses the default build directory (Linux runner cannot resolve Windows paths)
+    if (!System.getenv("CI")) {
+        buildDir = new File("C:/Users/hp/AppData/Local/Temp/ufcl-build/${project.name}")
+    }
 
     repositories {
         maven {
