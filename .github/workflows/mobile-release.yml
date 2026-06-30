@@ -22,6 +22,9 @@ on:
         required: false
         default: 'Bug fixes,Performance improvements'
 
+permissions:
+  contents: write
+
 jobs:
   # ── Job 1: Build APK on GitHub-hosted runner ─────────────────────────────────
   # Runs in the cloud (ubuntu-latest).  Produces the signed APK, checksums,
