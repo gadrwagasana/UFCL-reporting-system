@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { MechanicianTabParamList } from './types';
-import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }  from './stacks/MyRequestsStack';
 import { MachineLogStack }  from './stacks/MachineLogStack';
 import { MachineFuelStack } from './stacks/MachineFuelStack';
 
@@ -31,7 +31,7 @@ export function MechanicianNavigator() {
     >
       <Tab.Screen name="MachineLogList"  component={MachineLogStack}  options={{ title: 'Machine Logs' }} />
       <Tab.Screen name="MachineFuelList" component={MachineFuelStack} options={{ title: 'Fuel' }} />
-      <Tab.Screen name="MyRequests"      component={MyRequestsScreen} options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"      component={MyRequestsStack}  options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }

@@ -1461,6 +1461,139 @@ export interface BiDashboardResponse {
   stockAnomalies: BiStockAnomaly[];
 }
 
+// ─── Admin — Security & Governance ───────────────────────────────────────────
+
+export interface SecGovSecurityEvent {
+  id: number; time: string; username: string; role: string;
+  action_type: string; action: string;
+}
+
+export interface SecGovWorkflowJob {
+  id: number; type: string; attempts: number; max_attempts: number;
+  status: string; last_error: string | null; created_fmt: string;
+}
+
+export interface SecGovAuditRow {
+  id: number; time: string; username: string; full_name: string;
+  role: string; module: string; action_type: string; action: string;
+}
+
+export interface SecGovDashboardResponse {
+  ok: true;
+  kpi: {
+    failedLogins: number; privOverrides: number;
+    pendingApprovals: number; workflowFailures: number;
+  };
+  approvals: {
+    leaderPending: number; managerPending: number;
+    escalated: number; avgHours: number | null;
+  };
+  notifCounts: { security: number; approval: number; system: number };
+  securityEvents: SecGovSecurityEvent[];
+  workflowHealth: SecGovWorkflowJob[];
+  auditFeed:      SecGovAuditRow[];
+}
+
+// ─── Admin — Audit ────────────────────────────────────────────────────────────
+
+export interface AuditRow {
+  id:           number;
+  action:       string;
+  icon:         string;
+  role:         string;
+  username:     string;
+  full_name:    string;
+  module:       string;
+  action_type:  string;
+  record_id:    number | null;
+  ip_address:   string | null;
+  reason:       string | null;
+  before_values: unknown;
+  after_values:  unknown;
+  time:         string;
+  user_name:    string | null;
+}
+
+export interface AuditListResponse {
+  ok:      true;
+  rows:    AuditRow[];
+  modules: string[];
+}
+
+// ─── Admin — Users ────────────────────────────────────────────────────────────
+
+export interface UserRow {
+  id:                   number;
+  username:             string;
+  name:                 string;
+  role:                 string;
+  department:           string | null;
+  user_permissions:     string[];
+  user_responsibilities: string[];
+  active:               boolean;
+  workshop_id:          number | null;
+  workshop_name:        string | null;
+  created:              string;
+}
+
+export interface UsersListResponse {
+  ok:        true;
+  rows:      UserRow[];
+  workshops: { id: number; name: string }[];
+}
+
+// ─── Admin — Roles ────────────────────────────────────────────────────────────
+
+export interface RoleDefinition {
+  role:             string;
+  label:            string | null;
+  description:      string | null;
+  responsibilities: string[];
+  permissions:      string[];
+}
+
+export interface RolesListResponse {
+  ok:   true;
+  rows: RoleDefinition[];
+}
+
+// ─── Admin — Trash ────────────────────────────────────────────────────────────
+
+export interface TrashRow {
+  table_name:      string;
+  record_id:       number;
+  label:           string;
+  entity_ref:      string | null;
+  deleted_by_name: string | null;
+  deleted_at:      string;
+  deletion_reason: string | null;
+  days_remaining:  number;
+}
+
+export interface TrashListResponse {
+  ok:   true;
+  rows: TrashRow[];
+}
+
+// ─── Admin — Change Requests ──────────────────────────────────────────────────
+
+export interface ChangeRequest {
+  id:           number;
+  record_type:  string;
+  record_ref:   string;
+  request_text: string;
+  status:       string;
+  response:     string | null;
+  created:      string;
+  by:           string | null;
+}
+
+export interface ChangesListResponse {
+  ok:    true;
+  rows:  ChangeRequest[];
+  isMgr: boolean;
+}
+
 // ─── Reports — Monthly Dashboard ─────────────────────────────────────────────
 
 export interface MonthlyExpenseRow {

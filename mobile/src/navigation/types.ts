@@ -117,6 +117,32 @@ export type CustomersStackParamList = {
   CustomerForm:  { customer?: Customer };
 };
 
+// ─── Admin stack ─────────────────────────────────────────────────────────────
+export type AdminStackParamList = {
+  AdminHome:        undefined;
+  SecGov:           undefined;
+  Audit:            undefined;
+  Users:            undefined;
+  UserDetail:       { userId?: number };
+  UserPermissions:  { userId: number; userName: string };
+  Roles:            undefined;
+  RoleDetail:       { role: string };
+  Trash:            undefined;
+  Changes:          undefined;
+};
+
+export type AdminStackScreenProps<T extends keyof AdminStackParamList> =
+  NativeStackScreenProps<AdminStackParamList, T>;
+
+// ─── MyRequests stack (wraps MyRequestsScreen + ChangesScreen for non-admin roles) ──
+export type MyRequestsStackParamList = {
+  MyRequestsMain: undefined;
+  Changes:        undefined;
+};
+
+export type MyRequestsStackScreenProps<T extends keyof MyRequestsStackParamList> =
+  NativeStackScreenProps<MyRequestsStackParamList, T>;
+
 // ─── Reports stack ────────────────────────────────────────────────────────────
 export type ReportsStackParamList = {
   ReportsHome:  undefined;
@@ -153,6 +179,7 @@ export type CeoTabParamList = {
   SalesOrders:        undefined;
   Deliveries:         undefined;
   Reports:            undefined;
+  Admin:              undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -288,6 +315,7 @@ export type OperationsTabParamList = {
   StockTransfers:     undefined;
   SalesOrders:        undefined;
   Reports:            undefined;
+  Admin:              undefined;
   MyRequests:         undefined;
 };
 

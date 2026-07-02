@@ -193,4 +193,18 @@ export const EP = {
   META_STOCK_ITEMS:        '/api/meta/stock-items',
   META_WAREHOUSES:         '/api/meta/warehouses',
   META_POLES_REQUESTS:     '/api/meta/poles-purchase-requests',
+
+  // Admin — Security, Audit, Users, Roles, Trash, Changes
+  ADMIN_SECGOV:        '/api/admin/secgov',
+  ADMIN_AUDIT:         '/api/admin/audit',
+  ADMIN_USERS:         '/api/admin/users',
+  ADMIN_USER:          (id: number) => `/api/admin/users/${id}`,
+  ADMIN_USER_RESET_PW: (id: number) => `/api/admin/users/${id}/reset-password`,
+  ADMIN_ROLES:         '/api/admin/roles',
+  ADMIN_ROLE:          (role: string) => `/api/admin/roles/${role}`,
+  ADMIN_TRASH:         '/api/admin/trash',
+  ADMIN_TRASH_RESTORE: '/api/admin/trash/restore',
+  ADMIN_TRASH_PURGE:   '/api/admin/trash/purge',
+  ADMIN_CHANGES:       '/api/admin/changes',
+  ADMIN_CHANGE:        (id: number) => `/api/admin/changes/${id}`,
 } as const;

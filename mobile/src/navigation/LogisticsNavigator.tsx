@@ -6,7 +6,7 @@ import { LogisticsTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
 import { LogisticsDashboardScreen } from '../screens/logistics/LogisticsDashboardScreen';
-import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }  from './stacks/MyRequestsStack';
 import { DeliveryStack }    from './stacks/DeliveryStack';
 import { VehiclesStack }    from './stacks/VehiclesStack';
 import { MachinesStack }           from './stacks/MachinesStack';
@@ -68,7 +68,7 @@ export function LogisticsNavigator() {
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}    options={{ title: 'Transfers' }} />
       <Tab.Screen name="Dispatch"           component={DispatchStack}           options={{ title: 'Dispatch' }} />
       <Tab.Screen name="VehicleFuel"        component={VehicleFuelStack}        options={{ title: 'Fuel Logs' }} />
-      <Tab.Screen name="MyRequests"   component={MyRequestsScreen}   options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"   component={MyRequestsStack}    options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }

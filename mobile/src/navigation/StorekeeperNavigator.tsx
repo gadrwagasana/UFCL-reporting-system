@@ -6,7 +6,7 @@ import { StorekeeperTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen }          from '../screens/shared/DashboardScreen';
 import { ComingSoonScreen }          from '../screens/shared/ComingSoonScreen';
-import { MyRequestsScreen }          from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }           from './stacks/MyRequestsStack';
 import { WorkshopOverviewStack }     from './stacks/WorkshopOverviewStack';
 import { WorkshopManagementStack }   from './stacks/WorkshopManagementStack';
 import { StockCatalogStack }         from './stacks/StockCatalogStack';
@@ -53,7 +53,7 @@ export function StorekeeperNavigator() {
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}     options={{ title: 'Transfers' }} />
       <Tab.Screen name="MaterialReview"     component={ComingSoonScreen}         options={{ title: 'Materials' }} />
       <Tab.Screen name="Reports"            component={ReportsStack}             options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests"         component={MyRequestsScreen}         options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"         component={MyRequestsStack}          options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }

@@ -9,7 +9,7 @@ import { PolesDeliveryStack }      from './PolesDeliveryStack';
 import { PolesQCStack }            from './PolesQCStack';
 import { MaterialRequestsStack }   from './MaterialRequestsStack';
 import { StockMovementsStack }     from './stacks/StockMovementsStack';
-import { MyRequestsScreen }        from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }         from './stacks/MyRequestsStack';
 import { ProfileScreen }           from '../screens/profile/ProfileScreen';
 import { ReportsStack }            from './stacks/ReportsStack';
 
@@ -62,7 +62,7 @@ export function PolesNavigator() {
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="StockMovements"  component={StockMovementsStack}  options={{ title: 'Stock Mvmt' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}         options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests"      component={MyRequestsScreen}     options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"      component={MyRequestsStack}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

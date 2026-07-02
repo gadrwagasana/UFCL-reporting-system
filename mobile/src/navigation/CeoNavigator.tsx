@@ -27,6 +27,7 @@ import { DispatchStack }            from './stacks/DispatchStack';
 import { SalesOrdersStack }         from './stacks/SalesOrdersStack';
 import { DeliveryStack }            from './stacks/DeliveryStack';
 import { ReportsStack }             from './stacks/ReportsStack';
+import { AdminStack }              from './stacks/AdminStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -65,6 +66,7 @@ export function CeoNavigator() {
             SalesOrders:        { active: 'cart',             inactive: 'cart-outline' },
             Deliveries:         { active: 'truck',            inactive: 'truck-outline' },
             Reports:            { active: 'stats-chart',      inactive: 'stats-chart-outline' },
+            Admin:         { active: 'shield',          inactive: 'shield-outline' },
             Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
             Profile:       { active: 'person',         inactive: 'person-outline' },
           };
@@ -133,6 +135,7 @@ export function CeoNavigator() {
       <Tab.Screen name="SalesOrders"     component={SalesOrdersStack}     options={{ title: 'Sales Orders' }} />
       <Tab.Screen name="Deliveries"      component={DeliveryStack}        options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
+      <Tab.Screen name="Admin"           component={AdminStack}            options={{ title: 'Admin' }} />
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}

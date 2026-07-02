@@ -6,7 +6,7 @@ import { SalesTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
 import { ComingSoonScreen } from '../screens/shared/ComingSoonScreen';
-import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }  from './stacks/MyRequestsStack';
 import { CustomersStack }     from './stacks/CustomersStack';
 import { ProductsStack }      from './stacks/ProductsStack';
 import { SalesOrdersStack }   from './stacks/SalesOrdersStack';
@@ -42,7 +42,7 @@ export function SalesNavigator() {
       <Tab.Screen name="DeliveryStatus" component={DeliveryStack}    options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Customers"  component={CustomersStack}   options={{ title: 'Customers' }} />
       <Tab.Screen name="Products"   component={ProductsStack}    options={{ title: 'Products' }} />
-      <Tab.Screen name="MyRequests" component={MyRequestsScreen} options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests" component={MyRequestsStack}  options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }

@@ -10,7 +10,7 @@ import { CompartmentsStack }    from './stacks/CompartmentsStack';
 import { StockMovementsStack }  from './stacks/StockMovementsStack';
 import { TimberInventoryStack }  from './stacks/TimberInventoryStack';
 import { StockTransfersStack } from './stacks/StockTransfersStack';
-import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }       from './stacks/MyRequestsStack';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 import { ReportsStack }          from './stacks/ReportsStack';
 
@@ -66,7 +66,7 @@ export function SupervisorNavigator() {
       <Tab.Screen name="TimberInventory" component={TimberInventoryStack}  options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="StockTransfers"  component={StockTransfersStack}  options={{ title: 'Transfers' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"      component={MyRequestsStack}       options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

@@ -8,7 +8,7 @@ import { LogTransportStack }     from './LogTransportStack';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
 import { StockMovementsStack }   from './stacks/StockMovementsStack';
-import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }       from './stacks/MyRequestsStack';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 import { ReportsStack }          from './stacks/ReportsStack';
 
@@ -58,7 +58,7 @@ export function HarvestNavigator() {
       <Tab.Screen name="CasualLabour"     component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="StockMovements"   component={StockMovementsStack}   options={{ title: 'Stock Mvmt' }} />
       <Tab.Screen name="Reports"          component={ReportsStack}          options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests"       component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests"       component={MyRequestsStack}       options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"          component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

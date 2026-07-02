@@ -4,7 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { FinanceTabParamList } from './types';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
-import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }  from './stacks/MyRequestsStack';
 import { ReportsStack }     from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<FinanceTabParamList>();
@@ -31,7 +31,7 @@ export function FinanceNavigator() {
     >
       <Tab.Screen name="Overview"   component={DashboardScreen}  options={{ title: 'Overview' }} />
       <Tab.Screen name="Reports"    component={ReportsStack}     options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests" component={MyRequestsScreen} options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MyRequests" component={MyRequestsStack}  options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }

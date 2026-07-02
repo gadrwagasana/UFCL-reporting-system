@@ -6,7 +6,7 @@ import { OperationsTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
 import { ComingSoonScreen } from '../screens/shared/ComingSoonScreen';
-import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
+import { MyRequestsStack }  from './stacks/MyRequestsStack';
 import { CustomersStack }   from './stacks/CustomersStack';
 import { ProductsStack }    from './stacks/ProductsStack';
 import { MachinesStack }           from './stacks/MachinesStack';
@@ -20,6 +20,7 @@ import { TimberInventoryStack }    from './stacks/TimberInventoryStack';
 import { StockTransfersStack }   from './stacks/StockTransfersStack';
 import { SalesOrdersStack }      from './stacks/SalesOrdersStack';
 import { ReportsStack }          from './stacks/ReportsStack';
+import { AdminStack }           from './stacks/AdminStack';
 
 const Tab = createBottomTabNavigator<OperationsTabParamList>();
 
@@ -51,6 +52,7 @@ export function OperationsNavigator() {
             StockTransfers:     ['swap-vertical',   'swap-vertical-outline'],
             SalesOrders:        ['cart',            'cart-outline'],
             Reports:            ['stats-chart',     'stats-chart-outline'],
+            Admin:              ['shield',    'shield-outline'],
             MyRequests:         ['list',      'list-outline'],
           };
           const [a, i] = icons[route.name as keyof OperationsTabParamList];
@@ -75,7 +77,8 @@ export function OperationsNavigator() {
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}    options={{ title: 'Transfers' }} />
       <Tab.Screen name="SalesOrders"       component={SalesOrdersStack}       options={{ title: 'Sales Orders' }} />
       <Tab.Screen name="Reports"           component={ReportsStack}            options={{ title: 'Reports' }} />
-      <Tab.Screen name="MyRequests"         component={MyRequestsScreen}        options={{ title: 'My Requests' }} />
+      <Tab.Screen name="Admin"             component={AdminStack}              options={{ title: 'Admin' }} />
+      <Tab.Screen name="MyRequests"        component={MyRequestsStack}         options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );
 }
