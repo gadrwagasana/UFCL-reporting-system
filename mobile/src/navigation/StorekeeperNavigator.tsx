@@ -12,6 +12,7 @@ import { WorkshopManagementStack }   from './stacks/WorkshopManagementStack';
 import { StockCatalogStack }         from './stacks/StockCatalogStack';
 import { StockInventoryStack }       from './stacks/StockInventoryStack';
 import { StockMovementsStack }       from './stacks/StockMovementsStack';
+import { StockTransfersStack }     from './stacks/StockTransfersStack';
 
 const Tab = createBottomTabNavigator<StorekeeperTabParamList>();
 
@@ -32,6 +33,7 @@ export function StorekeeperNavigator() {
             StockCatalog:       ['layers',           'layers-outline'],
             StockInventory:     ['bar-chart',        'bar-chart-outline'],
             StockMovements:     ['swap-horizontal',  'swap-horizontal-outline'],
+            StockTransfers:     ['swap-vertical',   'swap-vertical-outline'],
             MaterialReview:     ['cube',     'cube-outline'],
             MyRequests:         ['list',     'list-outline'],
           };
@@ -46,6 +48,7 @@ export function StorekeeperNavigator() {
       <Tab.Screen name="StockCatalog"       component={StockCatalogStack}        options={{ title: 'Stock' }} />
       <Tab.Screen name="StockInventory"     component={StockInventoryStack}      options={{ title: 'Levels' }} />
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}      options={{ title: 'Movements' }} />
+      <Tab.Screen name="StockTransfers"    component={StockTransfersStack}     options={{ title: 'Transfers' }} />
       <Tab.Screen name="MaterialReview"     component={ComingSoonScreen}         options={{ title: 'Materials' }} />
       <Tab.Screen name="MyRequests"         component={MyRequestsScreen}         options={{ title: 'My Requests' }} />
     </Tab.Navigator>

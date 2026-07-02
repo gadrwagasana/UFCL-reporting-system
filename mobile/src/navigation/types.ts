@@ -40,6 +40,14 @@ export type CompartmentsStackParamList = {
   CompartmentForm:  { compartment?: Compartment };
 };
 
+// ─── Stock Transfers stack ────────────────────────────────────────────────────
+export type StockTransfersStackParamList = {
+  StockTransfersList:      undefined;
+  StockTransferNewRequest: undefined;
+  StockTransferDispatch:   { transferId: number; remaining: number; itemName: string; uom: string; vehicles: import('../types/api').TransferVehicle[] };
+  StockTransferDetail:     { transferId: number };
+};
+
 // ─── Dispatch stack ───────────────────────────────────────────────────────────
 export type DispatchStackParamList = {
   DispatchList:       undefined;
@@ -116,6 +124,7 @@ export type CeoTabParamList = {
   StockInventory:     undefined;
   StockMovements:     undefined;
   TimberInventory:    undefined;
+  StockTransfers:     undefined;
   Dispatch:           undefined;
   Notifications:      undefined;
   Profile:            undefined;
@@ -143,6 +152,7 @@ export type SupervisorTabParamList = {
   Compartments:    undefined;
   StockMovements:  undefined;
   TimberInventory: undefined;
+  StockTransfers:  undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -241,6 +251,7 @@ export type OperationsTabParamList = {
   StockInventory:     undefined;
   StockMovements:     undefined;
   TimberInventory:    undefined;
+  StockTransfers:     undefined;
   MyRequests:         undefined;
 };
 
@@ -257,6 +268,7 @@ export type LogisticsTabParamList = {
   StockInventory:      undefined;
   StockMovements:      undefined;
   TimberInventory:     undefined;
+  StockTransfers:      undefined;
   Dispatch:            undefined;
   VehicleFuel:         undefined;
   MyRequests:          undefined;
@@ -279,6 +291,7 @@ export type StorekeeperTabParamList = {
   StockCatalog:       undefined;
   StockInventory:     undefined;
   StockMovements:     undefined;
+  StockTransfers:     undefined;
   MaterialReview:     undefined;
   MyRequests:         undefined;
 };

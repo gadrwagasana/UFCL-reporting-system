@@ -11,6 +11,7 @@ interface Props {
   message?:      string;
   confirmLabel?: string;
   loading?:      boolean;
+  allowEmpty?:   boolean;
   onCancel:      () => void;
   onConfirm:     (reason: string) => void;
 }
@@ -21,6 +22,7 @@ export function ReasonModal({
   message = 'Please provide a reason.',
   confirmLabel = 'Submit',
   loading = false,
+  allowEmpty = false,
   onCancel,
   onConfirm,
 }: Props) {
@@ -30,7 +32,7 @@ export function ReasonModal({
     if (!visible) setReason('');
   }, [visible]);
 
-  const canSubmit = reason.trim().length > 0 && !loading;
+  const canSubmit = (allowEmpty || reason.trim().length > 0) && !loading;
 
   return (
     <Modal

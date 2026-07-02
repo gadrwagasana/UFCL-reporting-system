@@ -112,6 +112,14 @@ export const EP = {
   MACHINES_CATEGORY_DELETE:        (catId: number) => `/api/machines/categories/${catId}`,
   MACHINES_MAINT_SCHEDULE_CREATE:  (id: number) => `/api/machines/${id}/maint-schedules`,
 
+  // Stock Transfers
+  STOCK_TRANSFERS_LIST:     '/api/stock-transfers',
+  STOCK_TRANSFERS_CREATE:   '/api/stock-transfers',
+  STOCK_TRANSFERS_APPROVE:  (id: number) => `/api/stock-transfers/${id}/approve`,
+  STOCK_TRANSFERS_DISPATCH: (id: number) => `/api/stock-transfers/${id}/dispatch`,
+  STOCK_TRANSFERS_RECEIVE:  (id: number) => `/api/stock-transfers/${id}/receive`,
+  STOCK_TRANSFERS_HISTORY:  (id: number) => `/api/stock-transfers/${id}/history`,
+
   // Dispatch
   DISPATCH_LIST:   '/api/dispatch',
   DISPATCH_CREATE: '/api/dispatch',

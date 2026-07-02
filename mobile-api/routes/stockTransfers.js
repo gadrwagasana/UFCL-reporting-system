@@ -1,54 +1,69 @@
 'use strict';
 
-// Phase 2 — Stock Transfer lifecycle
-// Routes defined and documented but returning 501 until Phase 2 is built.
-
-const express          = require('express');
-const data             = require('../../db/services/data');
+const express = require('express');
+const router  = express.Router();
+const data    = require('../../db/services/data');
+const { requireRoles } = require('../middleware/auth');
 const { respond }      = require('../middleware/respond');
 
-const router = express.Router();
-const PHASE2 = (_req, res) => res.status(501).json({ ok: false, error: 'Phase 2 — not yet implemented' });
+const ACT_ROLES     = ['admin', 'ceo', 'operations', 'logistics', 'supervisor', 'storekeeper'];
+const APPROVE_ROLES = ['admin', 'ceo', 'operations', 'logistics'];
 
 // ── GET /api/stock-transfers ──────────────────────────────────────────────────
-// List stock transfers (filtered by workshop for restricted roles).
-// data.js: stockTransfersList(userId, workshopId?)
-//   Requires: stock-transfers page
+router.get('/', requireRoles(ACT_ROLES), async (req, res) => {
+  const result = await data.stockTransfersList(req.user.id, req.query.workshopId || null);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 403);
+  const rows = result.rows || [];
+  const summary = {
+    total:     rows.length,
+    pending:   rows.filter(r => r.status === 'pending').length,
+    inTransit: rows.filter(r => ['approved', 'in_transit', 'partially_received'].includes(r.status)).length,
+    completed: rows.filter(r => r.status === 'completed').length,
+  };
+  return respond(res, { ...result, summary }, 200, 30);
+});
 
-router.get('/', PHASE2);
+// ── POST /api/stock-transfers ─────────────────────────────────────────────────
+router.post('/', requireRoles(ACT_ROLES), async (req, res) => {
+  const result = await data.stockTransfersCreate(req.user.id, req.body);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 201);
+});
 
-// ── POST /api/stock-transfers/:id/approve ────────────────────────────────────
-// Approve or reject a pending stock transfer.
+// ── PATCH /api/stock-transfers/:id/approve ────────────────────────────────────
 // Body: { action: "approve"|"reject", rejectionReason? }
-// data.js: stockTransfersApproveReject(userId, transferId, action, rejectionReason)
-//   Requires role: admin|ceo|operations|logistics
+router.patch('/:id/approve', requireRoles(APPROVE_ROLES), async (req, res) => {
+  const { action, rejectionReason } = req.body || {};
+  const result = await data.stockTransfersApproveReject(
+    req.user.id, Number(req.params.id), action, rejectionReason || null
+  );
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 200);
+});
 
-router.post('/:id/approve', PHASE2);
+// ── POST /api/stock-transfers/:id/dispatch ────────────────────────────────────
+// Body: { qty, vehicle_id, driver_name?, dispatched_at?, reference?, notes? }
+router.post('/:id/dispatch', requireRoles(ACT_ROLES), async (req, res) => {
+  const result = await data.stockTransfersDispatch(req.user.id, Number(req.params.id), req.body);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 200);
+});
 
-// ── POST /api/stock-transfers/:id/dispatch ───────────────────────────────────
-// Dispatch a quantity from the source warehouse on a vehicle.
-// Body: { qty, vehicle_id, driver_name, dispatched_at?, reference?, notes? }
-// data.js: stockTransfersDispatch(userId, transferId, payload)
-//   Requires role: admin|ceo|operations|logistics|supervisor|storekeeper
-//   Side effects: deducts stock_levels at source warehouse, creates stock_movement
-//   Uses DB transaction with row-level locking (skip locked).
-
-router.post('/:id/dispatch', PHASE2);
-
-// ── POST /api/stock-transfers/:id/receive ────────────────────────────────────
-// Confirm receipt of a qty at the destination warehouse.
+// ── POST /api/stock-transfers/:id/receive ─────────────────────────────────────
 // Body: { qty, notes? }
-// data.js: stockTransfersReceive(userId, transferId, qty, notes)
-//   Requires role: admin|ceo|operations|logistics|supervisor|storekeeper
-//   Side effects: increments stock_levels at destination, status → completed or partially_received
-//   Uses DB transaction.
-
-router.post('/:id/receive', PHASE2);
+router.post('/:id/receive', requireRoles(ACT_ROLES), async (req, res) => {
+  const { qty, notes } = req.body || {};
+  const result = await data.stockTransfersReceive(req.user.id, Number(req.params.id), qty, notes || null);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 200);
+});
 
 // ── GET /api/stock-transfers/:id/history ─────────────────────────────────────
-// Dispatch history for a specific transfer.
-// data.js: stockTransfersDispatchHistory(userId, transferId)
-
-router.get('/:id/history', PHASE2);
+// Static routes above must precede this parameterized GET.
+router.get('/:id/history', requireRoles(ACT_ROLES), async (req, res) => {
+  const result = await data.stockTransfersDispatchHistory(req.user.id, Number(req.params.id));
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 403);
+  return respond(res, result, 200, 0);
+});
 
 module.exports = router;

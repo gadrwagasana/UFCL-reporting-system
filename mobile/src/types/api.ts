@@ -883,6 +883,70 @@ export interface WorkshopOverviewResponse {
   is_restricted:     boolean;
 }
 
+// ─── Stock Transfers ──────────────────────────────────────────────────────────
+
+export interface StockTransfer {
+  id:                   number;
+  reference:            string | null;
+  status:               string;
+  item_name:            string;
+  category:             string;
+  uom:                  string;
+  from_warehouse_name:  string;
+  to_warehouse_name:    string;
+  from_warehouse_id:    number;
+  to_warehouse_id:      number;
+  requested_qty:        number;
+  dispatched_qty:       number;
+  received_qty:         number;
+  rejection_reason:     string | null;
+  notes:                string | null;
+  requested_by:         string | null;
+  approved_by:          string | null;
+  requested_at:         string;
+  approved_at:          string | null;
+}
+
+export interface TransferItem {
+  id: number; name: string; category: string; uom: string; total_stock: number;
+}
+
+export interface TransferVehicle {
+  id: number; registration: string; label: string; driver_assigned: string | null;
+}
+
+export interface TransferSummary {
+  total: number; pending: number; inTransit: number; completed: number;
+}
+
+export interface StockTransfersListResponse {
+  ok:               true;
+  rows:             StockTransfer[];
+  items:            TransferItem[];
+  warehouses:       WarehouseRef[];
+  vehicles:         TransferVehicle[];
+  user_workshop_id: number | null;
+  summary:          TransferSummary;
+}
+
+export interface TransferDispatchEvent {
+  id:                number;
+  qty:               number;
+  driver_name:       string | null;
+  reference:         string | null;
+  notes:             string | null;
+  registration:      string | null;
+  vehicle_label:     string;
+  dispatched_by_name:string | null;
+  dispatched_at:     string;
+}
+
+export interface StockTransferHistoryResponse {
+  ok:        true;
+  transfer:  (StockTransfer & { transfer_ref: string | null }) | null;
+  dispatches:TransferDispatchEvent[];
+}
+
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
 
 export interface DispatchRequest {
