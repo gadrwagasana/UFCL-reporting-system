@@ -41,28 +41,38 @@ export type Permission =
   | 'fuel.machine'
   | 'delivery.update'
   | 'ceo.approve'
-  | 'monthly.approve';
+  | 'monthly.approve'
+  | 'reports.weekly_cost'
+  | 'reports.weekly_perf'
+  | 'reports.kpi'
+  | 'reports.executive'
+  | 'reports.bi'
+  | 'reports.monthly'
+  | 'reports.export'
+  | 'reports.edit_expenses'
+  | 'reports.edit_kpi'
+  | 'reports.monthly_approve';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
-  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay', 'delivery.update'],
-  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
+  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay', 'reports.weekly_cost', 'reports.weekly_perf', 'reports.kpi', 'reports.executive', 'reports.bi', 'reports.monthly', 'reports.export', 'reports.edit_expenses', 'reports.edit_kpi', 'reports.monthly_approve'],
+  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay', 'delivery.update', 'reports.weekly_cost', 'reports.weekly_perf', 'reports.kpi', 'reports.executive', 'reports.bi', 'reports.monthly', 'reports.export', 'reports.edit_expenses', 'reports.edit_kpi', 'reports.monthly_approve'],
+  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay', 'reports.weekly_cost', 'reports.weekly_perf', 'reports.executive', 'reports.bi', 'reports.export'],
   sales:                  ['delivery.update', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
   'sales-staff':          ['delivery.update'],
   'showroom-staff':       ['delivery.update'],
-  finance:                [],
+  finance:                ['reports.weekly_cost', 'reports.monthly', 'reports.export', 'reports.edit_expenses'],
   logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve'],
   'logistics-officer':    ['delivery.update'],
-  supervisor:             ['material.request', 'labour.write', 'compartment.create', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.act'],
-  storekeeper:            ['material.review', 'stock.catalog', 'stock.inventory', 'stock.movements', 'transfer.view', 'transfer.act'],
-  'storekeeper-assistant':['material.request', 'stock.movements'],
+  supervisor:             ['material.request', 'labour.write', 'compartment.create', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.act', 'reports.bi', 'reports.export'],
+  storekeeper:            ['material.review', 'stock.catalog', 'stock.inventory', 'stock.movements', 'transfer.view', 'transfer.act', 'reports.bi', 'reports.export'],
+  'storekeeper-assistant':['material.request', 'stock.movements', 'reports.bi'],
   mechanician:            ['machine.log', 'fuel.machine'],
-  'harvesting-leader':    ['harvest.write', 'logtransport.write', 'material.request', 'labour.write', 'stock.movements'],
-  'sawmill-leader':       ['sawmill.write', 'material.request', 'labour.write', 'stock.movements'],
-  'poles-leader':         ['poles.write', 'poles.purchase', 'poles.delivery', 'poles.qc', 'material.request', 'labour.write', 'stock.movements'],
-  'vat-leader':           ['vat.write', 'material.request', 'labour.write', 'stock.movements'],
-  'harvesting-supervisor': ['harvest.write', 'logtransport.write'],
-  'sawmill-supervisor':    ['sawmill.write'],
+  'harvesting-leader':    ['harvest.write', 'logtransport.write', 'material.request', 'labour.write', 'stock.movements', 'reports.bi'],
+  'sawmill-leader':       ['sawmill.write', 'material.request', 'labour.write', 'stock.movements', 'reports.bi'],
+  'poles-leader':         ['poles.write', 'poles.purchase', 'poles.delivery', 'poles.qc', 'material.request', 'labour.write', 'stock.movements', 'reports.bi'],
+  'vat-leader':           ['vat.write', 'material.request', 'labour.write', 'stock.movements', 'reports.bi'],
+  'harvesting-supervisor': ['harvest.write', 'logtransport.write', 'reports.bi'],
+  'sawmill-supervisor':    ['sawmill.write', 'reports.bi'],
   'poles-supervisor':      ['poles.write', 'poles.delivery'],
   'vat-supervisor':        ['vat.write'],
 };

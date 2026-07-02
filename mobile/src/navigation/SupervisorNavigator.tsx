@@ -12,6 +12,7 @@ import { TimberInventoryStack }  from './stacks/TimberInventoryStack';
 import { StockTransfersStack } from './stacks/StockTransfersStack';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
+import { ReportsStack }          from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<SupervisorTabParamList>();
 
@@ -23,6 +24,7 @@ const tabIcons: Record<keyof SupervisorTabParamList, [string, string]> = {
   StockMovements:  ['swap-horizontal', 'swap-horizontal-outline'],
   TimberInventory: ['leaf',           'leaf-outline'],
   StockTransfers:  ['swap-vertical', 'swap-vertical-outline'],
+  Reports:         ['stats-chart',  'stats-chart-outline'],
   MyRequests:      ['list',    'list-outline'],
   Profile:         ['person',  'person-outline'],
 };
@@ -35,6 +37,7 @@ const tabLabels: Record<keyof SupervisorTabParamList, string> = {
   StockMovements:  'Stock Mvmt',
   TimberInventory: 'Timber Inv.',
   StockTransfers:  'Transfers',
+  Reports:         'Reports',
   MyRequests:      'My Requests',
   Profile:         'Profile',
 };
@@ -62,6 +65,7 @@ export function SupervisorNavigator() {
       <Tab.Screen name="StockMovements"  component={StockMovementsStack}   options={{ title: 'Stock Mvmt' }} />
       <Tab.Screen name="TimberInventory" component={TimberInventoryStack}  options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="StockTransfers"  component={StockTransfersStack}  options={{ title: 'Transfers' }} />
+      <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>

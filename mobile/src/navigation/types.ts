@@ -117,6 +117,21 @@ export type CustomersStackParamList = {
   CustomerForm:  { customer?: Customer };
 };
 
+// ─── Reports stack ────────────────────────────────────────────────────────────
+export type ReportsStackParamList = {
+  ReportsHome:  undefined;
+  WeeklyCost:   undefined;
+  WeeklyPerf:   undefined;
+  KpiScorecard: undefined;
+  Executive:    undefined;
+  BI:           undefined;
+  Monthly:      undefined;
+  Export:       undefined;
+};
+
+export type ReportsStackScreenProps<T extends keyof ReportsStackParamList> =
+  NativeStackScreenProps<ReportsStackParamList, T>;
+
 // ─── CEO / Admin tabs ─────────────────────────────────────────────────────────
 export type CeoTabParamList = {
   Dashboard:          undefined;
@@ -137,6 +152,7 @@ export type CeoTabParamList = {
   Dispatch:           undefined;
   SalesOrders:        undefined;
   Deliveries:         undefined;
+  Reports:            undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -164,6 +180,7 @@ export type SupervisorTabParamList = {
   StockMovements:  undefined;
   TimberInventory: undefined;
   StockTransfers:  undefined;
+  Reports:         undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -175,6 +192,7 @@ export type HarvestTabParamList = {
   MaterialRequest:   undefined;
   CasualLabour:      undefined;
   StockMovements:    undefined;
+  Reports:           undefined;
   MyRequests:        undefined;
   Profile:           undefined;
 };
@@ -185,6 +203,7 @@ export type SawmillTabParamList = {
   MaterialRequest: undefined;
   CasualLabour:    undefined;
   StockMovements:  undefined;
+  Reports:         undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -197,6 +216,7 @@ export type PolesTabParamList = {
   PolesQC:         undefined;
   MaterialRequest: undefined;
   StockMovements:  undefined;
+  Reports:         undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -208,6 +228,7 @@ export type VatTabParamList = {
   MaterialRequest: undefined;
   CasualLabour:    undefined;
   StockMovements:  undefined;
+  Reports:         undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -216,12 +237,14 @@ export type VatTabParamList = {
 export type HarvestSupervisorTabParamList = {
   HarvestList:      undefined;
   LogTransportList: undefined;
+  Reports:          undefined;
   Profile:          undefined;
 };
 
 // ─── Sawmill Supervisor tabs ──────────────────────────────────────────────────
 export type SawmillSupervisorTabParamList = {
   SawmillList: undefined;
+  Reports:     undefined;
   Profile:     undefined;
 };
 
@@ -264,6 +287,7 @@ export type OperationsTabParamList = {
   TimberInventory:    undefined;
   StockTransfers:     undefined;
   SalesOrders:        undefined;
+  Reports:            undefined;
   MyRequests:         undefined;
 };
 
@@ -306,12 +330,14 @@ export type StorekeeperTabParamList = {
   StockMovements:     undefined;
   StockTransfers:     undefined;
   MaterialReview:     undefined;
+  Reports:            undefined;
   MyRequests:         undefined;
 };
 
 // ─── Finance tabs ─────────────────────────────────────────────────────────────
 export type FinanceTabParamList = {
   Overview:    undefined;
+  Reports:     undefined;
   MyRequests:  undefined;
 };
 

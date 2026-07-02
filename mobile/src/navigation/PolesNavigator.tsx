@@ -11,6 +11,7 @@ import { MaterialRequestsStack }   from './MaterialRequestsStack';
 import { StockMovementsStack }     from './stacks/StockMovementsStack';
 import { MyRequestsScreen }        from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }           from '../screens/profile/ProfileScreen';
+import { ReportsStack }            from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<PolesTabParamList>();
 
@@ -21,6 +22,7 @@ const tabIcons: Record<keyof PolesTabParamList, [string, string]> = {
   PolesQC:         ['shield-checkmark', 'shield-checkmark-outline'],
   MaterialRequest: ['layers',           'layers-outline'],
   StockMovements:  ['swap-horizontal',  'swap-horizontal-outline'],
+  Reports:         ['stats-chart',      'stats-chart-outline'],
   MyRequests:      ['list',             'list-outline'],
   Profile:         ['person',           'person-outline'],
 };
@@ -32,6 +34,7 @@ const tabLabels: Record<keyof PolesTabParamList, string> = {
   PolesQC:         'QC',
   MaterialRequest: 'Materials',
   StockMovements:  'Stock Mvmt',
+  Reports:         'Reports',
   MyRequests:      'My Requests',
   Profile:         'Profile',
 };
@@ -58,6 +61,7 @@ export function PolesNavigator() {
       <Tab.Screen name="PolesQC"         component={PolesQCStack}         options={{ title: 'QC' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="StockMovements"  component={StockMovementsStack}  options={{ title: 'Stock Mvmt' }} />
+      <Tab.Screen name="Reports"         component={ReportsStack}         options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}     options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}        options={{ title: 'Profile' }} />
     </Tab.Navigator>

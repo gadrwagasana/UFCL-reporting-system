@@ -5,16 +5,19 @@ import { Colors } from '../theme';
 import { SawmillSupervisorTabParamList } from './types';
 import { SawmillStack }  from './SawmillStack';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { ReportsStack }  from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<SawmillSupervisorTabParamList>();
 
 const tabIcons: Record<keyof SawmillSupervisorTabParamList, [string, string]> = {
-  SawmillList: ['construct', 'construct-outline'],
-  Profile:     ['person',    'person-outline'],
+  SawmillList: ['construct',   'construct-outline'],
+  Reports:     ['stats-chart', 'stats-chart-outline'],
+  Profile:     ['person',      'person-outline'],
 };
 
 const tabLabels: Record<keyof SawmillSupervisorTabParamList, string> = {
   SawmillList: 'Production',
+  Reports:     'Reports',
   Profile:     'Profile',
 };
 
@@ -35,6 +38,7 @@ export function SawmillSupervisorNavigator() {
       })}
     >
       <Tab.Screen name="SawmillList" component={SawmillStack}  options={{ title: 'Production' }} />
+      <Tab.Screen name="Reports"     component={ReportsStack}  options={{ title: 'Reports' }} />
       <Tab.Screen name="Profile"     component={ProfileScreen} options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

@@ -183,6 +183,8 @@ app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));
 app.use('/api/sales',            require('./routes/sales'));
 
+app.use('/api/reports',        require('./routes/reports'));
+
 // ── Monitoring dashboard (static HTML, no JWT) ────────────────────────────────
 // Served at /dashboard.html — admin opens in browser, fetches /api/metrics with token.
 

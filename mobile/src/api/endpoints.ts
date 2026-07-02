@@ -174,6 +174,16 @@ export const EP = {
   CUSTOMERS_UPDATE:   (id: number) => `/api/customers/${id}`,
   CUSTOMERS_DROPDOWN: '/api/customers/dropdown',
 
+  // Reports
+  REPORTS_WEEKLY_COST:     '/api/reports/weekly-cost',
+  REPORTS_WEEKLY_EXPENSES: '/api/reports/weekly-expenses',
+  REPORTS_WEEKLY_PERF:     '/api/reports/weekly-perf',
+  REPORTS_KPI:             '/api/reports/kpi',
+  REPORTS_EXECUTIVE:       '/api/reports/executive',
+  REPORTS_BI:              '/api/reports/bi',
+  REPORTS_MONTHLY:         '/api/reports/monthly',
+  REPORTS_MONTHLY_APPROVE: '/api/reports/monthly/approve',
+
   // Meta / lookup endpoints
   META_MACHINES:           '/api/meta/machines',
   META_MACHINE_FUEL_TARGETS: '/api/meta/machine-fuel-targets',

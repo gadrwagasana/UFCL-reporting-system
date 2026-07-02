@@ -13,6 +13,7 @@ import { StockCatalogStack }         from './stacks/StockCatalogStack';
 import { StockInventoryStack }       from './stacks/StockInventoryStack';
 import { StockMovementsStack }       from './stacks/StockMovementsStack';
 import { StockTransfersStack }     from './stacks/StockTransfersStack';
+import { ReportsStack }            from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<StorekeeperTabParamList>();
 
@@ -34,8 +35,9 @@ export function StorekeeperNavigator() {
             StockInventory:     ['bar-chart',        'bar-chart-outline'],
             StockMovements:     ['swap-horizontal',  'swap-horizontal-outline'],
             StockTransfers:     ['swap-vertical',   'swap-vertical-outline'],
-            MaterialReview:     ['cube',     'cube-outline'],
-            MyRequests:         ['list',     'list-outline'],
+            MaterialReview:     ['cube',        'cube-outline'],
+            Reports:            ['stats-chart', 'stats-chart-outline'],
+            MyRequests:         ['list',        'list-outline'],
           };
           const [a, i] = icons[route.name as keyof StorekeeperTabParamList];
           return <Ionicons name={(focused ? a : i) as any} size={size} color={color} />;
@@ -50,6 +52,7 @@ export function StorekeeperNavigator() {
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}      options={{ title: 'Movements' }} />
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}     options={{ title: 'Transfers' }} />
       <Tab.Screen name="MaterialReview"     component={ComingSoonScreen}         options={{ title: 'Materials' }} />
+      <Tab.Screen name="Reports"            component={ReportsStack}             options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"         component={MyRequestsScreen}         options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );

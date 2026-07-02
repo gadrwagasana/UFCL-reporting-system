@@ -1201,3 +1201,293 @@ export interface StockPendingApproval {
   pendingApproval: true;
   message:        string;
 }
+
+// ─── Reports — Weekly Cost ────────────────────────────────────────────────────
+
+export interface WeeklyCostCategory {
+  id:           number;
+  name:         string;
+  week_amount:  number;
+  month_amount: number;
+  budget:       number;
+  variance:     number;
+  status:       'green' | 'amber' | 'red';
+}
+
+export interface WeeklyCostResponse {
+  ok:         true;
+  weekNumber: number;
+  month:      string;
+  summary:    WeeklyCostCategory[];
+  totals: {
+    week:     number;
+    month:    number;
+    budget:   number;
+    variance: number;
+  };
+}
+
+// ─── Reports — Weekly Performance ────────────────────────────────────────────
+
+export interface WeeklyPerfDailyRow {
+  date:           string;
+  machine?:       string;
+  product_size?:  string;
+  timber_units:   number;
+  timber_waste:   number;
+  poles_units:    number;
+  poles_waste:    number;
+  downtime_hours: number;
+  supervisor?:    string;
+}
+
+export interface WeeklyPerfCategoryStatus {
+  category:   string;
+  amount:     number;
+  budget:     number;
+  variance:   number;
+  reason?:    string;
+  entered_by: string;
+  status:     'green' | 'amber' | 'red';
+}
+
+export interface WeeklyPerfResponse {
+  ok:         true;
+  weekNumber: number;
+  month:      string;
+  range:      string;
+  production: {
+    timber:           number;
+    poles:            number;
+    downtime_hours:   number;
+    cost_per_timber:  number;
+    cost_per_pole:    number;
+    comment_count:    number;
+  };
+  dailyRows:      WeeklyPerfDailyRow[];
+  categoryStatus: WeeklyPerfCategoryStatus[];
+}
+
+// ─── Reports — KPI Scorecard ──────────────────────────────────────────────────
+
+export interface KpiBudgetRow {
+  id:            number;
+  name:          string;
+  budget_amount: number;
+}
+
+export interface KpiBudgetsResponse {
+  ok:   true;
+  month: string;
+  rows:  KpiBudgetRow[];
+}
+
+// ─── Reports — Executive Dashboard ───────────────────────────────────────────
+
+export interface ExecTrendDay {
+  day?:    string;
+  week?:   string;
+  amount?: number;
+  orders?: number;
+  liters?: number;
+  trees?:  number;
+  logs?:   number;
+  timber?: number;
+  poles?:  number;
+  avg_hours?: number;
+  resolved?:  number;
+}
+
+export interface ExecTopMachine {
+  machine_code:   string;
+  name:           string;
+  hours_worked:   number;
+  production:     number;
+  fuel:           number;
+  efficiency_pct: number;
+}
+
+export interface ExecTopDriver {
+  driver_name:  string;
+  deliveries:   number;
+  qty_accepted: number;
+  qty_rejected: number;
+}
+
+export interface ExecTopCompartment {
+  compt_name:    string;
+  species:       string | null;
+  area_ha:       number;
+  trees_felled:  number;
+  logs_produced: number;
+}
+
+export interface ExecActiveUser {
+  username:    string;
+  full_name:   string;
+  role:        string;
+  actions:     number;
+  last_active: string;
+}
+
+export interface ExecutiveDashboardResponse {
+  ok: true;
+  kpi: {
+    revenueToday:      number;
+    revenueMonth:      number;
+    revenueYear:       number;
+    pendingApprovals:  number;
+    failedJobs:        number;
+    activeUsersToday:  number;
+    deliveriesPending: number;
+    dispatchPending:   number;
+  };
+  salesTrend:      ExecTrendDay[];
+  fuelTrend:       ExecTrendDay[];
+  harvestTrend:    ExecTrendDay[];
+  workshopTrend:   ExecTrendDay[];
+  approvalTrend:   ExecTrendDay[];
+  topMachines:     ExecTopMachine[];
+  topDrivers:      ExecTopDriver[];
+  topCompartments: ExecTopCompartment[];
+  activeUsers:     ExecActiveUser[];
+  stock: {
+    movements30d:       number;
+    lowStockItems:      number;
+    pendingTransfers:   number;
+    pendingMaterialReq: number;
+  };
+  governance: {
+    slaCompliancePct:  number;
+    totalResolved30d:  number;
+    escalatedCount:    number;
+    escalationRatePct: number;
+    privOverrides24h:  number;
+    failedLogins24h:   number;
+    auditVolume24h:    number;
+  };
+  notifications: {
+    totalUnread: number;
+    security:    number;
+    approval:    number;
+    system:      number;
+  };
+}
+
+// ─── Reports — Business Intelligence ─────────────────────────────────────────
+
+export interface BiBreakdownItem {
+  icon:  string;
+  label: string;
+  pts:   number;
+}
+
+export interface BiHealth {
+  score:     number;
+  breakdown: BiBreakdownItem[];
+}
+
+export interface BiRisk {
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  module:   string;
+  title:    string;
+  detail:   string;
+  icon:     string;
+}
+
+export interface BiRecommendation {
+  priority:    'critical' | 'high' | 'medium' | 'low';
+  module:      string;
+  title:       string;
+  description: string;
+  action?:     string;
+  icon?:       string;
+}
+
+export interface BiStockShortage {
+  name:                  string;
+  current_stock:         number;
+  uom:                   string;
+  avg_daily_consumption: number;
+  days_until_depletion:  number | null;
+}
+
+export interface BiHarvestForecast {
+  compt_name:       string;
+  sub_name?:        string;
+  species?:         string;
+  pct_complete:     number;
+  days_to_complete: number | null;
+  rate_per_day:     number;
+}
+
+export interface BiStockAnomaly {
+  item_name:     string;
+  quantity:      number;
+  movement_type: string;
+  z_score:       number;
+}
+
+export interface BiDashboardResponse {
+  ok:      true;
+  sections: string[];
+  health:   BiHealth;
+  predictions: {
+    stockShortages:     BiStockShortage[];
+    fuelAnomaly:        { z_score: number; pct_change: number; data_points?: number };
+    machineAlerts:      Array<{ machine_code: string; name: string; maintenance_type: string; days_overdue: number }>;
+    efficiencyDecline:  Array<{ machine_code: string; avg_eff: number; eff_slope?: number }>;
+    harvestForecast:    BiHarvestForecast[];
+    salesRegression:    { avg_daily: number; slope: number; r2: number };
+    workshopRegression: { total_avg: number; total_slope: number; n?: number };
+  };
+  forecasts: {
+    sales30d:      Array<{ day: string; revenue: number }>;
+    salesForecast: number[];
+    wkTrend:       Array<{ week: string; timber: number; poles: number }>;
+    wkForecast:    number[];
+  };
+  risks:           BiRisk[];
+  recommendations: BiRecommendation[];
+  govRisk: {
+    failed_logins_24h:  number;
+    priv_overrides_24h: number;
+    failed_jobs:        number;
+    total_pending:      number;
+    stalled_48h:        number;
+    delayed_deliveries: number;
+    avg_pending_hours:  number;
+  };
+  stockAnomalies: BiStockAnomaly[];
+}
+
+// ─── Reports — Monthly Dashboard ─────────────────────────────────────────────
+
+export interface MonthlyExpenseRow {
+  category: string;
+  total:    number;
+}
+
+export interface MonthlyDashboardResponse {
+  ok:    true;
+  month: string;
+  production: {
+    log_days:        number;
+    timber_units:    number;
+    timber_waste:    number;
+    poles_units:     number;
+    poles_waste:     number;
+    downtime_hours:  number;
+  };
+  sales: {
+    order_count:    number;
+    total_qty:      number;
+    total_revenue:  number;
+  };
+  expenses:      MonthlyExpenseRow[];
+  totalExpenses: number;
+  approval: {
+    approved:     boolean;
+    approved_at?: string;
+  };
+}

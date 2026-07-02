@@ -10,6 +10,7 @@ import { CasualLabourStack }       from './CasualLabourStack';
 import { StockMovementsStack }     from './stacks/StockMovementsStack';
 import { MyRequestsScreen }        from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }           from '../screens/profile/ProfileScreen';
+import { ReportsStack }            from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<VatTabParamList>();
 
@@ -19,6 +20,7 @@ const tabIcons: Record<keyof VatTabParamList, [string, string]> = {
   MaterialRequest: ['cube',              'cube-outline'],
   CasualLabour:    ['people',            'people-outline'],
   StockMovements:  ['swap-horizontal',   'swap-horizontal-outline'],
+  Reports:         ['stats-chart',       'stats-chart-outline'],
   MyRequests:      ['list',              'list-outline'],
   Profile:         ['person',            'person-outline'],
 };
@@ -29,6 +31,7 @@ const tabLabels: Record<keyof VatTabParamList, string> = {
   MaterialRequest: 'Materials',
   CasualLabour:    'Labour',
   StockMovements:  'Stock Mvmt',
+  Reports:         'Reports',
   MyRequests:      'My Requests',
   Profile:         'Profile',
 };
@@ -54,6 +57,7 @@ export function VatNavigator() {
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
       <Tab.Screen name="StockMovements"  component={StockMovementsStack}   options={{ title: 'Stock Mvmt' }} />
+      <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>

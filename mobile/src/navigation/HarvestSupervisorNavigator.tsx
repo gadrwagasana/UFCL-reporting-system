@@ -6,18 +6,21 @@ import { HarvestSupervisorTabParamList } from './types';
 import { HarvestStack }      from './HarvestStack';
 import { LogTransportStack } from './LogTransportStack';
 import { ProfileScreen }     from '../screens/profile/ProfileScreen';
+import { ReportsStack }      from './stacks/ReportsStack';
 
 const Tab = createBottomTabNavigator<HarvestSupervisorTabParamList>();
 
 const tabIcons: Record<keyof HarvestSupervisorTabParamList, [string, string]> = {
-  HarvestList:      ['leaf',   'leaf-outline'],
-  LogTransportList: ['bus',    'bus-outline'],
-  Profile:          ['person', 'person-outline'],
+  HarvestList:      ['leaf',        'leaf-outline'],
+  LogTransportList: ['bus',         'bus-outline'],
+  Reports:          ['stats-chart', 'stats-chart-outline'],
+  Profile:          ['person',      'person-outline'],
 };
 
 const tabLabels: Record<keyof HarvestSupervisorTabParamList, string> = {
   HarvestList:      'Harvest',
   LogTransportList: 'Log Transport',
+  Reports:          'Reports',
   Profile:          'Profile',
 };
 
@@ -39,6 +42,7 @@ export function HarvestSupervisorNavigator() {
     >
       <Tab.Screen name="HarvestList"      component={HarvestStack}      options={{ title: 'Harvest' }} />
       <Tab.Screen name="LogTransportList" component={LogTransportStack} options={{ title: 'Log Transport' }} />
+      <Tab.Screen name="Reports"          component={ReportsStack}      options={{ title: 'Reports' }} />
       <Tab.Screen name="Profile"          component={ProfileScreen}     options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );
