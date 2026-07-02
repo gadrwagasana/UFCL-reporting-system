@@ -1,7 +1,9 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { get, post } from '../api/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { get, post, patch, del } from '../api/client';
 import { EP } from '../api/endpoints';
 import { DeliveryListResponse, DeliveryStatus } from '../types/api';
+
+const QK = ['delivery-list'] as const;
 
 interface CreateDeliveryPayload {
   driver_name:      string;
@@ -15,9 +17,9 @@ interface CreateDeliveryPayload {
 
 export function useDeliveryList() {
   return useQuery<DeliveryListResponse>({
-    queryKey:  ['delivery-list'],
+    queryKey:  QK,
     queryFn:   () => get<DeliveryListResponse>(EP.DELIVERY_LIST),
-    staleTime: 2 * 60_000,
+    staleTime: 30_000,
   });
 }
 
@@ -26,7 +28,7 @@ export function useDeliveryStatusUpdate() {
 
   async function updateStatus(id: number, status: DeliveryStatus): Promise<void> {
     await post(EP.DELIVERY_STATUS(id), { status });
-    await qc.invalidateQueries({ queryKey: ['delivery-list'] });
+    await qc.invalidateQueries({ queryKey: QK });
   }
 
   return { updateStatus };
@@ -37,7 +39,7 @@ export function useDeliveryCreate() {
 
   async function createDelivery(payload: CreateDeliveryPayload): Promise<void> {
     await post(EP.DELIVERY_CREATE, payload);
-    await qc.invalidateQueries({ queryKey: ['delivery-list'] });
+    await qc.invalidateQueries({ queryKey: QK });
   }
 
   return { createDelivery };
@@ -51,8 +53,33 @@ export function usePODCreate() {
     payload: { qty_accepted: number; rejection_reason?: string },
   ): Promise<void> {
     await post(EP.DELIVERY_POD(id), payload);
-    await qc.invalidateQueries({ queryKey: ['delivery-list'] });
+    await qc.invalidateQueries({ queryKey: QK });
   }
 
   return { recordPOD };
+}
+
+export function useDeliveryUpdate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...payload }: {
+      id:             number;
+      driver_name:    string;
+      vehicle_id?:    number | null;
+      delivery_date?: string | null;
+      route?:         string;
+      notes?:         string;
+      qty_dispatched?: number | null;
+    }) => patch<{ ok: true }>(EP.DELIVERY_UPDATE(id), payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  });
+}
+
+export function useDeliveryDelete() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }: { id: number; reason?: string }) =>
+      del<{ ok: true }>(EP.DELIVERY_DELETE(id), { reason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  });
 }

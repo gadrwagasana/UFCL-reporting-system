@@ -136,6 +136,7 @@ export type CeoTabParamList = {
   StockTransfers:     undefined;
   Dispatch:           undefined;
   SalesOrders:        undefined;
+  Deliveries:         undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -422,6 +423,7 @@ export type VatEntriesStackScreenProps<T extends keyof VatEntriesStackParamList>
 export type DeliveryStackParamList = {
   DeliveriesList:  undefined;
   DeliveryCreate:  undefined;
+  DeliveryEdit:    { order: DeliveryOrder };
   DeliveryDetail:  { order: DeliveryOrder };
   DeliveryStatus:  { order: DeliveryOrder };
   PODList:         undefined;

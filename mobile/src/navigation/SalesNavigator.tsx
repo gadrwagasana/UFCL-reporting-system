@@ -10,6 +10,7 @@ import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
 import { CustomersStack }     from './stacks/CustomersStack';
 import { ProductsStack }      from './stacks/ProductsStack';
 import { SalesOrdersStack }   from './stacks/SalesOrdersStack';
+import { DeliveryStack }      from './stacks/DeliveryStack';
 
 const Tab = createBottomTabNavigator<SalesTabParamList>();
 
@@ -26,7 +27,7 @@ export function SalesNavigator() {
           const icons: Record<keyof SalesTabParamList, [string, string]> = {
             Dashboard:      DASHBOARD_TAB_ICON,
             SalesOrders:    ['cart',      'cart-outline'],
-            DeliveryStatus: ['receipt',   'receipt-outline'],
+            DeliveryStatus: ['truck',     'truck-outline'],
             Customers:      ['briefcase', 'briefcase-outline'],
             Products:       ['cube',      'cube-outline'],
             MyRequests:     ['list',      'list-outline'],
@@ -38,7 +39,7 @@ export function SalesNavigator() {
     >
       <Tab.Screen name="Dashboard"      component={DashboardScreen}   options={DASHBOARD_TAB_OPTIONS} />
       <Tab.Screen name="SalesOrders"    component={SalesOrdersStack}  options={{ title: 'Sales Orders' }} />
-      <Tab.Screen name="DeliveryStatus" component={ComingSoonScreen}  options={{ title: 'Deliveries' }} />
+      <Tab.Screen name="DeliveryStatus" component={DeliveryStack}    options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Customers"  component={CustomersStack}   options={{ title: 'Customers' }} />
       <Tab.Screen name="Products"   component={ProductsStack}    options={{ title: 'Products' }} />
       <Tab.Screen name="MyRequests" component={MyRequestsScreen} options={{ title: 'My Requests' }} />

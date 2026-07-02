@@ -57,6 +57,8 @@ export const EP = {
   // Deliveries
   DELIVERY_LIST:           '/api/deliveries',
   DELIVERY_CREATE:         '/api/deliveries',
+  DELIVERY_UPDATE:         (id: number) => `/api/deliveries/${id}`,
+  DELIVERY_DELETE:         (id: number) => `/api/deliveries/${id}`,
   DELIVERY_POD:            (id: number) => `/api/deliveries/${id}/pod`,
   DELIVERY_STATUS:         (id: number) => `/api/deliveries/${id}/status`,
 

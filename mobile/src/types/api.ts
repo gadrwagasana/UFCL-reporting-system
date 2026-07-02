@@ -138,9 +138,17 @@ export interface SalesOrderOption {
   qty_remaining:        number;
 }
 
+export interface DeliveryMetrics {
+  total:       number;
+  pending:     number;
+  inTransit:   number;
+  podRecorded: number;
+}
+
 export interface DeliveryListResponse {
   ok:          true;
   rows:        DeliveryOrder[];
+  metrics:     DeliveryMetrics;
   vehicles:    MetaVehicle[];
   salesOrders: SalesOrderOption[];
 }

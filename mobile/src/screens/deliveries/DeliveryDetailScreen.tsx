@@ -1,29 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert,
 } from 'react-native';
-import { SafeAreaView }   from 'react-native-safe-area-context';
-import { StatusBar }      from 'expo-status-bar';
-import { Ionicons }       from '@expo/vector-icons';
-import { AppHeader }      from '../../components/AppHeader';
+import { SafeAreaView }        from 'react-native-safe-area-context';
+import { StatusBar }           from 'expo-status-bar';
+import { Ionicons }            from '@expo/vector-icons';
+import { AppHeader }           from '../../components/AppHeader';
+import { DeliveryStatusBadge } from '../../components/DeliveryStatusBadge';
+import { ReasonModal }         from '../../components/ReasonModal';
+import { useDeliveryDelete }   from '../../hooks/useDeliveries';
 import { DeliveryStackScreenProps } from '../../navigation/types';
-import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 import { useOfflineStore }  from '../../stores/offlineStore';
-
-const STATUS_COLOR: Record<string, string> = {
-  'Pending':      Colors.textMuted,
-  'Assigned':     Colors.info,
-  'In Transit':   Colors.warning,
-  'POD Recorded': Colors.success,
-  'Failed':       Colors.error,
-};
+import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value == null || value === '') return null;
   return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{String(value)}</Text>
+    <View style={s.row}>
+      <Text style={s.rowLabel}>{label}</Text>
+      <Text style={s.rowValue}>{String(value)}</Text>
     </View>
   );
 }
@@ -32,141 +27,172 @@ type Props = DeliveryStackScreenProps<'DeliveryDetail'>;
 
 export function DeliveryDetailScreen({ route, navigation }: Props) {
   const { order } = route.params;
-  const isOnline  = useOfflineStore((s) => s.isOnline);
+  const isOnline  = useOfflineStore(st => st.isOnline);
+  const deleteMutation = useDeliveryDelete();
 
-  const statusColor  = STATUS_COLOR[order.status] ?? Colors.textMuted;
+  const [deleteVisible, setDeleteVisible] = useState(false);
+
   const canUpdateStatus = ['Pending', 'Assigned', 'In Transit'].includes(order.status);
-  const canRecordPOD    = order.status === 'In Transit';
+  const canRecordPOD    = order.status === 'In Transit' || order.status === 'Assigned';
+  const canEdit         = order.status !== 'POD Recorded';
 
-  const closeShortQty = (order.qty_remaining ?? 0);
+  const closeShortQty = order.qty_remaining ?? 0;
   const closeShortPct = order.so_quantity
     ? Math.round((closeShortQty / order.so_quantity) * 100)
     : null;
 
   function handleStatusPress() {
-    if (!isOnline) {
-      Alert.alert('Offline', 'Status updates require an internet connection.');
-      return;
-    }
+    if (!isOnline) { Alert.alert('Offline', 'Status updates require a connection.'); return; }
     navigation.navigate('DeliveryStatus', { order });
   }
 
   function handlePODPress() {
-    if (!isOnline) {
-      Alert.alert('Offline', 'POD capture requires an internet connection.');
-      return;
-    }
+    if (!isOnline) { Alert.alert('Offline', 'POD capture requires a connection.'); return; }
     navigation.navigate('PODCapture', { order });
   }
 
-  return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <StatusBar style="light" />
-      <AppHeader title={order.order_number} dark onBack={() => navigation.goBack()} />
+  async function handleDelete(reason: string) {
+    try {
+      const res = await deleteMutation.mutateAsync({ id: order.id, reason: reason || undefined });
+      if ((res as any).pendingApproval) {
+        setDeleteVisible(false);
+        Alert.alert('Submitted', 'Deletion submitted for manager approval.');
+      } else {
+        setDeleteVisible(false);
+        navigation.goBack();
+      }
+    } catch {
+      Alert.alert('Error', 'Could not delete delivery order.');
+    }
+  }
 
-      <ScrollView contentContainerStyle={styles.scroll}>
-        {/* Status badge */}
-        <View style={[styles.statusCard, { borderLeftColor: statusColor }]}>
-          <View style={[styles.statusBadge, { backgroundColor: statusColor + '22' }]}>
-            <Text style={[styles.statusText, { color: statusColor }]}>{order.status}</Text>
-          </View>
-          {order.delivery_date && (
-            <Text style={styles.statusDate}>{order.delivery_date}</Text>
-          )}
+  return (
+    <SafeAreaView style={s.safe} edges={['top']}>
+      <StatusBar style="light" />
+      <AppHeader
+        title={order.order_number}
+        dark
+        onBack={() => navigation.goBack()}
+        actions={[
+          ...(canEdit ? [{ icon: 'pencil-outline' as const, onPress: () => navigation.navigate('DeliveryEdit', { order }) }] : []),
+          { icon: 'trash-outline', onPress: () => setDeleteVisible(true) },
+        ]}
+      />
+
+      <ScrollView contentContainerStyle={s.scroll}>
+        {/* Status */}
+        <View style={s.statusCard}>
+          <DeliveryStatusBadge status={order.status} />
+          {order.delivery_date && <Text style={s.statusDate}>{order.delivery_date}</Text>}
         </View>
 
         {/* Quantities */}
-        <View style={styles.qtyGrid}>
-          <View style={styles.qtyCell}>
-            <Text style={styles.qtyValue}>{order.qty_dispatched ?? '—'}</Text>
-            <Text style={styles.qtyLabel}>Dispatched</Text>
+        <View style={s.qtyGrid}>
+          <View style={s.qtyCell}>
+            <Text style={s.qtyValue}>{order.qty_dispatched ?? '—'}</Text>
+            <Text style={s.qtyLabel}>Dispatched</Text>
           </View>
-          <View style={styles.qtySep} />
-          <View style={styles.qtyCell}>
-            <Text style={[styles.qtyValue, { color: Colors.success }]}>{order.qty_accepted ?? '—'}</Text>
-            <Text style={styles.qtyLabel}>Accepted</Text>
+          <View style={s.qtySep} />
+          <View style={s.qtyCell}>
+            <Text style={[s.qtyValue, { color: Colors.success }]}>{order.qty_accepted ?? '—'}</Text>
+            <Text style={s.qtyLabel}>Accepted</Text>
           </View>
-          <View style={styles.qtySep} />
-          <View style={styles.qtyCell}>
-            <Text style={[styles.qtyValue, { color: Colors.error }]}>{order.qty_rejected ?? '—'}</Text>
-            <Text style={styles.qtyLabel}>Rejected</Text>
+          <View style={s.qtySep} />
+          <View style={s.qtyCell}>
+            <Text style={[s.qtyValue, { color: Colors.error }]}>{order.qty_rejected ?? '—'}</Text>
+            <Text style={s.qtyLabel}>Rejected</Text>
           </View>
         </View>
 
-        {/* Close-short indicator */}
+        {/* Remaining SO units warning */}
         {closeShortQty > 0 && closeShortPct !== null && (
-          <View style={styles.closeShortBanner}>
+          <View style={s.warnBanner}>
             <Ionicons name="warning-outline" size={16} color={Colors.warning} />
-            <Text style={styles.closeShortText}>
+            <Text style={s.warnText}>
               {closeShortQty} units remaining on SO ({closeShortPct}% of {order.so_quantity} ordered)
             </Text>
           </View>
         )}
 
-        {/* Details */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Delivery Details</Text>
-          <DetailRow label="Driver"            value={order.driver_name} />
-          <DetailRow label="Vehicle"           value={order.vehicle_registration} />
-          <DetailRow label="Route"             value={order.route} />
-          <DetailRow label="Notes"             value={order.notes} />
-          <DetailRow label="Rejection Reason"  value={order.rejection_reason} />
+        {/* Delivery details */}
+        <View style={s.card}>
+          <Text style={s.sectionTitle}>Delivery Details</Text>
+          <DetailRow label="Driver"           value={order.driver_name} />
+          <DetailRow label="Vehicle"          value={order.vehicle_registration} />
+          <DetailRow label="Route"            value={order.route} />
+          <DetailRow label="Notes"            value={order.notes} />
+          <DetailRow label="Rejection Reason" value={order.rejection_reason} />
           {order.pod_recorded_at && (
             <DetailRow label="POD Recorded At" value={order.pod_recorded_at} />
           )}
         </View>
 
-        {/* Sales Order */}
+        {/* Linked sales order */}
         {order.sales_order_number && (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Sales Order</Text>
-            <DetailRow label="SO Number"   value={order.sales_order_number} />
-            <DetailRow label="Customer"    value={order.customer_name} />
-            <DetailRow label="SO Quantity" value={order.so_quantity} />
+          <View style={s.card}>
+            <Text style={s.sectionTitle}>Sales Order</Text>
+            <DetailRow label="SO Number"      value={order.sales_order_number} />
+            <DetailRow label="Customer"       value={order.customer_name} />
+            <DetailRow label="SO Quantity"    value={order.so_quantity} />
             <DetailRow label="Accepted Total" value={order.qty_accepted_total} />
-            <DetailRow label="Remaining"   value={order.qty_remaining} />
+            <DetailRow label="Remaining"      value={order.qty_remaining} />
           </View>
         )}
 
         {/* Actions */}
         {(canUpdateStatus || canRecordPOD) && (
-          <View style={styles.actions}>
+          <View style={s.actions}>
             {canUpdateStatus && (
-              <TouchableOpacity style={styles.actionBtn} onPress={handleStatusPress} activeOpacity={0.8}>
+              <TouchableOpacity style={s.actionBtn} onPress={handleStatusPress} activeOpacity={0.8}>
                 <Ionicons name="refresh-outline" size={18} color={Colors.white} />
-                <Text style={styles.actionText}>Update Status</Text>
+                <Text style={s.actionText}>Update Status</Text>
               </TouchableOpacity>
             )}
             {canRecordPOD && (
-              <TouchableOpacity style={[styles.actionBtn, styles.podBtn]} onPress={handlePODPress} activeOpacity={0.8}>
+              <TouchableOpacity style={[s.actionBtn, s.podBtn]} onPress={handlePODPress} activeOpacity={0.8}>
                 <Ionicons name="checkmark-circle-outline" size={18} color={Colors.white} />
-                <Text style={styles.actionText}>Record POD</Text>
+                <Text style={s.actionText}>Record POD</Text>
               </TouchableOpacity>
             )}
           </View>
         )}
       </ScrollView>
+
+      <ReasonModal
+        visible={deleteVisible}
+        title="Delete Delivery Order"
+        message={`Delete ${order.order_number}? This will also remove any linked dispatch requests.`}
+        confirmLabel="Delete"
+        loading={deleteMutation.isPending}
+        allowEmpty
+        onCancel={() => setDeleteVisible(false)}
+        onConfirm={handleDelete}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: Colors.bg },
   scroll: { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
 
-  statusCard:  { backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, borderLeftWidth: 3, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...Shadow.sm },
-  statusBadge: { borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
-  statusText:  { fontSize: Typography.sm, fontWeight: Typography.semibold },
-  statusDate:  { fontSize: Typography.xs, color: Colors.textMuted },
+  statusCard: {
+    backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', ...Shadow.sm,
+  },
+  statusDate: { fontSize: Typography.xs, color: Colors.textMuted },
 
   qtyGrid: { flexDirection: 'row', backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, ...Shadow.sm },
   qtyCell: { flex: 1, alignItems: 'center' },
   qtySep:  { width: 1, backgroundColor: Colors.border },
-  qtyValue:  { fontSize: Typography.xl, fontWeight: Typography.bold, color: Colors.textPrimary },
-  qtyLabel:  { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2 },
+  qtyValue: { fontSize: Typography.xl, fontWeight: Typography.bold, color: Colors.textPrimary },
+  qtyLabel: { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2 },
 
-  closeShortBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.warning + '1A', borderRadius: Radius.md, padding: Spacing.sm },
-  closeShortText:   { flex: 1, fontSize: Typography.xs, color: Colors.warning, fontWeight: Typography.medium },
+  warnBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
+    backgroundColor: Colors.warning + '1A', borderRadius: Radius.md, padding: Spacing.sm,
+  },
+  warnText: { flex: 1, fontSize: Typography.xs, color: Colors.warning, fontWeight: Typography.medium },
 
   card:         { backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, gap: Spacing.xs, ...Shadow.sm },
   sectionTitle: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.textMuted, marginBottom: Spacing.xs },
