@@ -11,6 +11,12 @@ import { RolesScreen }          from '../../screens/admin/RolesScreen';
 import { RoleDetailScreen }     from '../../screens/admin/RoleDetailScreen';
 import { TrashScreen }          from '../../screens/admin/TrashScreen';
 import { ChangesScreen }        from '../../screens/admin/ChangesScreen';
+import { AutomationHomeScreen }        from '../../screens/automation/AutomationHomeScreen';
+import { AutomationRulesScreen }       from '../../screens/automation/AutomationRulesScreen';
+import { AutomationRuleDetailScreen }  from '../../screens/automation/AutomationRuleDetailScreen';
+import { AutomationEscalationsScreen } from '../../screens/automation/AutomationEscalationsScreen';
+import { AutomationHistoryScreen }     from '../../screens/automation/AutomationHistoryScreen';
+import { AutomationJobsScreen }        from '../../screens/automation/AutomationJobsScreen';
 
 const Stack = createNativeStackNavigator<AdminStackParamList>();
 
@@ -26,7 +32,13 @@ export function AdminStack() {
       <Stack.Screen name="Roles"            component={RolesScreen} />
       <Stack.Screen name="RoleDetail"       component={RoleDetailScreen} />
       <Stack.Screen name="Trash"            component={TrashScreen} />
-      <Stack.Screen name="Changes"          component={ChangesScreen} />
+      <Stack.Screen name="Changes"               component={ChangesScreen} />
+      <Stack.Screen name="AutomationHome"        component={AutomationHomeScreen} />
+      <Stack.Screen name="AutomationRules"       component={AutomationRulesScreen} />
+      <Stack.Screen name="AutomationRuleDetail"  component={AutomationRuleDetailScreen} />
+      <Stack.Screen name="AutomationEscalations" component={AutomationEscalationsScreen} />
+      <Stack.Screen name="AutomationHistory"     component={AutomationHistoryScreen} />
+      <Stack.Screen name="AutomationJobs"        component={AutomationJobsScreen} />
     </Stack.Navigator>
   );
 }

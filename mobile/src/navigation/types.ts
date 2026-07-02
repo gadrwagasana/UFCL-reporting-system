@@ -119,16 +119,23 @@ export type CustomersStackParamList = {
 
 // ─── Admin stack ─────────────────────────────────────────────────────────────
 export type AdminStackParamList = {
-  AdminHome:        undefined;
-  SecGov:           undefined;
-  Audit:            undefined;
-  Users:            undefined;
-  UserDetail:       { userId?: number };
-  UserPermissions:  { userId: number; userName: string };
-  Roles:            undefined;
-  RoleDetail:       { role: string };
-  Trash:            undefined;
-  Changes:          undefined;
+  AdminHome:              undefined;
+  SecGov:                 undefined;
+  Audit:                  undefined;
+  Users:                  undefined;
+  UserDetail:             { userId?: number };
+  UserPermissions:        { userId: number; userName: string };
+  Roles:                  undefined;
+  RoleDetail:             { role: string };
+  Trash:                  undefined;
+  Changes:                undefined;
+  // Automation Center (Module 17A)
+  AutomationHome:         undefined;
+  AutomationRules:        undefined;
+  AutomationRuleDetail:   { ruleKey: string };
+  AutomationEscalations:  undefined;
+  AutomationHistory:      undefined;
+  AutomationJobs:         undefined;
 };
 
 export type AdminStackScreenProps<T extends keyof AdminStackParamList> =

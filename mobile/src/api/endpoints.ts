@@ -207,4 +207,13 @@ export const EP = {
   ADMIN_TRASH_PURGE:   '/api/admin/trash/purge',
   ADMIN_CHANGES:       '/api/admin/changes',
   ADMIN_CHANGE:        (id: number) => `/api/admin/changes/${id}`,
+
+  // Automation Center
+  AUTOMATION_DASHBOARD:         '/api/automation/dashboard',
+  AUTOMATION_RUN:               '/api/automation/run',
+  AUTOMATION_RULES:             '/api/automation/rules',
+  AUTOMATION_RULE:              (key: string) => `/api/automation/rules/${key}`,
+  AUTOMATION_ESCALATIONS:       '/api/automation/escalations',
+  AUTOMATION_ESCALATION_RESOLVE:(id: number) => `/api/automation/escalations/${id}/resolve`,
+  AUTOMATION_ESCALATION_ACK:    (id: number) => `/api/automation/escalations/${id}/ack`,
 } as const;

@@ -21,7 +21,7 @@ interface HubCard {
   icon:       string;
   color:      string;
   screen:     keyof AdminStackParamList;
-  permission: 'admin.secgov' | 'admin.audit' | 'admin.users' | 'admin.roles' | 'admin.trash' | 'admin.changes';
+  permission: 'admin.secgov' | 'admin.audit' | 'admin.users' | 'admin.roles' | 'admin.trash' | 'admin.changes' | 'automation.view';
 }
 
 const CARDS: HubCard[] = [
@@ -72,6 +72,14 @@ const CARDS: HubCard[] = [
     color:      Colors.orange,
     screen:     'Changes',
     permission: 'admin.changes',
+  },
+  {
+    title:      'Automation Center',
+    subtitle:   'Rules, escalations, jobs & history',
+    icon:       'hardware-chip',
+    color:      '#2563EB',
+    screen:     'AutomationHome',
+    permission: 'automation.view',
   },
 ];
 

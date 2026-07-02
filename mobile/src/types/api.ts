@@ -1594,6 +1594,113 @@ export interface ChangesListResponse {
   isMgr: boolean;
 }
 
+// ─── Automation Center ────────────────────────────────────────────────────────
+
+export type AutomationSeverity = 'critical' | 'high' | 'medium' | 'low' | 'info';
+export type AutomationAction   = 'notify' | 'draft_request' | 'escalate' | 'log_only';
+export type EscalationLevel    = 'leader' | 'manager' | 'director' | 'ceo';
+
+export interface AutomationRule {
+  id:             number;
+  rule_key:       string;
+  label:          string;
+  description:    string | null;
+  enabled:        boolean;
+  cooldown_hours: number;
+  notify_roles:   string[];
+  threshold:      Record<string, unknown>;
+  severity:       AutomationSeverity;
+  auto_action:    AutomationAction;
+  updated_at:     string;
+  last_fired:     string | null;
+}
+
+export interface AutomationLogEntry {
+  id:             number;
+  rule_key:       string;
+  related_module: string | null;
+  related_id:     string | null;
+  action_taken:   string;
+  fired_at:       string;
+  meta:           Record<string, unknown> | null;
+}
+
+export interface WorkflowJob {
+  id:           number;
+  type:         string;
+  status:       string;
+  run_at:       string | null;
+  attempts:     number;
+  max_attempts: number;
+  last_error:   string | null;
+  processed_at: string | null;
+  created_at:   string;
+}
+
+export interface EscalationRow {
+  id:            number;
+  entity_type:   string;
+  entity_id:     string;
+  entity_ref:    string | null;
+  triggered_by:  string;
+  current_level: EscalationLevel;
+  status:        string;
+  escalated_at:  string;
+  notified_at:   string | null;
+  age_hours:     number;
+}
+
+export interface SchedulerRun {
+  id:           number;
+  started_at:   string;
+  completed_at: string | null;
+  duration_ms:  number | null;
+  errors:       number;
+  status:       string;
+}
+
+export interface AutomationSummary {
+  rules_total:        number;
+  rules_enabled:      number;
+  rules_disabled:     number;
+  active_escalations: number;
+  pending_jobs:       number;
+  failed_jobs:        number;
+  automations_24h:    number;
+  avg_tick_ms:        number | null;
+  ticks_24h:          number;
+}
+
+export interface AutomationDashboardResponse {
+  ok:              true;
+  timestamp:       string;
+  summary:         AutomationSummary;
+  scheduler: {
+    last_automation: string | null;
+    last_security:   string | null;
+    recent_runs:     SchedulerRun[];
+  };
+  activity_by_day: { day: string; count: number }[];
+  rules:           AutomationRule[];
+  automation_log:  AutomationLogEntry[];
+  pending_jobs:    WorkflowJob[];
+  failed_jobs:     WorkflowJob[];
+  escalations: {
+    active:       EscalationRow[];
+    level_counts: Record<EscalationLevel, number>;
+  };
+}
+
+export interface AutomationRuleResponse {
+  ok:   true;
+  rule: AutomationRule;
+}
+
+export interface EscalationsResponse {
+  ok:          true;
+  escalations: EscalationRow[];
+}
+
 // ─── Reports — Monthly Dashboard ─────────────────────────────────────────────
 
 export interface MonthlyExpenseRow {
