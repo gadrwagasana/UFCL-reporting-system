@@ -7,6 +7,83 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [Unreleased — Mobile ERP parity] — Milestone v0.8-compartments — 2026-07-02
+
+Desktop-parity mobile implementation (Modules 1–8). All modules follow a strict
+Read → Spec → Gap Report → Implement workflow against `renderer/app.js` as the
+sole source of truth. No business logic was reimplemented on the client; all
+calculations and permission checks remain in `db/services/data.js`.
+
+### Module 1 — Core Dashboard (`v0.1-dashboard`)
+- KPI banner: revenue, volume, deliveries, machines (role-filtered)
+- Alerts panel: maintenance overdue, low stock, pending approvals
+- Recent activity feed with role-aware action routing
+- Trend badges (up/down/neutral vs. previous period)
+- `DashboardScreen` shared across all tab navigators
+- Backend: `/api/dashboard` with computed KPIs and alerts
+
+### Module 2 — Navigation (`v0.2-navigation`)
+- Role-aware bottom-tab navigators for all 20 roles
+- `MainNavigator` dispatches to role navigator after JWT decode
+- `dashboardTabConfig` shared constant for the Dashboard tab entry
+- All param lists typed in `navigation/types.ts`
+
+### Module 3 — Customers (`v0.3-customers`)
+- Customer list with search, active/inactive filter
+- Customer create / edit form (admin, ceo, operations, sales roles)
+- `useCustomers` hooks; endpoints wired to existing `/api/ceo` route
+- Permission gate: `ceo.approve` required for write access
+
+### Module 4 — Products (`v0.4-products`)
+- Product list with category filter badges
+- Product create / edit form
+- `useProducts` hooks
+
+### Module 5 — Vehicles (`v0.5-vehicles`)
+- Vehicle list with status badges, odometer, last-service date
+- Vehicle detail screen: fuel history, maintenance history
+- Vehicle create / edit form (full fleet form parity)
+- Inline fuel-log and maintenance-record creation from detail screen
+- `useVehicles` hooks; permission: `machine.register`
+
+### Module 6 — Machines (`v0.6-machines`)
+- Machine list with category / status filters
+- Machine detail screen: maintenance schedule, daily log history, fuel history
+- Machine create / edit / categories screens
+- Inline maintenance-schedule and daily-log creation
+- `machineEnums.ts` / `machineEnums.js` enum centralisation pattern established
+- Permission: `machine.register` (write), `machine.cats` (category management)
+
+### Module 7 — Workshops (`v0.7-workshops`)
+- Workshop Overview screen: KPI cards, pending transfers (approve/reject gated on `workshop.approve`), pending material requests, low-stock alerts
+- Workshop Management screen: list with metrics banner, create/edit/delete (gated on `workshop.manage`)
+- `workshopsListWithMetrics()` added to `data.js` as additive wrapper (metrics computed server-side)
+- `workshopEnums.ts` / `workshopEnums.js` enum centralisation
+- Split navigation: `WorkshopOverviewStack` (CEO/Operations/Logistics/Storekeeper) and `WorkshopManagementStack`
+- Backend: `/api/workshops` — 6 endpoints including transfer approval
+
+### Module 8 — Compartments (`v0.8-compartments`)
+- Compartment list with 5-stat metrics banner and per-row harvest progress bar
+- Compartment create / edit form with live volume preview (`area_ha × 219 m³` — presentation only; server computes authoritative value)
+- Status field (Active / Completed) available on edit only
+- `DeletionReasonModal` introduced as **reusable shared component** (`mobile/src/components/DeletionReasonModal.tsx`): multiline TextInput, 500-char limit, Confirm disabled until reason is non-empty, loading state, auto-clear on close
+- Supervisor governance: edit → `pendingEditsCreate`; delete → `deletionRequestCreate` (route-layer conditional, not applyGovernance)
+- Admin/CEO/Operations delete also routes through modal to maintain full audit trail
+- `pending_deletion` flag displayed as badge on compartment rows
+- Permissions: `compartment.create` (admin/ceo/operations/supervisor), `compartment.manage` (admin/ceo/operations)
+- Backend: `/api/compartments` — 4 endpoints
+
+### Shared infrastructure added (Modules 1–8)
+- `mobile-api/constants/` — domain enum files (`dashboardEnums.js`, `machineEnums.js`, `workshopEnums.js`, `errorCodes.js`)
+- `mobile-api/utils/computeTrend.js` — trend direction utility
+- `mobile/src/constants/` — TypeScript enum mirrors
+- `mobile/src/components/` — `AlertsPanel`, `BarChart`, `DeletionReasonModal`, `KpiCard`, `PendingActionItem`, `RecentRow`, `TrendBadge`
+- `mobile/src/types/api.ts` — extended with types for all 8 modules
+- `mobile/src/utils/permissions.ts` — `compartment.create`, `compartment.manage`, `workshop.manage`, `workshop.approve` added
+- `data.js` — `workshopsListWithMetrics()` additive function added
+
+---
+
 ## [1.0.0] — 2026-06-29
 
 **Initial production release.** Replaces all paper-based daily reporting and

@@ -6,6 +6,7 @@ import type {
   HarvestEntry, LogTransportEntry, DailyLog,
   VatInboundEntry, VatEntry,
   DeliveryOrder, FuelLog, MachineFuelLog, MachineLog,
+  Customer, Product, Vehicle, Machine, Workshop, Compartment,
 } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
@@ -26,11 +27,67 @@ export type CeoApprovalsStackParamList = {
   ApprovalDetail:   { item: PolesRequest };
 };
 
+// ─── Products stack ──────────────────────────────────────────────────────────
+export type ProductsStackParamList = {
+  ProductsList: undefined;
+  ProductForm:  { product?: Product };
+};
+
+// ─── Compartments stack ───────────────────────────────────────────────────────
+export type CompartmentsStackParamList = {
+  CompartmentsList: undefined;
+  CompartmentForm:  { compartment?: Compartment };
+};
+
+// ─── Workshop Overview stack ──────────────────────────────────────────────────
+export type WorkshopOverviewStackParamList = {
+  WorkshopOverview: undefined;
+};
+
+// ─── Workshop Management stack ────────────────────────────────────────────────
+export type WorkshopManagementStackParamList = {
+  WorkshopsList: undefined;
+  WorkshopForm:  { workshop?: Workshop };
+};
+
+// ─── Machines stack ───────────────────────────────────────────────────────────
+export type MachinesStackParamList = {
+  MachinesList:                undefined;
+  MachineDetail:               { machineId: number };
+  MachineForm:                 { machine?: Machine };
+  MachineMaintScheduleCreate:  { machineId: number; machineName: string };
+  MachineCategories:           undefined;
+};
+
+// ─── Vehicles stack ───────────────────────────────────────────────────────────
+export type VehiclesStackParamList = {
+  VehiclesList:             undefined;
+  VehicleDetail:            { vehicleId: number };
+  VehicleForm:              { vehicle?: Vehicle };
+  VehicleFuelLogCreate:     { vehicleId: number; registration: string };
+  VehicleMaintenanceCreate: { vehicleId: number; registration: string };
+};
+
+// ─── Customers stack ─────────────────────────────────────────────────────────
+export type CustomersStackParamList = {
+  CustomersList: undefined;
+  CustomerForm:  { customer?: Customer };
+};
+
 // ─── CEO / Admin tabs ─────────────────────────────────────────────────────────
 export type CeoTabParamList = {
-  CeoOverview:  undefined;
-  CeoApprovals: undefined;
-  Profile:      undefined;
+  Dashboard:          undefined;
+  CeoOverview:        undefined;
+  CeoApprovals:       undefined;
+  Customers:          undefined;
+  Products:           undefined;
+  Vehicles:           undefined;
+  Machines:           undefined;
+  WorkshopOverview:   undefined;
+  WorkshopManagement: undefined;
+  Compartments:       undefined;
+  Notifications:      undefined;
+  Profile:            undefined;
 };
 
 // ─── Material Requests stack (shared across role navigators) ─────────────────
@@ -49,11 +106,12 @@ export type CasualLabourStackParamList = {
 
 // ─── Supervisor tabs ─────────────────────────────────────────────────────────
 export type SupervisorTabParamList = {
-  TodayDashboard: undefined;
+  TodayDashboard:  undefined;
   MaterialRequest: undefined;
-  CasualLabour:   undefined;
-  MyRequests:     undefined;
-  Profile:        undefined;
+  CasualLabour:    undefined;
+  Compartments:    undefined;
+  MyRequests:      undefined;
+  Profile:         undefined;
 };
 
 // ─── Harvesting leader tabs ──────────────────────────────────────────────────
@@ -132,29 +190,48 @@ export type MechanicianTabParamList = {
 
 // ─── Operations tabs ─────────────────────────────────────────────────────────
 export type OperationsTabParamList = {
-  PendingReviews:  undefined;
-  MaterialReview:  undefined;
-  LabourReview:    undefined;
-  MyRequests:      undefined;
+  Dashboard:          undefined;
+  PendingReviews:     undefined;
+  MaterialReview:     undefined;
+  LabourReview:       undefined;
+  Customers:          undefined;
+  Products:           undefined;
+  Machines:           undefined;
+  WorkshopOverview:   undefined;
+  WorkshopManagement: undefined;
+  Compartments:       undefined;
+  MyRequests:         undefined;
 };
 
 // ─── Logistics tabs ──────────────────────────────────────────────────────────
 export type LogisticsTabParamList = {
-  DeliveryList:    undefined;
-  VehicleFuel:     undefined;
-  MyRequests:      undefined;
+  Dashboard:           undefined;
+  LogisticsDashboard:  undefined;
+  DeliveryList:        undefined;
+  Vehicles:            undefined;
+  Machines:            undefined;
+  WorkshopOverview:    undefined;
+  WorkshopManagement:  undefined;
+  VehicleFuel:         undefined;
+  MyRequests:          undefined;
 };
 
 // ─── Sales tabs ──────────────────────────────────────────────────────────────
 export type SalesTabParamList = {
+  Dashboard:       undefined;
   DeliveryStatus:  undefined;
+  Customers:       undefined;
+  Products:        undefined;
   MyRequests:      undefined;
 };
 
 // ─── Storekeeper tabs ────────────────────────────────────────────────────────
 export type StorekeeperTabParamList = {
-  MaterialReview:  undefined;
-  MyRequests:      undefined;
+  Dashboard:          undefined;
+  WorkshopOverview:   undefined;
+  WorkshopManagement: undefined;
+  MaterialReview:     undefined;
+  MyRequests:         undefined;
 };
 
 // ─── Finance tabs ─────────────────────────────────────────────────────────────

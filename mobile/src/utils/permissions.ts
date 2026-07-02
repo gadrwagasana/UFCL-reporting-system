@@ -17,6 +17,12 @@ export type Permission =
   | 'labour.write'
   | 'labour.review'
   | 'machine.log'
+  | 'machine.register'
+  | 'machine.cats'
+  | 'workshop.manage'
+  | 'workshop.approve'
+  | 'compartment.create'
+  | 'compartment.manage'
   | 'fuel.vehicle'
   | 'fuel.machine'
   | 'delivery.update'
@@ -24,15 +30,16 @@ export type Permission =
   | 'monthly.approve';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update'],
-  ceo:                    ['ceo.approve', 'monthly.approve'],
-  operations:             ['material.review', 'labour.review'],
+  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
+  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
+  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
   sales:                  ['delivery.update'],
   'sales-staff':          ['delivery.update'],
+  'showroom-staff':       ['delivery.update'],
   finance:                [],
-  logistics:              ['delivery.update', 'fuel.vehicle'],
+  logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve'],
   'logistics-officer':    ['delivery.update'],
-  supervisor:             ['material.request', 'labour.write'],
+  supervisor:             ['material.request', 'labour.write', 'compartment.create'],
   storekeeper:            ['material.review'],
   'storekeeper-assistant':['material.request'],
   mechanician:            ['machine.log', 'fuel.machine'],
@@ -73,6 +80,7 @@ export const ROLE_NAV_GROUPS: Record<UserRole, NavGroup[]> = {
   operations:             ['operations', 'my-requests'],
   sales:                  ['sales', 'my-requests'],
   'sales-staff':          ['sales', 'my-requests'],
+  'showroom-staff':       ['sales', 'my-requests'],
   finance:                ['my-requests'],
   logistics:              ['logistics', 'my-requests'],
   'logistics-officer':    ['logistics', 'my-requests'],

@@ -6,6 +6,7 @@ import { SupervisorTabParamList } from './types';
 import { DashboardScreen }       from '../screens/shared/DashboardScreen';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
+import { CompartmentsStack }    from './stacks/CompartmentsStack';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
@@ -15,6 +16,7 @@ const tabIcons: Record<keyof SupervisorTabParamList, [string, string]> = {
   TodayDashboard:  ['today',   'today-outline'],
   MaterialRequest: ['cube',    'cube-outline'],
   CasualLabour:    ['people',  'people-outline'],
+  Compartments:    ['map-pin', 'map-pin-outline'],
   MyRequests:      ['list',    'list-outline'],
   Profile:         ['person',  'person-outline'],
 };
@@ -23,6 +25,7 @@ const tabLabels: Record<keyof SupervisorTabParamList, string> = {
   TodayDashboard:  'Today',
   MaterialRequest: 'Materials',
   CasualLabour:    'Labour',
+  Compartments:    'Compartments',
   MyRequests:      'My Requests',
   Profile:         'Profile',
 };
@@ -46,7 +49,8 @@ export function SupervisorNavigator() {
       <Tab.Screen name="TodayDashboard"  component={DashboardScreen}       options={{ title: 'Today' }} />
       <Tab.Screen name="MaterialRequest" component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
-      <Tab.Screen name="MyRequests"      component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
+      <Tab.Screen name="Compartments"   component={CompartmentsStack}     options={{ title: 'Compartments' }} />
+      <Tab.Screen name="MyRequests"     component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

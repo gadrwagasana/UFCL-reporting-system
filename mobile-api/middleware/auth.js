@@ -1,6 +1,8 @@
 'use strict';
 
-const jwt = require('jsonwebtoken');
+const jwt                        = require('jsonwebtoken');
+const { buildEnvelope }          = require('./respond');
+const { ErrorCode }              = require('../constants/errorCodes');
 
 /**
  * Express middleware: verify Bearer JWT, attach decoded payload to req.user.
@@ -12,22 +14,33 @@ const jwt = require('jsonwebtoken');
 function authenticate(req, res, next) {
   const header = req.headers.authorization;
   if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ ok: false, error: 'Missing or malformed Authorization header' });
+    return res.status(401).json(buildEnvelope(false, {
+      code:    ErrorCode.UNAUTHORIZED,
+      message: 'Missing or malformed Authorization header.',
+    }));
   }
 
-  const token = header.slice(7);
+  const token  = header.slice(7);
   const secret = process.env.JWT_SECRET;
   if (!secret) {
     console.error('[auth] JWT_SECRET is not set in .env');
-    return res.status(500).json({ ok: false, error: 'Server configuration error' });
+    return res.status(500).json(buildEnvelope(false, {
+      code:    ErrorCode.INTERNAL_ERROR,
+      message: 'Server configuration error.',
+    }));
   }
 
   try {
     req.user = jwt.verify(token, secret);
     next();
   } catch (err) {
-    const msg = err.name === 'TokenExpiredError' ? 'Token expired — please log in again' : 'Invalid token';
-    return res.status(401).json({ ok: false, error: msg });
+    const message = err.name === 'TokenExpiredError'
+      ? 'Token expired — please log in again.'
+      : 'Invalid token.';
+    return res.status(401).json(buildEnvelope(false, {
+      code: ErrorCode.UNAUTHORIZED,
+      message,
+    }));
   }
 }
 

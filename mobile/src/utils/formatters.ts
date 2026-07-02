@@ -10,7 +10,7 @@ export function formatDateTime(date: string | Date | null | undefined): string {
   return formatDate(date, 'dd MMM yyyy, HH:mm');
 }
 
-export function formatCurrency(value: number | null | undefined, currency = 'ETB'): string {
+export function formatCurrency(value: number | null | undefined, currency = 'RWF'): string {
   if (value == null) return '—';
   return `${currency} ${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }

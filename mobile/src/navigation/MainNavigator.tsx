@@ -64,6 +64,7 @@ export function MainNavigator() {
 
     case 'sales':
     case 'sales-staff':
+    case 'showroom-staff':
       return <SalesNavigator />;
 
     case 'storekeeper':

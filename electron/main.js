@@ -2,10 +2,24 @@
 
 const path = require('path');
 const fs = require('fs');
-const { app, BrowserWindow, ipcMain, dialog, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, session, Menu, powerMonitor } = require('electron');
 const { migrate } = require('../db/migrate');
 
 const LOCAL_VERSION = require('../package.json').version;
+
+// Safety net: pg-pool can emit a secondary ECONNABORTED when it calls
+// client.end() on a socket that died during machine sleep.  That error
+// bypasses pg's own error chain and surfaces as an uncaught exception.
+// We swallow known stale-connection codes here so the app stays alive.
+const _STALE_CODES = new Set(['ECONNABORTED', 'ECONNRESET', 'EPIPE', 'ETIMEDOUT']);
+process.on('uncaughtException', (err, origin) => {
+  if (_STALE_CODES.has(err.code)) {
+    console.warn('[main] suppressed stale-connection error (machine sleep):', err.code);
+    return;
+  }
+  // Re-throw real errors so Electron's default handler shows the crash dialog.
+  throw err;
+});
 
 let autoUpdater = null;
 
@@ -51,7 +65,7 @@ function setupAutoUpdater() {
   });
 }
 
-const { closePool } = require('../db/pool');
+const { closePool, pool } = require('../db/pool');
 const auth = require('../db/services/auth');
 const data = require('../db/services/data');
 
@@ -182,6 +196,20 @@ app.whenReady().then(async () => {
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  });
+
+  // When the machine wakes from sleep, idle pg connections are dead but the
+  // pool doesn't know yet.  Proactively run a SELECT 1 so the pool detects and
+  // replaces stale clients before the first real query hits them.
+  powerMonitor.on('resume', async () => {
+    try {
+      const client = await pool.connect();
+      await client.query('SELECT 1');
+      client.release();
+      console.log('[power] db connection verified after system resume');
+    } catch (e) {
+      console.warn('[power] db reconnect probe after resume failed:', e.message);
+    }
   });
 });
 

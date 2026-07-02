@@ -1697,7 +1697,7 @@ async function getDashboardStats(userId) {
        from sales_orders where created_at >= $1 and created_at < $2`, [monthStart, nextMonthStart]
     ),
     pool.query(
-      `select order_number, customer_name, product_type, product_size, quantity, unit_price, created_at
+      `select id, order_number, customer_name, product_type, product_size, quantity, unit_price, created_at
        from sales_orders order by created_at desc limit 5`
     ),
     pool.query(
@@ -1714,7 +1714,7 @@ async function getDashboardStats(userId) {
     pool.query(`select count(*)::int as n from logistics_items where stock <= min_stock`),
     pool.query(`select count(*)::int as n from change_requests where status='Pending'`),
     pool.query(
-      `select a.action, a.icon, a.role,
+      `select a.id, a.action, a.icon, a.role,
               to_char(a.created_at,'DD Mon HH24:MI') as time,
               u.name as user_name
        from audit_log a
@@ -1935,6 +1935,19 @@ async function warehousesUpdate(userId, warehouseId, payload) {
   );
   logAudit(user, `Updated warehouse #${warehouseId}`, 'ti-building-warehouse', { id: warehouseId });
   return { ok: true };
+}
+
+async function workshopsListWithMetrics(userId) {
+  const result = await warehousesList(userId, null);
+  if (!result.ok) return result;
+  const shops = result.rows || [];
+  const metrics = {
+    total:    shops.length,
+    active:   shops.filter(r => r.active).length,
+    inactive: shops.filter(r => !r.active).length,
+    capacity: shops.reduce((s, r) => s + Number(r.capacity || 0), 0),
+  };
+  return { ok: true, workshops: shops, allWarehouses: result.allWarehouses, user_workshop_id: result.user_workshop_id, metrics };
 }
 
 // ── Stock Catalog ─────────────────────────────────────────────────────────────
@@ -7020,6 +7033,7 @@ module.exports = {
   warehousesList,
   warehousesCreate,
   warehousesUpdate,
+  workshopsListWithMetrics,
   stockItemsList,
   stockItemsCreate,
   stockItemsUpdate,
@@ -7223,7 +7237,7 @@ async function getCeoOverview(userId) {
   const d = new Date();
   const monthLabel = d.toLocaleString('default', { month: 'long', year: 'numeric' });
 
-  const [prod, harvest, sales, mach, veh, cas, labour, chg] = await Promise.all([
+  const [prod, harvest, sales, mach, veh, cas, labour, chg, pendingPoles, pendingMonthly] = await Promise.all([
     pool.query(`
       select coalesce(sum(timber_units),0)::int  as timber_units,
              coalesce(sum(poles_units),0)::int   as poles_units,
@@ -7254,20 +7268,34 @@ async function getCeoOverview(userId) {
 
     pool.query(`select count(*)::int as pending from casual_labour_requests where status='Pending'`),
 
-    pool.query(`select count(*)::int as pending from change_requests where status='Pending'`)
+    pool.query(`select count(*)::int as pending from change_requests where status='Pending'`),
+
+    pool.query(`select count(*)::int as n from poles_purchase_requests where status='Pending'`),
+
+    pool.query(`select count(*)::int as n from monthly_approvals where status='Pending' and month_key=$1`, [month])
   ]);
+
+  const prodRow        = prod.rows[0];
+  const downtimeHours  = Number(prodRow.downtime_hours || 0);
 
   return {
     ok: true,
-    month: monthLabel,
-    production: prod.rows[0],
+    month:    monthLabel,
+    monthKey: month,
+    production: {
+      ...prodRow,
+      downtime_hours:  downtimeHours,
+      downtime_status: downtimeHours > 8 ? 'review_required' : 'within_target',
+    },
     harvest:    harvest.rows[0],
     sales:      sales.rows[0],
     machines:   mach.rows[0],
     vehicles:   Number(veh.rows[0].total),
     casuals:    Number(cas.rows[0].total),
-    pendingLabour:  Number(labour.rows[0].pending),
-    pendingChanges: Number(chg.rows[0].pending)
+    pendingLabour:          Number(labour.rows[0].pending),
+    pendingChanges:         Number(chg.rows[0].pending),
+    pendingPolesRequests:   Number(pendingPoles.rows[0].n),
+    pendingMonthlyApproval: Number(pendingMonthly.rows[0].n) > 0,
   };
 }
 

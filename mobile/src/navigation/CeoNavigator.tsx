@@ -3,11 +3,21 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
 import { CeoTabParamList } from './types';
+import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 
 // Screens / stacks
-import { CeoOverviewScreen } from '../screens/ceo/CeoOverviewScreen';
-import { CeoApprovalsStack } from './CeoApprovalsStack';
-import { ProfileScreen }     from '../screens/profile/ProfileScreen';
+import { DashboardScreen }      from '../screens/shared/DashboardScreen';
+import { CeoOverviewScreen }    from '../screens/ceo/CeoOverviewScreen';
+import { CeoApprovalsStack }    from './CeoApprovalsStack';
+import { NotificationsScreen }  from '../screens/notifications/NotificationsScreen';
+import { ProfileScreen }        from '../screens/profile/ProfileScreen';
+import { CustomersStack }       from './stacks/CustomersStack';
+import { ProductsStack }        from './stacks/ProductsStack';
+import { VehiclesStack }        from './stacks/VehiclesStack';
+import { MachinesStack }            from './stacks/MachinesStack';
+import { WorkshopOverviewStack }    from './stacks/WorkshopOverviewStack';
+import { WorkshopManagementStack }  from './stacks/WorkshopManagementStack';
+import { CompartmentsStack }        from './stacks/CompartmentsStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -27,9 +37,18 @@ export function CeoNavigator() {
         tabBarLabelStyle: { fontSize: 11, fontWeight: '500' },
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<keyof CeoTabParamList, { active: string; inactive: string }> = {
-            CeoOverview:  { active: 'home',          inactive: 'home-outline' },
-            CeoApprovals: { active: 'checkmark-done', inactive: 'checkmark-done-outline' },
-            Profile:      { active: 'person',         inactive: 'person-outline' },
+            Dashboard:     { active: DASHBOARD_TAB_ICON[0], inactive: DASHBOARD_TAB_ICON[1] },
+            CeoOverview:   { active: 'home',           inactive: 'home-outline' },
+            CeoApprovals:  { active: 'checkmark-done', inactive: 'checkmark-done-outline' },
+            Customers:     { active: 'people',         inactive: 'people-outline' },
+            Products:      { active: 'cube',           inactive: 'cube-outline' },
+            Vehicles:      { active: 'car',            inactive: 'car-outline' },
+            Machines:           { active: 'settings',   inactive: 'settings-outline' },
+            WorkshopOverview:   { active: 'eye',       inactive: 'eye-outline' },
+            WorkshopManagement: { active: 'business',  inactive: 'business-outline' },
+            Compartments:       { active: 'map-pin',   inactive: 'map-pin-outline' },
+            Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
+            Profile:       { active: 'person',         inactive: 'person-outline' },
           };
           const set  = icons[route.name as keyof CeoTabParamList];
           const name = focused ? set.active : set.inactive;
@@ -37,6 +56,11 @@ export function CeoNavigator() {
         },
       })}
     >
+      <Tab.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={DASHBOARD_TAB_OPTIONS}
+      />
       <Tab.Screen
         name="CeoOverview"
         component={CeoOverviewScreen}
@@ -46,6 +70,46 @@ export function CeoNavigator() {
         name="CeoApprovals"
         component={CeoApprovalsStack}
         options={{ title: 'Approvals' }}
+      />
+      <Tab.Screen
+        name="Customers"
+        component={CustomersStack}
+        options={{ title: 'Customers' }}
+      />
+      <Tab.Screen
+        name="Products"
+        component={ProductsStack}
+        options={{ title: 'Products' }}
+      />
+      <Tab.Screen
+        name="Vehicles"
+        component={VehiclesStack}
+        options={{ title: 'Vehicles' }}
+      />
+      <Tab.Screen
+        name="Machines"
+        component={MachinesStack}
+        options={{ title: 'Machines' }}
+      />
+      <Tab.Screen
+        name="WorkshopOverview"
+        component={WorkshopOverviewStack}
+        options={{ title: 'Wk Overview' }}
+      />
+      <Tab.Screen
+        name="WorkshopManagement"
+        component={WorkshopManagementStack}
+        options={{ title: 'Workshops' }}
+      />
+      <Tab.Screen
+        name="Compartments"
+        component={CompartmentsStack}
+        options={{ title: 'Compartments' }}
+      />
+      <Tab.Screen
+        name="Notifications"
+        component={NotificationsScreen}
+        options={{ title: 'Notifications' }}
       />
       <Tab.Screen
         name="Profile"

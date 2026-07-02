@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, post } from '../api/client';
 import { EP } from '../api/endpoints';
-import { HarvestListResponse, CompartmentsResponse } from '../types/api';
+import { HarvestListResponse, CompartmentListResponse } from '../types/api';
 
 export function useHarvestList() {
   return useQuery<HarvestListResponse>({
@@ -12,9 +12,9 @@ export function useHarvestList() {
 }
 
 export function useCompartments() {
-  return useQuery<CompartmentsResponse>({
+  return useQuery<CompartmentListResponse>({
     queryKey:  ['meta-compartments'],
-    queryFn:   () => get<CompartmentsResponse>(EP.META_COMPARTMENTS),
+    queryFn:   () => get<CompartmentListResponse>(EP.META_COMPARTMENTS),
     staleTime: 10 * 60_000,
   });
 }

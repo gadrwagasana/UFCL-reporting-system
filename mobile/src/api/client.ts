@@ -39,23 +39,43 @@ apiClient.interceptors.response.use(
   },
 );
 
-// Helper: unwrap data and surface API-layer errors as thrown exceptions
+// Detect versioned envelope and unwrap it.
+// Success envelope  → { ok: true, ...data }   (backward-compat: screens can still check result.ok)
+// Error envelope    → { ok: false, error: message, errorCode: code }
+// Legacy format     → returned as-is
+function unwrapEnvelope<T>(raw: unknown): T {
+  if (raw && typeof raw === 'object' && 'ok' in raw && 'version' in raw) {
+    const env = raw as { ok: boolean; version: number; data?: unknown; error?: { code: string; message: string } };
+    if (!env.ok) {
+      const err = env.error ?? { code: 'INTERNAL_ERROR', message: 'Unknown error' };
+      return { ok: false, error: err.message, errorCode: err.code } as T;
+    }
+    return { ok: true, ...(env.data as object) } as T;
+  }
+  return raw as T;
+}
+
 export async function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
-  const r = await apiClient.get<T>(url, { params });
-  return r.data;
+  const r = await apiClient.get<unknown>(url, { params });
+  return unwrapEnvelope<T>(r.data);
 }
 
 export async function post<T>(url: string, body: unknown): Promise<T> {
-  const r = await apiClient.post<T>(url, body);
-  return r.data;
+  const r = await apiClient.post<unknown>(url, body);
+  return unwrapEnvelope<T>(r.data);
 }
 
 export async function put<T>(url: string, body: unknown): Promise<T> {
-  const r = await apiClient.put<T>(url, body);
-  return r.data;
+  const r = await apiClient.put<unknown>(url, body);
+  return unwrapEnvelope<T>(r.data);
 }
 
 export async function patch<T>(url: string, body: unknown): Promise<T> {
-  const r = await apiClient.patch<T>(url, body);
-  return r.data;
+  const r = await apiClient.patch<unknown>(url, body);
+  return unwrapEnvelope<T>(r.data);
+}
+
+export async function del<T>(url: string, body?: unknown): Promise<T> {
+  const r = await apiClient.delete<unknown>(url, { data: body });
+  return unwrapEnvelope<T>(r.data);
 }

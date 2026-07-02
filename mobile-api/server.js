@@ -7,7 +7,9 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const express   = require('express');
 const rateLimit = require('express-rate-limit');
 const helmet    = require('helmet');
-const { authenticate } = require('./middleware/auth');
+const { authenticate }  = require('./middleware/auth');
+const { buildEnvelope } = require('./middleware/respond');
+const { ErrorCode }     = require('./constants/errorCodes');
 const logger  = require('./lib/logger');
 const metrics = require('./lib/metrics');
 
@@ -160,6 +162,20 @@ app.use('/api/meta',             require('./routes/meta'));
 // Sprint 4 — VAT workflow
 app.use('/api/vat',              require('./routes/vat'));
 
+// Notifications — all authenticated roles
+app.use('/api/notifications',    require('./routes/notifications'));
+
+// Dashboard — general stats (multi-role) + logistics warehouse view
+app.use('/api/dashboard',        require('./routes/dashboard'));
+app.use('/api/logistics',        require('./routes/logistics'));
+
+app.use('/api/customers',        require('./routes/customers'));
+app.use('/api/products',         require('./routes/products'));
+app.use('/api/vehicles',         require('./routes/vehicles'));
+app.use('/api/machines',         require('./routes/machines'));
+app.use('/api/workshops',        require('./routes/workshops'));
+app.use('/api/compartments',     require('./routes/compartments'));
+
 // Phase 2 skeletons (routes exist, return 501 until implemented)
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));
@@ -172,7 +188,10 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── 404 catch-all ─────────────────────────────────────────────────────────────
 
 app.use((req, res) => {
-  res.status(404).json({ ok: false, error: `Route not found: ${req.method} ${req.path}` });
+  res.status(404).json(buildEnvelope(false, {
+    code:    ErrorCode.NOT_FOUND,
+    message: `Route not found: ${req.method} ${req.path}`,
+  }));
 });
 
 // ── Global error handler ──────────────────────────────────────────────────────
@@ -180,7 +199,10 @@ app.use((req, res) => {
 app.use((err, req, res, _next) => {
   logger.error('request_error', { method: req.method, path: req.path, message: err.message });
   console.error('[server]', err.message);
-  res.status(500).json({ ok: false, error: 'Internal server error' });
+  res.status(500).json(buildEnvelope(false, {
+    code:    ErrorCode.INTERNAL_ERROR,
+    message: 'Internal server error',
+  }));
 });
 
 // ── Process-level safety nets ─────────────────────────────────────────────────

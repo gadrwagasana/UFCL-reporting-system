@@ -34,5 +34,17 @@ const pool = new Pool({
   connectionTimeoutMillis: 5_000
 });
 
+// Stale connections left in the pool after machine sleep emit ECONNABORTED /
+// ECONNRESET when pg-pool tries to close them.  Without this handler those
+// errors become uncaught exceptions and crash the Electron main process.
+const STALE_CODES = new Set(['ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ETIMEDOUT']);
+pool.on('error', (err) => {
+  if (STALE_CODES.has(err.code)) {
+    console.warn('[pool] stale client discarded after sleep:', err.code);
+  } else {
+    console.error('[pool] unexpected idle client error:', err.message);
+  }
+});
+
 module.exports = { pool, closePool: () => pool.end() };
 

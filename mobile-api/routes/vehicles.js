@@ -1,0 +1,113 @@
+'use strict';
+
+const express          = require('express');
+const data             = require('../../db/services/data');
+const { requireRoles } = require('../middleware/authorize');
+const { respond }      = require('../middleware/respond');
+
+const router = express.Router();
+
+// Roles with 'vehicles' in ROLE_PAGES (data.js): admin, ceo, logistics
+const VEHICLE_ROLES = ['admin', 'ceo', 'logistics'];
+
+// GET /api/vehicles/transport-dropdown — auth-only, used to populate Third-Party owner picker.
+// Must be registered before /:id to prevent Express matching 'transport-dropdown' as an id.
+router.get('/transport-dropdown', async (req, res) => {
+  respond(res, await data.transportCompaniesForDropdown(req.user.userId), 120);
+});
+
+// GET /api/vehicles — fleet list with server-computed summary metrics.
+// Metrics are derived from the same vehiclesList rows, keeping data.js additive.
+router.get('/', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  const result = await data.vehiclesList(req.user.userId);
+  if (!result.ok) return respond(res, result);
+  const rows = result.rows || [];
+  const now = new Date();
+  const metrics = {
+    fleet:            rows.length,
+    active:           rows.filter(r => r.status === 'Active').length,
+    maintenance:      rows.filter(r => r.status === 'In Maintenance').length,
+    fuelCost:         Math.round(rows.reduce((s, r) => s + Number(r.total_fuel_cost || 0), 0)),
+    expiredInsurance: rows.filter(r => r.insurance_expiry && new Date(r.insurance_expiry) < now).length,
+  };
+  respond(res, { ok: true, rows, metrics });
+});
+
+// GET /api/vehicles/:id — aggregate for VehicleDetailScreen:
+// vehicle data, per-vehicle fuel log history, per-vehicle maintenance history.
+// Three data.js calls run in parallel per the user's "one request per screen" principle.
+router.get('/:id', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  const vehicleId = Number(req.params.id);
+  const userId    = req.user.userId;
+  const [listResult, fuelResult, maintResult] = await Promise.all([
+    data.vehiclesList(userId),
+    data.fuelLogsList(userId, vehicleId),
+    data.maintenanceList(userId, vehicleId),
+  ]);
+  if (!listResult.ok) return respond(res, listResult);
+  const vehicle = (listResult.rows || []).find(r => Number(r.id) === vehicleId);
+  if (!vehicle) return respond(res, { ok: false, error: 'Vehicle not found' });
+  respond(res, {
+    ok:          true,
+    vehicle,
+    fuelLogs:    fuelResult.ok    ? fuelResult.rows    : [],
+    maintenance: maintResult.ok   ? maintResult.rows   : [],
+  }, 30);
+});
+
+// POST /api/vehicles — register a vehicle
+router.post('/', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.vehiclesCreate(req.user.userId, req.body));
+});
+
+// PUT /api/vehicles/:id — update vehicle record
+router.put('/:id', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.vehiclesUpdate(req.user.userId, Number(req.params.id), req.body));
+});
+
+// DELETE /api/vehicles/:id — delete vehicle (cascades fuel logs + maintenance records)
+router.delete('/:id', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.vehiclesDelete(req.user.userId, Number(req.params.id), req.body.reason));
+});
+
+// POST /api/vehicles/:id/fuel-logs — log fuel for a vehicle
+router.post('/:id/fuel-logs', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.fuelLogsCreate(req.user.userId, {
+    ...req.body, vehicle_id: req.params.id,
+  }));
+});
+
+// DELETE /api/vehicles/fuel-logs/:logId — delete a fuel log entry.
+// Two-segment path, no conflict with DELETE /:id.
+// data.js fuelLogsDelete uses applyGovernance — passthrough as 200 success when pending.
+router.delete('/fuel-logs/:logId', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  const result = await data.fuelLogsDelete(
+    req.user.userId, Number(req.params.logId), req.body.reason
+  );
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
+});
+
+// POST /api/vehicles/:id/maintenance — add a maintenance record
+router.post('/:id/maintenance', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.maintenanceCreate(req.user.userId, {
+    ...req.body, vehicle_id: req.params.id,
+  }));
+});
+
+// DELETE /api/vehicles/maintenance/:recordId — delete a maintenance record.
+// Two-segment path, no conflict with DELETE /:id.
+// data.js maintenanceDelete uses applyGovernance — passthrough as 200 success when pending.
+router.delete('/maintenance/:recordId', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  const result = await data.maintenanceDelete(
+    req.user.userId, Number(req.params.recordId), req.body.reason
+  );
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
+});
+
+module.exports = router;

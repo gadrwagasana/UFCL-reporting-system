@@ -5,6 +5,7 @@ export type UserRole =
   | 'operations'
   | 'sales'
   | 'sales-staff'
+  | 'showroom-staff'
   | 'finance'
   | 'logistics'
   | 'logistics-officer'
@@ -53,7 +54,11 @@ export interface LoginResponse {
   user:  User;
 }
 
-// Roles that are confined to a single workshop
+// Roles that are confined to a single workshop.
+// Mirrors Desktop's renderer/app.js isCrossWorkshop() — every role not listed
+// there is workshop-restricted. 'logistics-officer' is intentionally absent:
+// on Desktop it is cross-workshop only when the user has no workshop_id, so
+// it cannot be classified statically — see isCrossWorkshop() below.
 export const WORKSHOP_RESTRICTED_ROLES: UserRole[] = [
   'supervisor',
   'storekeeper',
@@ -67,16 +72,27 @@ export const WORKSHOP_RESTRICTED_ROLES: UserRole[] = [
   'sawmill-supervisor',
   'poles-supervisor',
   'vat-supervisor',
+  'sales-staff',
+  'showroom-staff',
+  'finance',
 ];
 
-// Roles that see all workshops (cross-workshop)
+// Roles that always see all workshops, regardless of the user's workshop_id.
+// Mirrors Desktop's renderer/app.js isCrossWorkshop(). 'logistics-officer' is
+// excluded here because it is conditional — use isCrossWorkshop() instead.
 export const CROSS_WORKSHOP_ROLES: UserRole[] = [
   'admin',
   'ceo',
   'operations',
   'logistics',
-  'logistics-officer',
   'sales',
-  'sales-staff',
-  'finance',
 ];
+
+// Mirrors Desktop's renderer/app.js isCrossWorkshop() exactly: most roles are
+// statically classified, but 'logistics-officer' is cross-workshop only when
+// the user has no workshop assigned.
+export function isCrossWorkshop(role: UserRole, workshopId: number | null): boolean {
+  if (CROSS_WORKSHOP_ROLES.includes(role)) return true;
+  if (role === 'logistics-officer' && !workshopId) return true;
+  return false;
+}

@@ -13,9 +13,60 @@ const ceoOnly = requireRoles('ceo', 'admin');
 // ── GET /api/ceo/overview ─────────────────────────────────────────────────────
 // Current-month KPI summary: production, harvest, sales, machines, pending items.
 // data.js: getCeoOverview(userId) — requires role admin or ceo
+// Transforms flat data.js result into grouped mobile envelope blocks.
 
 router.get('/overview', ceoOnly, async (req, res) => {
-  respond(res, await data.getCeoOverview(req.user.userId));
+  const result = await data.getCeoOverview(req.user.userId);
+  if (!result.ok) return respond(res, result, 0);
+
+  const {
+    ok: _,
+    month, monthKey,
+    production,
+    harvest,
+    sales,
+    machines,
+    vehicles, casuals, pendingLabour,
+    pendingChanges, pendingPolesRequests, pendingMonthlyApproval,
+  } = result;
+
+  respond(res, {
+    ok: true,
+    month,
+    monthKey,
+    production: {
+      timber_units:    Number(production.timber_units    || 0),
+      poles_units:     Number(production.poles_units     || 0),
+      downtime_hours:  Number(production.downtime_hours  || 0),
+      entries:         Number(production.entries         || 0),
+      downtime_status: production.downtime_status,
+    },
+    harvest: {
+      trees: Number(harvest.trees || 0),
+      logs:  Number(harvest.logs  || 0),
+    },
+    sales: {
+      total_orders: Number(sales.total_orders || 0),
+      revenue:      Number(sales.revenue      || 0),
+      currency:     'RWF',
+    },
+    machines: {
+      total:       Number(machines.total       || 0),
+      available:   Number(machines.available   || 0),
+      in_use:      Number(machines.in_use      || 0),
+      maintenance: Number(machines.maintenance || 0),
+    },
+    operations: {
+      vehicles:      Number(vehicles      || 0),
+      casuals:       Number(casuals       || 0),
+      pendingLabour: Number(pendingLabour || 0),
+    },
+    governance: {
+      pendingChanges:         Number(pendingChanges        || 0),
+      pendingPolesRequests:   Number(pendingPolesRequests  || 0),
+      pendingMonthlyApproval: Boolean(pendingMonthlyApproval),
+    },
+  }, 60);
 });
 
 // ── GET /api/ceo/poles-requests ───────────────────────────────────────────────

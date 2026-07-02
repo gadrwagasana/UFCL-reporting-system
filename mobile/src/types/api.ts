@@ -240,6 +240,91 @@ export interface MachineLogListResponse {
   itemCategories: { id: number; name: string }[];
 }
 
+// ─── Machine Registry ─────────────────────────────────────────────────────────
+
+export type MachineStatus   = 'Available' | 'Running' | 'Maintenance' | 'Breakdown';
+export type MachineFuelType = 'Diesel' | 'Petroleum/Essence' | 'DAT' | 'Petrol' | 'Chain Oil' | 'Engine Oil';
+
+export interface MachineCategory {
+  id:           number;
+  name:         string;
+  description?: string;
+  icon?:        string;
+}
+
+export interface WorkshopRef {
+  id:             number;
+  name:           string;
+  workshop_type?: string;
+}
+
+export interface Machine {
+  id:                    number;
+  machine_code:          string;
+  name:                  string;
+  category_id:           number;
+  category_name:         string;
+  workshop_id?:          number;
+  workshop_name?:        string;
+  status:                MachineStatus;
+  plate_number?:         string;
+  production_capacity:   number;
+  capacity_unit:         string;
+  fuel_consumption_rate: number;
+  fuel_type?:            MachineFuelType;
+  manufacturer?:         string;
+  model_number?:         string;
+  serial_number?:        string;
+  year_manufactured?:    number;
+  date_acquired?:        string;
+  notes?:                string;
+  next_maintenance?:     string;
+}
+
+export interface MachineMetrics {
+  total:     number;
+  available: number;
+  running:   number;
+  offline:   number;
+}
+
+export interface MachineListResponse {
+  ok:         true;
+  machines:   Machine[];
+  categories: MachineCategory[];
+  workshops:  WorkshopRef[];
+  metrics:    MachineMetrics;
+}
+
+export interface MaintSchedule {
+  id:               number;
+  machine_id:       number;
+  maintenance_type: string;
+  frequency_days:   number;
+  last_performed?:  string;
+  next_due?:        string;
+  estimated_hours:  number;
+  notes?:           string;
+}
+
+export interface MachineDetailResponse {
+  ok:        true;
+  machine:   Machine;
+  schedules: MaintSchedule[];
+}
+
+export interface MachinePendingApproval {
+  ok:              true;
+  pendingApproval: true;
+  level:           'leader' | 'manager';
+  message:         string;
+}
+
+export interface MachineCategoryListResponse {
+  ok:   true;
+  rows: MachineCategory[];
+}
+
 // ─── VAT (Value-Added Timber) ─────────────────────────────────────────────────
 
 export interface VatInboundEntry {
@@ -359,23 +444,7 @@ export interface LogTransportListResponse {
   };
 }
 
-// ─── Compartments (meta) ──────────────────────────────────────────────────────
-
-export interface Compartment {
-  id:                  number;
-  compt_name:          string;
-  sub_name?:           string;
-  species?:            string;
-  area_ha?:            number;
-  volume_m3?:          number;
-  status?:             string;
-  volume_harvested_m3?: number;
-}
-
-export interface CompartmentsResponse {
-  ok:   true;
-  rows: Compartment[];
-}
+// ─── Compartments (meta) — full definition added later in this file ───────────
 
 // ─── Sawmill / Daily Log ──────────────────────────────────────────────────────
 
@@ -470,6 +539,196 @@ export interface CasualLabourListResponse {
   rows: CasualLabourRequest[];
 }
 
+// ─── Products ────────────────────────────────────────────────────────────────
+
+export type ProductType    = 'Timber' | 'Poles';
+export type ProductSubType = 'Kiln-dried' | 'CCA-treated' | 'Untreated';
+
+export interface Product {
+  id:          number;
+  type:        ProductType;
+  sub_type:    ProductSubType | null;
+  size:        string;           // e.g. "100x200x4m" or "O255x9m"
+  width_mm:    number | null;
+  height_mm:   number | null;
+  length_m:    number | null;
+  diameter_mm: number | null;
+  machine:     string | null;
+  active:      boolean;
+  reason:      string | null;
+  ref:         string | null;
+  by:          string | null;    // created_by user name (joined)
+  date:        string;           // 'DD Mon YYYY'
+}
+
+export interface ProductListResponse {
+  ok:      true;
+  rows:    Product[];
+  isAdmin: boolean;  // true when role is ceo or operations — controls toggle button visibility
+}
+
+export interface ProductActiveItem {
+  id:       number;
+  type:     string;
+  sub_type: string | null;
+  size:     string;
+  machine:  string | null;
+}
+
+export interface ProductActiveResponse {
+  ok:   true;
+  rows: ProductActiveItem[];
+}
+
+// ─── Vehicles ────────────────────────────────────────────────────────────────
+
+export type VehicleOwnership  = 'Company Car' | 'Third-Party Car';
+export type VehicleStatus     = 'Active' | 'In Maintenance' | 'Inactive';
+export type VehicleCategory   = 'Pickup' | 'Truck' | 'Van' | 'Bus' | 'Lorry' | 'Motorcycle' | 'Excavator' | 'Tractor' | 'Other';
+export type VehicleFuelType   = 'Diesel' | 'Petrol' | 'Electric' | 'Hybrid';
+export type MaintenanceType   = 'Scheduled' | 'Corrective' | 'Inspection';
+export type VehicleOwnerType  = 'Individual' | 'Company';
+export type VehiclePayMethod  = 'Monthly' | 'Weekly' | 'Per Trip' | 'Per Day' | 'Fixed Contract';
+
+export interface Vehicle {
+  id:                    number;
+  registration:          string;
+  make:                  string | null;
+  model:                 string | null;
+  vehicle_type:          string | null;
+  status:                VehicleStatus;
+  fuel_type:             VehicleFuelType | null;
+  insurance_expiry:      string | null;   // ISO date string
+  road_license_expiry:   string | null;
+  inspection_expiry:     string | null;
+  notes:                 string | null;
+  ownership_type:        VehicleOwnership | null;
+  vehicle_category:      VehicleCategory | null;
+  year:                  number | null;
+  chassis_vin:           string | null;
+  engine_number:         string | null;
+  odometer_reading:      number | null;
+  asset_code:            string | null;
+  purchase_date:         string | null;
+  purchase_cost:         number | null;
+  department:            string | null;
+  driver_assigned:       string | null;
+  // Third-Party fields
+  owner_name:            string | null;
+  owner_type:            VehicleOwnerType | null;
+  owner_id_number:       string | null;
+  owner_phone:           string | null;
+  owner_email:           string | null;
+  owner_address:         string | null;
+  contract_number:       string | null;
+  contract_start_date:   string | null;
+  contract_end_date:     string | null;
+  payment_rate:          number | null;
+  payment_method:        VehiclePayMethod | null;
+  assigned_project:      string | null;
+  driver_name:           string | null;
+  driver_phone:          string | null;
+  driver_license_number: string | null;
+  driver_license_expiry: string | null;
+  // Aggregated server-side
+  total_fuel_cost:       number;
+  total_liters:          number;
+  maintenance_count:     number;
+}
+
+export interface VehicleMetrics {
+  fleet:            number;
+  active:           number;
+  maintenance:      number;
+  fuelCost:         number;
+  expiredInsurance: number;
+}
+
+export interface VehicleListResponse {
+  ok:      true;
+  rows:    Vehicle[];
+  metrics: VehicleMetrics;
+}
+
+export interface MaintenanceRecord {
+  id:               number;
+  registration:     string;
+  maintenance_type: MaintenanceType;
+  description:      string;
+  cost:             number | null;
+  maintenance_date: string;        // 'DD/MM/YYYY'
+  next_due_date:    string | null;
+  performed_by:     string | null;
+  notes:            string | null;
+  pending_deletion: boolean;
+}
+
+export interface VehicleDetailResponse {
+  ok:          true;
+  vehicle:     Vehicle;
+  fuelLogs:    FuelLog[];
+  maintenance: MaintenanceRecord[];
+}
+
+export interface TransportDropdownItem {
+  id:   number;
+  name: string;
+}
+
+export interface TransportDropdownResponse {
+  ok:   true;
+  rows: TransportDropdownItem[];
+}
+
+export interface VehiclePendingApproval {
+  ok:              true;
+  pendingApproval: true;
+  level:           'leader' | 'manager';
+  message:         string;
+}
+
+// ─── Customers ───────────────────────────────────────────────────────────────
+
+export interface Customer {
+  id:               number;
+  name:             string;
+  contact_person:   string | null;
+  phone:            string | null;
+  email:            string | null;
+  address:          string | null;
+  tin:              string | null;
+  notes:            string | null;
+  active:           boolean;
+  created_at:       string;      // 'DD Mon YYYY' from server
+  created_by:       string | null; // creator's name (joined from app_users)
+}
+
+export interface CustomerDropdownItem {
+  id:             number;
+  name:           string;
+  contact_person: string | null;
+  phone:          string | null;
+}
+
+export interface CustomerListResponse {
+  ok:   true;
+  rows: Customer[];
+}
+
+export interface CustomerDropdownResponse {
+  ok:   true;
+  rows: CustomerDropdownItem[];
+}
+
+// Returned when a customer edit is queued for governance approval instead of
+// being applied immediately (data.js applyGovernance → pendingApproval: true).
+export interface CustomerPendingApproval {
+  ok:              true;
+  pendingApproval: true;
+  level:           'leader' | 'manager';
+  message:         string;
+}
+
 // ─── My Requests ──────────────────────────────────────────────────────────────
 
 export interface MyRequest {
@@ -488,4 +747,138 @@ export interface MyRequestsResponse {
   ok:        true;
   edits:     MyRequest[];
   deletions: MyRequest[];
+}
+
+// ─── Compartments ────────────────────────────────────────────────────────────
+
+export type CompartmentStatus = 'Active' | 'Completed';
+
+export interface Compartment {
+  id:                  number;
+  compt_name:          string;
+  sub_name?:           string;
+  species:             string;
+  area_ha:             number;
+  volume_m3:           number;
+  status:              CompartmentStatus;
+  entry_date:          string;   // 'DD/MM/YYYY'
+  created_at?:         string;
+  created_by_name?:    string;
+  trees_harvested:     number;
+  logs_harvested:      number;
+  volume_harvested_m3: number;
+  pending_deletion:    boolean;
+}
+
+export interface CompartmentMetrics {
+  total:            number;
+  active:           number;
+  totalAreaHa:      number;
+  totalVolumeM3:    number;
+  totalHarvestedM3: number;
+}
+
+export interface CompartmentListResponse {
+  ok:      true;
+  rows:    Compartment[];
+  metrics: CompartmentMetrics;
+}
+
+export interface CompartmentPendingApproval {
+  ok:              true;
+  pendingApproval: true;
+  message:         string;
+}
+
+// ─── Workshops ────────────────────────────────────────────────────────────────
+
+export type WorkshopType =
+  | 'Sawmill Workshop'
+  | 'Logging Equipment Workshop'
+  | 'Vehicle Workshop'
+  | 'Pole Treatment Workshop'
+  | 'Electrical Workshop'
+  | 'Central Warehouse';
+
+export interface Workshop {
+  id:            number;
+  name:          string;
+  location?:     string;
+  workshop_type?: WorkshopType;
+  capacity?:     number;
+  notes?:        string;
+  active:        boolean;
+  created_at:    string;
+}
+
+export interface WorkshopMetrics {
+  total:    number;
+  active:   number;
+  inactive: number;
+  capacity: number;
+}
+
+export interface WorkshopListResponse {
+  ok:                true;
+  workshops:         Workshop[];
+  allWarehouses:     { id: number; name: string; workshop_type?: string }[];
+  user_workshop_id?: number;
+  metrics:           WorkshopMetrics;
+}
+
+export interface OverviewWorkshopCard {
+  id:                   number;
+  name:                 string;
+  location?:            string;
+  workshop_type?:       string;
+  active:               boolean;
+  item_count:           number;
+  stock_value:          number;
+  machine_count:        number;
+  machines_available:   number;
+  machines_maintenance: number;
+}
+
+export interface PendingTransfer {
+  id:            number;
+  item_name:     string;
+  uom:           string;
+  from_workshop: string;
+  to_workshop:   string;
+  quantity:      number;
+  notes?:        string;
+  created_at:    string;
+  requested_by:  string;
+}
+
+export interface PendingMaterialRequest {
+  id:            number;
+  item_name:     string;
+  uom:           string;
+  workshop_name: string;
+  requested_qty: number;
+  priority:      string;
+  reason?:       string;
+  requested_at:  string;
+  requested_by:  string;
+}
+
+export interface LowStockItem {
+  name:           string;
+  category:       string;
+  uom:            string;
+  min_stock:      number;
+  total_stock:    number;
+  warehouse_name: string;
+  warehouse_id:   number;
+}
+
+export interface WorkshopOverviewResponse {
+  ok:                true;
+  workshops:         OverviewWorkshopCard[];
+  pendingTransfers:  PendingTransfer[];
+  pendingRequests:   PendingMaterialRequest[];
+  lowStock:          LowStockItem[];
+  user_workshop_id?: number;
+  is_restricted:     boolean;
 }
