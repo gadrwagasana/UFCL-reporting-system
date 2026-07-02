@@ -7,8 +7,9 @@ import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTab
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
 import { ComingSoonScreen } from '../screens/shared/ComingSoonScreen';
 import { MyRequestsScreen } from '../screens/shared/MyRequestsScreen';
-import { CustomersStack }   from './stacks/CustomersStack';
-import { ProductsStack }    from './stacks/ProductsStack';
+import { CustomersStack }     from './stacks/CustomersStack';
+import { ProductsStack }      from './stacks/ProductsStack';
+import { SalesOrdersStack }   from './stacks/SalesOrdersStack';
 
 const Tab = createBottomTabNavigator<SalesTabParamList>();
 
@@ -24,6 +25,7 @@ export function SalesNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           const icons: Record<keyof SalesTabParamList, [string, string]> = {
             Dashboard:      DASHBOARD_TAB_ICON,
+            SalesOrders:    ['cart',      'cart-outline'],
             DeliveryStatus: ['receipt',   'receipt-outline'],
             Customers:      ['briefcase', 'briefcase-outline'],
             Products:       ['cube',      'cube-outline'],
@@ -34,8 +36,9 @@ export function SalesNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Dashboard"      component={DashboardScreen}  options={DASHBOARD_TAB_OPTIONS} />
-      <Tab.Screen name="DeliveryStatus" component={ComingSoonScreen} options={{ title: 'Orders' }} />
+      <Tab.Screen name="Dashboard"      component={DashboardScreen}   options={DASHBOARD_TAB_OPTIONS} />
+      <Tab.Screen name="SalesOrders"    component={SalesOrdersStack}  options={{ title: 'Sales Orders' }} />
+      <Tab.Screen name="DeliveryStatus" component={ComingSoonScreen}  options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Customers"  component={CustomersStack}   options={{ title: 'Customers' }} />
       <Tab.Screen name="Products"   component={ProductsStack}    options={{ title: 'Products' }} />
       <Tab.Screen name="MyRequests" component={MyRequestsScreen} options={{ title: 'My Requests' }} />

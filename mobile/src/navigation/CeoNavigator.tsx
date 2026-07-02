@@ -24,6 +24,7 @@ import { StockMovementsStack }      from './stacks/StockMovementsStack';
 import { TimberInventoryStack }     from './stacks/TimberInventoryStack';
 import { StockTransfersStack }     from './stacks/StockTransfersStack';
 import { DispatchStack }            from './stacks/DispatchStack';
+import { SalesOrdersStack }         from './stacks/SalesOrdersStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -59,6 +60,7 @@ export function CeoNavigator() {
             TimberInventory:    { active: 'leaf',             inactive: 'leaf-outline' },
             StockTransfers:     { active: 'swap-vertical',   inactive: 'swap-vertical-outline' },
             Dispatch:           { active: 'send',             inactive: 'send-outline' },
+            SalesOrders:        { active: 'cart',             inactive: 'cart-outline' },
             Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
             Profile:       { active: 'person',         inactive: 'person-outline' },
           };
@@ -124,6 +126,7 @@ export function CeoNavigator() {
       <Tab.Screen name="TimberInventory" component={TimberInventoryStack} options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="StockTransfers"  component={StockTransfersStack}  options={{ title: 'Transfers' }} />
       <Tab.Screen name="Dispatch"        component={DispatchStack}        options={{ title: 'Dispatch' }} />
+      <Tab.Screen name="SalesOrders"     component={SalesOrdersStack}     options={{ title: 'Sales Orders' }} />
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}

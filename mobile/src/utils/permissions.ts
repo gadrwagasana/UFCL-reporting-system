@@ -28,6 +28,10 @@ export type Permission =
   | 'stock.movements'
   | 'stock.approve'
   | 'timber.inventory'
+  | 'sales.view'
+  | 'sales.create'
+  | 'sales.edit'
+  | 'sales.pay'
   | 'transfer.view'
   | 'transfer.approve'
   | 'transfer.act'
@@ -40,10 +44,10 @@ export type Permission =
   | 'monthly.approve';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve'],
-  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve'],
-  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act'],
-  sales:                  ['delivery.update'],
+  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
+  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'dispatch.view', 'dispatch.approve', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
+  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory', 'transfer.view', 'transfer.approve', 'transfer.act', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
+  sales:                  ['delivery.update', 'sales.view', 'sales.create', 'sales.edit', 'sales.pay'],
   'sales-staff':          ['delivery.update'],
   'showroom-staff':       ['delivery.update'],
   finance:                [],

@@ -883,6 +883,87 @@ export interface WorkshopOverviewResponse {
   is_restricted:     boolean;
 }
 
+// ─── Sales Orders ─────────────────────────────────────────────────────────────
+
+export interface SalesOrder {
+  id:                    number;
+  order_number:          string;
+  customer_name:         string;
+  customer_id:           number | null;
+  product_type:          'Timber' | 'Poles';
+  product_sub_type:      'Kiln-dried' | 'CCA-treated' | 'Untreated' | null;
+  product_size:          string;
+  quantity:              number;
+  unit_price:            number;
+  currency:              'RWF' | 'USD' | 'EUR' | 'GBP';
+  price_tax_type:        'Inclusive' | 'Exclusive';
+  payment_due_date:      string | null;
+  payment_status:        'Paid' | 'Unpaid';
+  notes:                 string | null;
+  status:                string;
+  created_at:            string;
+  pending_deletion:      boolean;
+  qty_dispatched_total:  number;
+  qty_accepted_total:    number;
+  qty_rejected_total:    number;
+  qty_remaining:         number;
+  delivery_number:       string | null;
+  delivery_status:       string | null;
+}
+
+export interface SalesStockSummary {
+  timberStock:       number;
+  timberProduced:    number;
+  timberSold:        number;
+  polesStock:        number;
+  polesProduced:     number;
+  polesSold:         number;
+  kilnDriedStock:    number;
+  ccaTreatedStock:   number;
+  untreatedStock:    number;
+}
+
+export interface SalesMetrics {
+  pending:    number;
+  confirmed:  number;
+  inProgress: number;
+  delivered:  number;
+  closed:     number;
+}
+
+export interface SalesDropdownCustomer {
+  id:             number;
+  name:           string;
+  contact_person: string | null;
+  phone:          string | null;
+}
+
+export interface SalesDropdownProduct {
+  id:       number;
+  type:     string;
+  sub_type: string | null;
+  size:     string;
+}
+
+export interface SalesDropdownVehicle {
+  id:             number;
+  registration:   string;
+  make:           string | null;
+  driver_assigned:string | null;
+}
+
+export interface SalesListResponse {
+  ok:       true;
+  rows:     SalesOrder[];
+  metrics:  SalesMetrics;
+  stock:    SalesStockSummary;
+  dropdowns: {
+    customers: SalesDropdownCustomer[];
+    products:  SalesDropdownProduct[];
+    vehicles:  SalesDropdownVehicle[];
+  };
+}
+
 // ─── Stock Transfers ──────────────────────────────────────────────────────────
 
 export interface StockTransfer {

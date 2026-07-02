@@ -18,6 +18,7 @@ import { StockInventoryStack }     from './stacks/StockInventoryStack';
 import { StockMovementsStack }     from './stacks/StockMovementsStack';
 import { TimberInventoryStack }    from './stacks/TimberInventoryStack';
 import { StockTransfersStack }   from './stacks/StockTransfersStack';
+import { SalesOrdersStack }      from './stacks/SalesOrdersStack';
 
 const Tab = createBottomTabNavigator<OperationsTabParamList>();
 
@@ -47,6 +48,7 @@ export function OperationsNavigator() {
             StockMovements:     ['swap-horizontal',  'swap-horizontal-outline'],
             TimberInventory:    ['leaf',             'leaf-outline'],
             StockTransfers:     ['swap-vertical',   'swap-vertical-outline'],
+            SalesOrders:        ['cart',            'cart-outline'],
             MyRequests:         ['list',      'list-outline'],
           };
           const [a, i] = icons[route.name as keyof OperationsTabParamList];
@@ -69,6 +71,7 @@ export function OperationsNavigator() {
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}     options={{ title: 'Movements' }} />
       <Tab.Screen name="TimberInventory"    component={TimberInventoryStack}    options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}    options={{ title: 'Transfers' }} />
+      <Tab.Screen name="SalesOrders"       component={SalesOrdersStack}       options={{ title: 'Sales Orders' }} />
       <Tab.Screen name="MyRequests"         component={MyRequestsScreen}        options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );

@@ -181,6 +181,7 @@ app.use('/api/timber-inventory', require('./routes/timberInventory'));
 // Phase 2 skeletons (routes exist, return 501 until implemented)
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));
+app.use('/api/sales',            require('./routes/sales'));
 
 // ── Monitoring dashboard (static HTML, no JWT) ────────────────────────────────
 // Served at /dashboard.html — admin opens in browser, fetches /api/metrics with token.

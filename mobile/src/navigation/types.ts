@@ -7,7 +7,7 @@ import type {
   VatInboundEntry, VatEntry,
   DeliveryOrder, FuelLog, MachineFuelLog, MachineLog,
   Customer, Product, Vehicle, Machine, Workshop, Compartment,
-  StockItem, WarehouseRef,
+  StockItem, WarehouseRef, SalesOrder,
 } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
@@ -46,6 +46,15 @@ export type StockTransfersStackParamList = {
   StockTransferNewRequest: undefined;
   StockTransferDispatch:   { transferId: number; remaining: number; itemName: string; uom: string; vehicles: import('../types/api').TransferVehicle[] };
   StockTransferDetail:     { transferId: number };
+};
+
+// ─── Sales Orders stack ───────────────────────────────────────────────────────
+export type SalesOrdersStackParamList = {
+  SalesOrdersList:      undefined;
+  SalesOrderCreate:     undefined;
+  SalesOrderEdit:       { order: SalesOrder };
+  SalesOrderDeliver:    { orderId: number; orderNumber: string; customerName: string };
+  SalesCustomerCreate:  undefined;
 };
 
 // ─── Dispatch stack ───────────────────────────────────────────────────────────
@@ -126,6 +135,7 @@ export type CeoTabParamList = {
   TimberInventory:    undefined;
   StockTransfers:     undefined;
   Dispatch:           undefined;
+  SalesOrders:        undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -252,6 +262,7 @@ export type OperationsTabParamList = {
   StockMovements:     undefined;
   TimberInventory:    undefined;
   StockTransfers:     undefined;
+  SalesOrders:        undefined;
   MyRequests:         undefined;
 };
 
@@ -277,6 +288,7 @@ export type LogisticsTabParamList = {
 // ─── Sales tabs ──────────────────────────────────────────────────────────────
 export type SalesTabParamList = {
   Dashboard:       undefined;
+  SalesOrders:     undefined;
   DeliveryStatus:  undefined;
   Customers:       undefined;
   Products:        undefined;

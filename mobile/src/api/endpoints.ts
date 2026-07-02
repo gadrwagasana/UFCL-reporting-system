@@ -126,6 +126,16 @@ export const EP = {
   DISPATCH_REVIEW: (id: number) => `/api/dispatch/${id}`,
   DISPATCH_DELETE: (id: number) => `/api/dispatch/${id}`,
 
+  // Sales Orders
+  SALES_LIST:         '/api/sales',
+  SALES_CREATE:       '/api/sales',
+  SALES_UPDATE:       (id: number) => `/api/sales/${id}`,
+  SALES_DELETE:       (id: number) => `/api/sales/${id}`,
+  SALES_PAY:          (id: number) => `/api/sales/${id}/pay`,
+  SALES_STATUS:       (id: number) => `/api/sales/${id}/status`,
+  SALES_CLOSE_SHORT:  (id: number) => `/api/sales/${id}/close-short`,
+  SALES_DELIVER:      (id: number) => `/api/sales/${id}/deliver`,
+
   // Timber Inventory
   TIMBER_INVENTORY: '/api/timber-inventory',
 
