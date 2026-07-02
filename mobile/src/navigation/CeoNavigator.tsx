@@ -18,6 +18,9 @@ import { MachinesStack }            from './stacks/MachinesStack';
 import { WorkshopOverviewStack }    from './stacks/WorkshopOverviewStack';
 import { WorkshopManagementStack }  from './stacks/WorkshopManagementStack';
 import { CompartmentsStack }        from './stacks/CompartmentsStack';
+import { StockCatalogStack }        from './stacks/StockCatalogStack';
+import { StockInventoryStack }      from './stacks/StockInventoryStack';
+import { StockMovementsStack }      from './stacks/StockMovementsStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -46,7 +49,10 @@ export function CeoNavigator() {
             Machines:           { active: 'settings',   inactive: 'settings-outline' },
             WorkshopOverview:   { active: 'eye',       inactive: 'eye-outline' },
             WorkshopManagement: { active: 'business',  inactive: 'business-outline' },
-            Compartments:       { active: 'map-pin',   inactive: 'map-pin-outline' },
+            Compartments:       { active: 'map-pin',          inactive: 'map-pin-outline' },
+            StockCatalog:       { active: 'layers',           inactive: 'layers-outline' },
+            StockInventory:     { active: 'bar-chart',        inactive: 'bar-chart-outline' },
+            StockMovements:     { active: 'swap-horizontal',  inactive: 'swap-horizontal-outline' },
             Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
             Profile:       { active: 'person',         inactive: 'person-outline' },
           };
@@ -106,6 +112,9 @@ export function CeoNavigator() {
         component={CompartmentsStack}
         options={{ title: 'Compartments' }}
       />
+      <Tab.Screen name="StockCatalog"   component={StockCatalogStack}   options={{ title: 'Stock' }} />
+      <Tab.Screen name="StockInventory" component={StockInventoryStack} options={{ title: 'Levels' }} />
+      <Tab.Screen name="StockMovements" component={StockMovementsStack} options={{ title: 'Movements' }} />
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}

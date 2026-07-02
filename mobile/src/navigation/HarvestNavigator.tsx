@@ -7,6 +7,7 @@ import { HarvestStack }          from './HarvestStack';
 import { LogTransportStack }     from './LogTransportStack';
 import { MaterialRequestsStack } from './MaterialRequestsStack';
 import { CasualLabourStack }     from './CasualLabourStack';
+import { StockMovementsStack }   from './stacks/StockMovementsStack';
 import { MyRequestsScreen }      from '../screens/shared/MyRequestsScreen';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 
@@ -16,7 +17,8 @@ const tabIcons: Record<keyof HarvestTabParamList, [string, string]> = {
   HarvestList:      ['leaf',    'leaf-outline'],
   LogTransportList: ['bus',     'bus-outline'],
   MaterialRequest:  ['cube',    'cube-outline'],
-  CasualLabour:     ['people',  'people-outline'],
+  CasualLabour:     ['people',          'people-outline'],
+  StockMovements:   ['swap-horizontal', 'swap-horizontal-outline'],
   MyRequests:       ['list',    'list-outline'],
   Profile:          ['person',  'person-outline'],
 };
@@ -26,6 +28,7 @@ const tabLabels: Record<keyof HarvestTabParamList, string> = {
   LogTransportList: 'Log Transport',
   MaterialRequest:  'Materials',
   CasualLabour:     'Labour',
+  StockMovements:   'Stock Mvmt',
   MyRequests:       'My Requests',
   Profile:          'Profile',
 };
@@ -50,6 +53,7 @@ export function HarvestNavigator() {
       <Tab.Screen name="LogTransportList" component={LogTransportStack} options={{ title: 'Log Transport' }} />
       <Tab.Screen name="MaterialRequest"  component={MaterialRequestsStack} options={{ title: 'Materials' }} />
       <Tab.Screen name="CasualLabour"     component={CasualLabourStack}     options={{ title: 'Labour' }} />
+      <Tab.Screen name="StockMovements"   component={StockMovementsStack}   options={{ title: 'Stock Mvmt' }} />
       <Tab.Screen name="MyRequests"       component={MyRequestsScreen}      options={{ title: 'My Requests' }} />
       <Tab.Screen name="Profile"          component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>

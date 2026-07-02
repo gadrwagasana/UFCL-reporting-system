@@ -495,7 +495,7 @@ export interface MaterialRequest {
   reviewed_at?:  string;
 }
 
-export interface StockItem {
+export interface StockItemRef {
   id:       number;
   name:     string;
   category?: string;
@@ -505,14 +505,14 @@ export interface StockItem {
 export interface MaterialRequestsListResponse {
   ok:               true;
   rows:             MaterialRequest[];
-  items:            StockItem[];
+  items:            StockItemRef[];
   workshops:        { id: number; name: string }[];
   user_workshop_id?: number;
 }
 
 export interface StockItemsResponse {
   ok:   true;
-  rows: StockItem[];
+  rows: StockItemRef[];
 }
 
 // ─── Casual Labour ────────────────────────────────────────────────────────────
@@ -881,4 +881,90 @@ export interface WorkshopOverviewResponse {
   lowStock:          LowStockItem[];
   user_workshop_id?: number;
   is_restricted:     boolean;
+}
+
+// ─── Stock Management ─────────────────────────────────────────────────────────
+
+export type MovementType    = 'in' | 'out' | 'adjustment' | 'transfer' | 'return';
+export type ApprovalStatus  = 'pending' | 'approved' | 'rejected';
+
+export interface WarehouseRef { id: number; name: string }
+
+export interface StockCategory { id: number; name: string }
+
+export interface StockItem {
+  id:             number;
+  category:       string;
+  name:           string;
+  sku?:           string;
+  uom:            string;
+  unit_cost:      number;
+  min_stock:      number;
+  max_stock?:     number;
+  notes?:         string;
+  total_stock:    number;
+  wh_breakdown?:  Record<string, number>;
+  active:         boolean;
+  default_unit_cost?: number;
+}
+
+export interface StockItemListResponse {
+  ok:               true;
+  rows:             StockItem[];
+  warehouses:       WarehouseRef[];
+  categories:       StockCategory[];
+  user_workshop_id?: number;
+}
+
+export interface InventoryItem {
+  id:        number;
+  category:  string;
+  name:      string;
+  sku?:      string;
+  uom:       string;
+  unit_cost: number;
+  stock:     number;
+  min_stock: number;
+}
+
+export interface InventoryListResponse {
+  ok:               true;
+  rows:             InventoryItem[];
+  lowStockCount:    number;
+  warehouses:       WarehouseRef[];
+  user_workshop_id?: number;
+}
+
+export interface StockMovement {
+  id:                number;
+  item_name:         string;
+  category:          string;
+  uom:               string;
+  warehouse_name?:   string;
+  to_warehouse_name?: string;
+  movement_type:     MovementType;
+  quantity:          number;
+  unit_cost?:        number;
+  total_value?:      number;
+  reference?:        string;
+  notes?:            string;
+  approval_status?:  ApprovalStatus;
+  rejection_reason?: string;
+  pending_deletion?: boolean;
+  created_at:        string;
+  created_by:        string;
+}
+
+export interface StockMovementListResponse {
+  ok:               true;
+  rows:             StockMovement[];
+  items:            StockItem[];
+  warehouses:       WarehouseRef[];
+  user_workshop_id?: number;
+}
+
+export interface StockPendingApproval {
+  ok:             true;
+  pendingApproval: true;
+  message:        string;
 }

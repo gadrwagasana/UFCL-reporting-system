@@ -175,6 +175,7 @@ app.use('/api/vehicles',         require('./routes/vehicles'));
 app.use('/api/machines',         require('./routes/machines'));
 app.use('/api/workshops',        require('./routes/workshops'));
 app.use('/api/compartments',     require('./routes/compartments'));
+app.use('/api/stock',            require('./routes/stock'));
 
 // Phase 2 skeletons (routes exist, return 501 until implemented)
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));

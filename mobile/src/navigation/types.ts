@@ -7,6 +7,7 @@ import type {
   VatInboundEntry, VatEntry,
   DeliveryOrder, FuelLog, MachineFuelLog, MachineLog,
   Customer, Product, Vehicle, Machine, Workshop, Compartment,
+  StockItem, WarehouseRef,
 } from '../types/api';
 
 // ─── Root stack ───────────────────────────────────────────────────────────────
@@ -37,6 +38,20 @@ export type ProductsStackParamList = {
 export type CompartmentsStackParamList = {
   CompartmentsList: undefined;
   CompartmentForm:  { compartment?: Compartment };
+};
+
+// ─── Stock Management stacks ──────────────────────────────────────────────────
+export type StockCatalogStackParamList = {
+  StockCatalogList: undefined;
+  StockItemForm:    { item?: StockItem };
+  StockCategories:  undefined;
+};
+export type StockInventoryStackParamList = {
+  StockInventoryList: undefined;
+};
+export type StockMovementsStackParamList = {
+  StockMovementsList: undefined;
+  StockMovementForm:  { items: StockItem[]; warehouses: WarehouseRef[]; userWorkshopId?: number };
 };
 
 // ─── Workshop Overview stack ──────────────────────────────────────────────────
@@ -86,6 +101,9 @@ export type CeoTabParamList = {
   WorkshopOverview:   undefined;
   WorkshopManagement: undefined;
   Compartments:       undefined;
+  StockCatalog:       undefined;
+  StockInventory:     undefined;
+  StockMovements:     undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -110,6 +128,7 @@ export type SupervisorTabParamList = {
   MaterialRequest: undefined;
   CasualLabour:    undefined;
   Compartments:    undefined;
+  StockMovements:  undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -120,6 +139,7 @@ export type HarvestTabParamList = {
   LogTransportList:  undefined;
   MaterialRequest:   undefined;
   CasualLabour:      undefined;
+  StockMovements:    undefined;
   MyRequests:        undefined;
   Profile:           undefined;
 };
@@ -129,6 +149,7 @@ export type SawmillTabParamList = {
   SawmillList:     undefined;
   MaterialRequest: undefined;
   CasualLabour:    undefined;
+  StockMovements:  undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -140,6 +161,7 @@ export type PolesTabParamList = {
   PolesDelivery:   undefined;
   PolesQC:         undefined;
   MaterialRequest: undefined;
+  StockMovements:  undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -150,6 +172,7 @@ export type VatTabParamList = {
   VatEntries:      undefined;
   MaterialRequest: undefined;
   CasualLabour:    undefined;
+  StockMovements:  undefined;
   MyRequests:      undefined;
   Profile:         undefined;
 };
@@ -200,6 +223,9 @@ export type OperationsTabParamList = {
   WorkshopOverview:   undefined;
   WorkshopManagement: undefined;
   Compartments:       undefined;
+  StockCatalog:       undefined;
+  StockInventory:     undefined;
+  StockMovements:     undefined;
   MyRequests:         undefined;
 };
 
@@ -212,6 +238,9 @@ export type LogisticsTabParamList = {
   Machines:            undefined;
   WorkshopOverview:    undefined;
   WorkshopManagement:  undefined;
+  StockCatalog:        undefined;
+  StockInventory:      undefined;
+  StockMovements:      undefined;
   VehicleFuel:         undefined;
   MyRequests:          undefined;
 };
@@ -230,6 +259,9 @@ export type StorekeeperTabParamList = {
   Dashboard:          undefined;
   WorkshopOverview:   undefined;
   WorkshopManagement: undefined;
+  StockCatalog:       undefined;
+  StockInventory:     undefined;
+  StockMovements:     undefined;
   MaterialReview:     undefined;
   MyRequests:         undefined;
 };

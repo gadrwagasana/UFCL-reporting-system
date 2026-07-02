@@ -23,6 +23,10 @@ export type Permission =
   | 'workshop.approve'
   | 'compartment.create'
   | 'compartment.manage'
+  | 'stock.catalog'
+  | 'stock.inventory'
+  | 'stock.movements'
+  | 'stock.approve'
   | 'fuel.vehicle'
   | 'fuel.machine'
   | 'delivery.update'
@@ -30,23 +34,23 @@ export type Permission =
   | 'monthly.approve';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
-  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
-  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage'],
+  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve'],
+  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
+  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
   sales:                  ['delivery.update'],
   'sales-staff':          ['delivery.update'],
   'showroom-staff':       ['delivery.update'],
   finance:                [],
-  logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve'],
+  logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
   'logistics-officer':    ['delivery.update'],
-  supervisor:             ['material.request', 'labour.write', 'compartment.create'],
-  storekeeper:            ['material.review'],
-  'storekeeper-assistant':['material.request'],
+  supervisor:             ['material.request', 'labour.write', 'compartment.create', 'stock.movements', 'stock.approve'],
+  storekeeper:            ['material.review', 'stock.catalog', 'stock.inventory', 'stock.movements'],
+  'storekeeper-assistant':['material.request', 'stock.movements'],
   mechanician:            ['machine.log', 'fuel.machine'],
-  'harvesting-leader':    ['harvest.write', 'logtransport.write', 'material.request', 'labour.write'],
-  'sawmill-leader':       ['sawmill.write', 'material.request', 'labour.write'],
-  'poles-leader':         ['poles.write', 'poles.purchase', 'poles.delivery', 'poles.qc', 'material.request', 'labour.write'],
-  'vat-leader':           ['vat.write', 'material.request', 'labour.write'],
+  'harvesting-leader':    ['harvest.write', 'logtransport.write', 'material.request', 'labour.write', 'stock.movements'],
+  'sawmill-leader':       ['sawmill.write', 'material.request', 'labour.write', 'stock.movements'],
+  'poles-leader':         ['poles.write', 'poles.purchase', 'poles.delivery', 'poles.qc', 'material.request', 'labour.write', 'stock.movements'],
+  'vat-leader':           ['vat.write', 'material.request', 'labour.write', 'stock.movements'],
   'harvesting-supervisor': ['harvest.write', 'logtransport.write'],
   'sawmill-supervisor':    ['sawmill.write'],
   'poles-supervisor':      ['poles.write', 'poles.delivery'],
