@@ -40,6 +40,12 @@ export type CompartmentsStackParamList = {
   CompartmentForm:  { compartment?: Compartment };
 };
 
+// ─── Dispatch stack ───────────────────────────────────────────────────────────
+export type DispatchStackParamList = {
+  DispatchList:       undefined;
+  DispatchNewRequest: undefined;
+};
+
 // ─── Timber Inventory stack ───────────────────────────────────────────────────
 export type TimberInventoryStackParamList = {
   TimberInventoryDashboard: undefined;
@@ -110,6 +116,7 @@ export type CeoTabParamList = {
   StockInventory:     undefined;
   StockMovements:     undefined;
   TimberInventory:    undefined;
+  Dispatch:           undefined;
   Notifications:      undefined;
   Profile:            undefined;
 };
@@ -250,6 +257,7 @@ export type LogisticsTabParamList = {
   StockInventory:      undefined;
   StockMovements:      undefined;
   TimberInventory:     undefined;
+  Dispatch:            undefined;
   VehicleFuel:         undefined;
   MyRequests:          undefined;
 };

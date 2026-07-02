@@ -12,7 +12,7 @@ import { AppHeader }           from '../../components/AppHeader';
 import { LoadingState }        from '../../components/LoadingState';
 import { ErrorState }          from '../../components/ErrorState';
 import { EmptyState }          from '../../components/EmptyState';
-import { DeletionReasonModal }  from '../../components/DeletionReasonModal';
+import { ReasonModal }          from '../../components/ReasonModal';
 import {
   useStockMovements, useStockMovementDelete, useTransferApproveFromMovements,
 } from '../../hooks/useStock';
@@ -291,7 +291,7 @@ export function StockMovementsScreen() {
       />
 
       {deleteItem && (
-        <DeletionReasonModal
+        <ReasonModal
           visible
           title={`Delete movement for "${deleteItem.item_name}"?`}
           onCancel={() => setDeleteItem(null)}

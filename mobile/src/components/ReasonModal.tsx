@@ -15,11 +15,11 @@ interface Props {
   onConfirm:     (reason: string) => void;
 }
 
-export function DeletionReasonModal({
+export function ReasonModal({
   visible,
   title,
-  message = 'Please provide a reason for this deletion request.',
-  confirmLabel = 'Submit Request',
+  message = 'Please provide a reason.',
+  confirmLabel = 'Submit',
   loading = false,
   onCancel,
   onConfirm,

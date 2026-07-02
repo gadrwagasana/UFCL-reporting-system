@@ -1,33 +1,44 @@
 'use strict';
 
-// Phase 2 — Dispatch request review (logistics / operations)
-// Routes defined but returning 501 until Phase 2 is built.
-
 const express = require('express');
+const router  = express.Router();
 const data    = require('../../db/services/data');
-const { respond } = require('../middleware/respond');
+const { requireRoles } = require('../middleware/auth');
+const { respond }      = require('../middleware/respond');
 
-const router = express.Router();
-const PHASE2 = (_req, res) => res.status(501).json({ ok: false, error: 'Phase 2 — not yet implemented' });
+const VIEW_ROLES    = ['admin', 'ceo', 'logistics'];
+const REVIEW_ROLES  = ['admin', 'ceo', 'logistics', 'operations'];
 
 // ── GET /api/dispatch ─────────────────────────────────────────────────────────
-// List dispatch requests + pending delivery orders awaiting dispatch.
-// data.js: dispatchList(userId)
-//   Requires: dispatch page (admin, ceo, logistics)
-//   NOTE: operations lacks 'dispatch' page by default (Gap D — do not fix).
+router.get('/', requireRoles(VIEW_ROLES), async (req, res) => {
+  const result = await data.dispatchList(req.user.id);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 403);
+  return respond(res, result, 200, 30);
+});
 
-router.get('/', PHASE2);
+// ── POST /api/dispatch ────────────────────────────────────────────────────────
+router.post('/', requireRoles(VIEW_ROLES), async (req, res) => {
+  const result = await data.dispatchCreate(req.user.id, req.body);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 201);
+});
 
-// ── POST /api/dispatch/:id/review ────────────────────────────────────────────
-// Approve, reject, or mark a dispatch request as dispatched.
-// Body: { status: "Approved"|"Rejected"|"Dispatched", notes? }
-// data.js: dispatchReview(userId, requestId, status, notes)
-//   Role check (direct): admin|ceo|logistics|operations
-//   When status = "Dispatched":
-//     - Sets delivery_order.status = 'In Transit'
-//     - Sets sales_order.status = 'Dispatched'
-//     - Triggers refreshStockView()
+// ── PATCH /api/dispatch/:id ───────────────────────────────────────────────────
+// Approve / Reject / Dispatch — status in body
+router.patch('/:id', requireRoles(REVIEW_ROLES), async (req, res) => {
+  const { status, notes } = req.body || {};
+  const result = await data.dispatchReview(req.user.id, Number(req.params.id), status, notes || null);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 200);
+});
 
-router.post('/:id/review', PHASE2);
+// ── DELETE /api/dispatch/:id ──────────────────────────────────────────────────
+router.delete('/:id', requireRoles(VIEW_ROLES), async (req, res) => {
+  const { reason } = req.body || {};
+  const result = await data.dispatchDelete(req.user.id, Number(req.params.id), reason);
+  if (result.pendingApproval) return respond(res, result, 202);
+  if (!result.ok) return respond(res, { ok: false, error: result.error }, 400);
+  return respond(res, result, 200);
+});
 
 module.exports = router;

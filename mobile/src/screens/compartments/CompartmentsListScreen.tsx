@@ -11,7 +11,7 @@ import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
-import { DeletionReasonModal } from '../../components/DeletionReasonModal';
+import { ReasonModal } from '../../components/ReasonModal';
 import { useCompartmentList, useCompartmentDelete } from '../../hooks/useCompartments';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useAuthStore }    from '../../stores/authStore';
@@ -132,7 +132,7 @@ export function CompartmentsListScreen() {
   const rows    = data?.rows    ?? [];
   const metrics = data?.metrics ?? { total: 0, active: 0, totalAreaHa: 0, totalVolumeM3: 0, totalHarvestedM3: 0 };
 
-  // DeletionReasonModal state
+  // ReasonModal state
   const [modalTarget, setModalTarget]   = useState<Compartment | null>(null);
   const [modalDeleting, setModalDeleting] = useState(false);
   // For direct delete (admin/ceo/operations) we also collect a reason via the modal
@@ -196,7 +196,7 @@ export function CompartmentsListScreen() {
         )}
       />
 
-      <DeletionReasonModal
+      <ReasonModal
         visible={modalTarget !== null}
         title={modalMode === 'supervisor' ? 'Reason Required' : 'Delete Compartment'}
         message={

@@ -883,6 +883,39 @@ export interface WorkshopOverviewResponse {
   is_restricted:     boolean;
 }
 
+// ─── Dispatch ─────────────────────────────────────────────────────────────────
+
+export interface DispatchRequest {
+  id:                      number;
+  request_number:          string;
+  status:                  'Pending' | 'Approved' | 'Rejected' | 'Dispatched';
+  notes:                   string | null;
+  created_at:              string;
+  approved_at:             string | null;
+  delivery_order_number:   string | null;
+  driver_name:             string | null;
+  route:                   string | null;
+  vehicle_registration:    string | null;
+  so_order_number:         string | null;
+  customer_name:           string | null;
+  created_by:              string | null;
+  approved_by:             string | null;
+}
+
+export interface PendingDelivery {
+  id:             number;
+  order_number:   string;
+  driver_name:    string | null;
+  so_order_number:string | null;
+  customer_name:  string | null;
+}
+
+export interface DispatchListResponse {
+  ok:                true;
+  rows:              DispatchRequest[];
+  pendingDeliveries: PendingDelivery[];
+}
+
 // ─── Timber Inventory ─────────────────────────────────────────────────────────
 
 export interface TimberStock {

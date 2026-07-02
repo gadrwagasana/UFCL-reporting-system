@@ -112,6 +112,12 @@ export const EP = {
   MACHINES_CATEGORY_DELETE:        (catId: number) => `/api/machines/categories/${catId}`,
   MACHINES_MAINT_SCHEDULE_CREATE:  (id: number) => `/api/machines/${id}/maint-schedules`,
 
+  // Dispatch
+  DISPATCH_LIST:   '/api/dispatch',
+  DISPATCH_CREATE: '/api/dispatch',
+  DISPATCH_REVIEW: (id: number) => `/api/dispatch/${id}`,
+  DISPATCH_DELETE: (id: number) => `/api/dispatch/${id}`,
+
   // Timber Inventory
   TIMBER_INVENTORY: '/api/timber-inventory',
 

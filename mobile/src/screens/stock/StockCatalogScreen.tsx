@@ -12,7 +12,7 @@ import { AppHeader }          from '../../components/AppHeader';
 import { LoadingState }       from '../../components/LoadingState';
 import { ErrorState }         from '../../components/ErrorState';
 import { EmptyState }         from '../../components/EmptyState';
-import { DeletionReasonModal } from '../../components/DeletionReasonModal';
+import { ReasonModal } from '../../components/ReasonModal';
 import { useStockItems, useStockItemDelete, useStockConsume } from '../../hooks/useStock';
 import { useAuthStore }   from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
@@ -319,7 +319,7 @@ export function StockCatalogScreen() {
       )}
 
       {deleteItem && (
-        <DeletionReasonModal
+        <ReasonModal
           visible
           title={`Delete "${deleteItem.name}"?`}
           onCancel={() => setDeleteItem(null)}
