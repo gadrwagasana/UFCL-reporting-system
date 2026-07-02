@@ -21,6 +21,7 @@ import { CompartmentsStack }        from './stacks/CompartmentsStack';
 import { StockCatalogStack }        from './stacks/StockCatalogStack';
 import { StockInventoryStack }      from './stacks/StockInventoryStack';
 import { StockMovementsStack }      from './stacks/StockMovementsStack';
+import { TimberInventoryStack }     from './stacks/TimberInventoryStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -53,6 +54,7 @@ export function CeoNavigator() {
             StockCatalog:       { active: 'layers',           inactive: 'layers-outline' },
             StockInventory:     { active: 'bar-chart',        inactive: 'bar-chart-outline' },
             StockMovements:     { active: 'swap-horizontal',  inactive: 'swap-horizontal-outline' },
+            TimberInventory:    { active: 'leaf',             inactive: 'leaf-outline' },
             Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
             Profile:       { active: 'person',         inactive: 'person-outline' },
           };
@@ -114,7 +116,8 @@ export function CeoNavigator() {
       />
       <Tab.Screen name="StockCatalog"   component={StockCatalogStack}   options={{ title: 'Stock' }} />
       <Tab.Screen name="StockInventory" component={StockInventoryStack} options={{ title: 'Levels' }} />
-      <Tab.Screen name="StockMovements" component={StockMovementsStack} options={{ title: 'Movements' }} />
+      <Tab.Screen name="StockMovements"  component={StockMovementsStack}  options={{ title: 'Movements' }} />
+      <Tab.Screen name="TimberInventory" component={TimberInventoryStack} options={{ title: 'Timber Inv.' }} />
       <Tab.Screen
         name="Notifications"
         component={NotificationsScreen}

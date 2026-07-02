@@ -112,6 +112,9 @@ export const EP = {
   MACHINES_CATEGORY_DELETE:        (catId: number) => `/api/machines/categories/${catId}`,
   MACHINES_MAINT_SCHEDULE_CREATE:  (id: number) => `/api/machines/${id}/maint-schedules`,
 
+  // Timber Inventory
+  TIMBER_INVENTORY: '/api/timber-inventory',
+
   // Stock Management
   STOCK_ITEMS:                   '/api/stock',
   STOCK_ITEMS_CREATE:            '/api/stock',

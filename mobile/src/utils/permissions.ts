@@ -27,6 +27,7 @@ export type Permission =
   | 'stock.inventory'
   | 'stock.movements'
   | 'stock.approve'
+  | 'timber.inventory'
   | 'fuel.vehicle'
   | 'fuel.machine'
   | 'delivery.update'
@@ -34,16 +35,16 @@ export type Permission =
   | 'monthly.approve';
 
 const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
-  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve'],
-  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
-  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
+  admin:                  ['ceo.approve', 'monthly.approve', 'material.review', 'labour.review', 'delivery.update', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.movements', 'stock.approve', 'timber.inventory'],
+  ceo:                    ['ceo.approve', 'monthly.approve', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory'],
+  operations:             ['material.review', 'labour.review', 'machine.cats', 'workshop.manage', 'workshop.approve', 'compartment.create', 'compartment.manage', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory'],
   sales:                  ['delivery.update'],
   'sales-staff':          ['delivery.update'],
   'showroom-staff':       ['delivery.update'],
   finance:                [],
-  logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve'],
+  logistics:              ['delivery.update', 'fuel.vehicle', 'machine.register', 'machine.cats', 'workshop.manage', 'workshop.approve', 'stock.catalog', 'stock.inventory', 'stock.movements', 'stock.approve', 'timber.inventory'],
   'logistics-officer':    ['delivery.update'],
-  supervisor:             ['material.request', 'labour.write', 'compartment.create', 'stock.movements', 'stock.approve'],
+  supervisor:             ['material.request', 'labour.write', 'compartment.create', 'stock.movements', 'stock.approve', 'timber.inventory'],
   storekeeper:            ['material.review', 'stock.catalog', 'stock.inventory', 'stock.movements'],
   'storekeeper-assistant':['material.request', 'stock.movements'],
   mechanician:            ['machine.log', 'fuel.machine'],

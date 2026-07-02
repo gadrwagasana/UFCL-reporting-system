@@ -16,6 +16,7 @@ import { VehicleFuelStack }        from './stacks/VehicleFuelStack';
 import { StockCatalogStack }       from './stacks/StockCatalogStack';
 import { StockInventoryStack }     from './stacks/StockInventoryStack';
 import { StockMovementsStack }     from './stacks/StockMovementsStack';
+import { TimberInventoryStack }    from './stacks/TimberInventoryStack';
 
 const Tab = createBottomTabNavigator<LogisticsTabParamList>();
 
@@ -40,6 +41,7 @@ export function LogisticsNavigator() {
             StockCatalog:       ['layers',           'layers-outline'],
             StockInventory:     ['bar-chart',        'bar-chart-outline'],
             StockMovements:     ['swap-horizontal',  'swap-horizontal-outline'],
+            TimberInventory:    ['leaf',             'leaf-outline'],
             VehicleFuel:        ['flame',     'flame-outline'],
             MyRequests:         ['list',      'list-outline'],
           };
@@ -58,6 +60,7 @@ export function LogisticsNavigator() {
       <Tab.Screen name="StockCatalog"       component={StockCatalogStack}       options={{ title: 'Stock' }} />
       <Tab.Screen name="StockInventory"     component={StockInventoryStack}     options={{ title: 'Levels' }} />
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}     options={{ title: 'Movements' }} />
+      <Tab.Screen name="TimberInventory"    component={TimberInventoryStack}    options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="VehicleFuel"        component={VehicleFuelStack}        options={{ title: 'Fuel Logs' }} />
       <Tab.Screen name="MyRequests"   component={MyRequestsScreen}   options={{ title: 'My Requests' }} />
     </Tab.Navigator>

@@ -883,6 +883,53 @@ export interface WorkshopOverviewResponse {
   is_restricted:     boolean;
 }
 
+// ─── Timber Inventory ─────────────────────────────────────────────────────────
+
+export interface TimberStock {
+  timberProduced:     number;
+  polesProduced:      number;
+  kilnDriedProduced:  number;
+  ccaTreatedProduced: number;
+  untreatedProduced:  number;
+  timberSold:         number;
+  polesSold:          number;
+  kilnDriedSold:      number;
+  ccaTreatedSold:     number;
+  untreatedSold:      number;
+  timberStock:        number;
+  polesStock:         number;
+  kilnDriedStock:     number;
+  ccaTreatedStock:    number;
+  untreatedStock:     number;
+}
+
+export interface ProductionDay {
+  date:                string;
+  timber_units:        number;
+  timber_kiln_dried:   number;
+  timber_cca_treated:  number;
+  timber_untreated:    number;
+  timber_waste:        number;
+  poles_units:         number;
+  poles_waste:         number;
+  downtime_hours:      number;
+  supervisor:          string | null;
+}
+
+export interface HarvestSpecies {
+  species:  string;
+  total:    number;
+  harvests: number;
+}
+
+export interface TimberInventoryResponse {
+  ok:              true;
+  stock:           TimberStock;
+  logs7:           ProductionDay[];
+  harvestSummary:  HarvestSpecies[];
+  wasteRate:       string;
+}
+
 // ─── Stock Management ─────────────────────────────────────────────────────────
 
 export type MovementType    = 'in' | 'out' | 'adjustment' | 'transfer' | 'return';
