@@ -167,6 +167,8 @@ export type ReportsStackParamList = {
   EpmKpis:             undefined;
   EpmActionPlans:      undefined;
   EpmTrends:           undefined;
+  // Sage Reconciliation (Module 17C)
+  Sage:                undefined;
 };
 
 export type ReportsStackScreenProps<T extends keyof ReportsStackParamList> =

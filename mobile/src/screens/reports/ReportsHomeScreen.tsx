@@ -30,6 +30,7 @@ const REPORTS: ReportEntry[] = [
   { key: 'Monthly',      title: 'Monthly Dashboard',      description: 'Monthly production, sales and expense summary', icon: 'calendar-outline',   permission: 'reports.monthly'      },
   { key: 'Export',       title: 'Exports',                description: 'Share data as CSV via the native share sheet', icon: 'share-outline',        permission: 'reports.export'       },
   { key: 'EpmHome',     title: 'Enterprise Performance', description: 'KPI scorecards, action plans and trends across all departments', icon: 'analytics-outline', permission: 'reports.epm' },
+  { key: 'Sage',        title: 'Sage Reconciliation',    description: 'Monthly expense summary for Sage accounting reconciliation', icon: 'calculator-outline', permission: 'reports.sage' },
 ];
 
 function ReportCard({ item, onPress }: { item: ReportEntry; onPress: () => void }) {

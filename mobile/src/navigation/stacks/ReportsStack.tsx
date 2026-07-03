@@ -15,6 +15,7 @@ import { EpmDepartmentKpisScreen }    from '../../screens/reports/EpmDepartmentK
 import { EpmKpisScreen }              from '../../screens/reports/EpmKpisScreen';
 import { EpmActionPlansScreen }       from '../../screens/reports/EpmActionPlansScreen';
 import { EpmTrendsScreen }            from '../../screens/reports/EpmTrendsScreen';
+import { SageScreen }                 from '../../screens/reports/SageScreen';
 
 const Stack = createNativeStackNavigator<ReportsStackParamList>();
 
@@ -35,6 +36,7 @@ export function ReportsStack() {
       <Stack.Screen name="EpmKpis"            component={EpmKpisScreen} />
       <Stack.Screen name="EpmActionPlans"     component={EpmActionPlansScreen} />
       <Stack.Screen name="EpmTrends"          component={EpmTrendsScreen} />
+      <Stack.Screen name="Sage"               component={SageScreen} />
     </Stack.Navigator>
   );
 }
