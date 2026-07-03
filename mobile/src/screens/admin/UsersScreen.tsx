@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl, TouchableOpacity, Alert,
+  Modal, TextInput, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -127,6 +128,10 @@ export function UsersScreen() {
   const deleteUser  = useDeleteUser();
   const resetPw     = useResetPassword();
 
+  const [resetTarget, setResetTarget] = useState<UserRow | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetting,   setResetting]   = useState(false);
+
   const kpi = useMemo(() => {
     const rows = data?.rows ?? [];
     return {
@@ -138,28 +143,30 @@ export function UsersScreen() {
   }, [data]);
 
   function handleResetPw(user: UserRow) {
-    Alert.prompt(
-      'Reset Password',
-      `New password for @${user.username}:`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reset',
-          onPress: (pw) => {
-            if (!pw?.trim()) return Alert.alert('Error', 'Password cannot be empty');
-            resetPw.mutate(
-              { userId: user.id, newPassword: pw.trim() },
-              {
-                onSuccess: (res) => {
-                  if (res.ok) Alert.alert('Done', 'Password reset successfully');
-                  else        Alert.alert('Error', res.error ?? 'Failed');
-                },
-              },
-            );
-          },
+    setNewPassword('');
+    setResetTarget(user);
+  }
+
+  function handleConfirmReset() {
+    if (!resetTarget || !newPassword.trim()) return;
+    setResetting(true);
+    resetPw.mutate(
+      { userId: resetTarget.id, newPassword: newPassword.trim() },
+      {
+        onSuccess: (res) => {
+          setResetting(false);
+          if (res.ok) {
+            setResetTarget(null);
+            Alert.alert('Done', 'Password reset successfully');
+          } else {
+            Alert.alert('Error', res.error ?? 'Failed');
+          }
         },
-      ],
-      'secure-text',
+        onError: () => {
+          setResetting(false);
+          Alert.alert('Error', 'Could not reset password. Please try again.');
+        },
+      },
     );
   }
 
@@ -231,6 +238,52 @@ export function UsersScreen() {
           )}
         />
       )}
+
+      {/* Password Reset Modal — replaces Alert.prompt which is iOS-only */}
+      <Modal
+        visible={resetTarget !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => !resetting && setResetTarget(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Reset Password</Text>
+            <Text style={styles.modalSub}>New password for @{resetTarget?.username}</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newPassword}
+              onChangeText={setNewPassword}
+              placeholder="Enter new password"
+              placeholderTextColor={Colors.textMuted}
+              secureTextEntry
+              autoFocus
+              editable={!resetting}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnCancel]}
+                onPress={() => setResetTarget(null)}
+                disabled={resetting}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalBtnCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnConfirm, (!newPassword.trim() || resetting) && styles.modalBtnDisabled]}
+                onPress={handleConfirmReset}
+                disabled={!newPassword.trim() || resetting}
+                activeOpacity={0.8}
+              >
+                {resetting
+                  ? <ActivityIndicator size="small" color={Colors.white} />
+                  : <Text style={styles.modalBtnConfirmText}>Reset Password</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -268,4 +321,27 @@ const styles = StyleSheet.create({
   actions:    { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap', borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: Spacing.sm },
   actionBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 4 },
   actionText: { fontSize: Typography.xs, fontWeight: Typography.medium },
+
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center', padding: Spacing.xl,
+  },
+  modalBox: {
+    backgroundColor: Colors.card, borderRadius: Radius.lg,
+    padding: Spacing.lg, width: '100%', gap: Spacing.md, ...Shadow.sm,
+  },
+  modalTitle:  { fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.textPrimary },
+  modalSub:    { fontSize: Typography.sm, color: Colors.textSecondary, marginTop: -Spacing.xs },
+  modalInput: {
+    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md,
+    padding: Spacing.md, fontSize: Typography.base,
+    color: Colors.textPrimary, backgroundColor: Colors.bg,
+  },
+  modalActions:        { flexDirection: 'row', gap: Spacing.sm },
+  modalBtn:            { flex: 1, height: 44, borderRadius: Radius.md, alignItems: 'center', justifyContent: 'center' },
+  modalBtnCancel:      { borderWidth: 1, borderColor: Colors.border, backgroundColor: Colors.bg },
+  modalBtnCancelText:  { fontSize: Typography.base, fontWeight: Typography.medium, color: Colors.textSecondary },
+  modalBtnConfirm:     { backgroundColor: Colors.navy },
+  modalBtnConfirmText: { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.white },
+  modalBtnDisabled:    { opacity: 0.45 },
 });
