@@ -5,6 +5,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
@@ -75,6 +76,7 @@ function TrashCard({
 }
 
 export function TrashScreen() {
+  const navigation = useNavigation();
   const role = useAuthStore((s) => s.user?.role as UserRole | undefined);
   const canPurge = role === 'admin' || role === 'ceo';
 
@@ -125,7 +127,7 @@ export function TrashScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Trash" showBack />
+      <AppHeader title="Trash" onBack={() => navigation.goBack()} />
 
       {isError ? (
         <ErrorState message="Could not load trash" onRetry={refetch} fullScreen />

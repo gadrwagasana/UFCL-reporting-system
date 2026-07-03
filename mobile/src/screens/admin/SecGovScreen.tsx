@@ -3,6 +3,7 @@ import { StyleSheet, View, Text, ScrollView, RefreshControl } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
@@ -25,6 +26,7 @@ function SectionHeader({ title }: { title: string }) {
 }
 
 export function SecGovScreen() {
+  const navigation = useNavigation();
   const { data, isLoading, isError, refetch, isRefetching } = useSecGov();
 
   if (isLoading) return <LoadingState message="Loading security dashboard…" fullScreen />;
@@ -33,7 +35,7 @@ export function SecGovScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Security & Governance" showBack />
+      <AppHeader title="Security & Governance" onBack={() => navigation.goBack()} />
 
       {isError ? (
         <ErrorState message="Could not load security data" onRetry={refetch} fullScreen />

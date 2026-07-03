@@ -145,7 +145,7 @@ export function UserDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title={isEdit ? 'Edit User' : 'Create User'} showBack />
+      <AppHeader title={isEdit ? 'Edit User' : 'Create User'} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {!isEdit && (

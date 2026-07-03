@@ -6,6 +6,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
@@ -77,6 +79,7 @@ function AuditCard({ item }: { item: AuditRow }) {
 }
 
 export function AuditScreen() {
+  const navigation = useNavigation();
   const [pending, setPending] = useState<AuditFilters>({});
   const [applied, setApplied] = useState<AuditFilters>({});
   const [showFilters, setShowFilters] = useState(false);
@@ -101,7 +104,7 @@ export function AuditScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Audit Trail" showBack />
+      <AppHeader title="Audit Trail" onBack={() => navigation.goBack()} />
 
       {/* Filter toggle */}
       <View style={styles.filterBar}>

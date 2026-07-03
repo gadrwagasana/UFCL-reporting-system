@@ -140,7 +140,7 @@ export function UserPermissionsScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title={`Permissions — ${userName}`} showBack />
+      <AppHeader title={`Permissions — ${userName}`} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* User info card */}

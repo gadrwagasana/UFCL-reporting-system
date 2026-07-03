@@ -121,7 +121,7 @@ function UserCard({
 export function UsersScreen() {
   const navigation = useNavigation<Nav>();
   const myRole     = useAuthStore((s) => s.user?.role as UserRole | undefined);
-  const myId       = useAuthStore((s) => s.user?.id);
+  const myId       = useAuthStore((s) => s.user?.id != null ? Number(s.user.id) : undefined);
 
   const { data, isLoading, isError, refetch, isRefetching } = useAdminUsers();
   const deleteUser  = useDeleteUser();
@@ -191,13 +191,11 @@ export function UsersScreen() {
       <OfflineBanner />
       <AppHeader
         title="Users"
-        showBack
-        rightElement={
-          myRole && hasPermission(myRole, 'admin.users') ? (
-            <TouchableOpacity onPress={() => navigation.navigate('UserDetail', {})}>
-              <Ionicons name="add" size={24} color={Colors.white} />
-            </TouchableOpacity>
-          ) : undefined
+        onBack={() => navigation.goBack()}
+        actions={
+          myRole && hasPermission(myRole, 'admin.users')
+            ? [{ icon: 'add' as const, onPress: () => navigation.navigate('UserDetail', {}) }]
+            : []
         }
       />
 

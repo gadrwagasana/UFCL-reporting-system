@@ -48,7 +48,7 @@ export function RolesScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Role Definitions" showBack />
+      <AppHeader title="Role Definitions" onBack={() => navigation.goBack()} />
 
       {isError ? (
         <ErrorState message="Could not load roles" onRetry={refetch} fullScreen />

@@ -6,6 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
@@ -72,6 +73,7 @@ function ChangeCard({
 }
 
 export function ChangesScreen() {
+  const navigation = useNavigation();
   const { data, isLoading, isError, refetch, isRefetching } = useChanges();
   const submitChange = useSubmitChange();
   const reviewChange = useReviewChange();
@@ -135,7 +137,7 @@ export function ChangesScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Change Requests" showBack />
+      <AppHeader title="Change Requests" onBack={() => navigation.goBack()} />
 
       <FlatList
         data={data?.rows ?? []}

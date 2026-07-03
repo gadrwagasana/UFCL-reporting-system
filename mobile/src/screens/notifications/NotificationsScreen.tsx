@@ -186,7 +186,7 @@ export function NotificationsScreen() {
           ListEmptyComponent={
             <EmptyState
               icon="notifications-off-outline"
-              message={search || category ? 'No notifications match your filters' : 'No notifications'}
+              title={search || category ? 'No notifications match your filters' : 'No notifications'}
             />
           }
           contentContainerStyle={styles.list}

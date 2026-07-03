@@ -122,7 +122,7 @@ export function RoleDetailScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title={existing?.label ?? role} showBack />
+      <AppHeader title={existing?.label ?? role} onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         {/* Role key (read-only) */}
