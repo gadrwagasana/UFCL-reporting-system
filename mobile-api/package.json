@@ -1,6 +1,6 @@
 {
   "name": "ufcl-mobile-api",
-  "version": "1.0.0",
+  "version": "1.5.0",
   "private": true,
   "description": "UFCL Mobile REST API — thin Express.js bridge over db/services/data.js",
   "main": "server.js",
