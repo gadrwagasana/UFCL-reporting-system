@@ -13,9 +13,8 @@ export async function syncQueue(): Promise<void> {
   store.setSyncing(true);
 
   for (const item of pending) {
-    await store.updateItem(item.id, { status: 'syncing' });
-
     try {
+      await store.updateItem(item.id, { status: 'syncing' });
       await apiClient.request({
         method: item.method,
         url:    item.endpoint,

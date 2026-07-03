@@ -13,7 +13,7 @@ export function startNetworkMonitor(): void {
       const prevOnline = useOfflineStore.getState().isOnline;
       useOfflineStore.getState().setOnline(online);
       if (online && !prevOnline) {
-        syncQueue();
+        syncQueue().catch(console.error);
         useAuthStore.getState().revalidateSession();
       }
     });

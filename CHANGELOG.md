@@ -7,6 +7,16 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.6.1] — 2026-07-03 — Crash-fix patch
+
+### Fixed
+- **Fatal crash on startup for authenticated users** — `loadQueue()` was called without `.catch()` in `MainNavigator.useEffect`; if the AsyncStorage cleanup inside `loadQueue`'s own catch block also threw, the rejection escaped to the RN fatal handler and closed the app (~1 s after splash)
+- **Unhandled rejection in offline sync** — `syncQueue()` call in `networkMonitor.ts` was not guarded by `.catch()`; a sync failure when coming back online could crash the app in production
+- **Unhandled rejection in syncService loop** — `store.updateItem()` was outside the per-item try/catch in `syncService.ts`; an AsyncStorage write failure during sync would propagate as an unhandled rejection
+- **Corrupt offline queue recovery** — `offlineStore.ts` catch block called `AsyncStorage.removeItem()` without its own try/catch; a second failure here escaped silently and became a fatal unhandled rejection
+
+---
+
 ## [Unreleased — Mobile ERP parity] — Milestone v0.8-compartments — 2026-07-02
 
 Desktop-parity mobile implementation (Modules 1–8). All modules follow a strict

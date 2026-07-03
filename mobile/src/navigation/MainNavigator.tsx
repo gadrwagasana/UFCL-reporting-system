@@ -30,7 +30,7 @@ export function MainNavigator() {
   // Services are started here — after the user is authenticated — not at app
   // startup. This guarantees the Login screen renders with zero dependencies.
   useEffect(() => {
-    loadQueue();
+    loadQueue().catch(console.error);
     startNetworkMonitor();
     return () => stopNetworkMonitor();
   }, [loadQueue]);

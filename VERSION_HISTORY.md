@@ -4,7 +4,8 @@
 
 | Version | Date | Status |
 |---|---|---|
-| **1.6.0** | 2026-07-03 | **CURRENT — Production** |
+| **1.6.1** | 2026-07-03 | **CURRENT — Production** |
+| 1.6.0 | 2026-07-03 | Superseded — crash bug |
 | 1.0.0 | 2026-06-29 | Superseded |
 
 ---
@@ -90,6 +91,18 @@ Rules:
 ---
 
 ## Version History
+
+### v1.6.1 — 2026-07-03 — Crash-fix Patch
+
+**Fixes only — no new features, no schema changes, no API changes.**
+
+#### Mobile — Bug Fixes
+- **Fatal crash on startup** (`MainNavigator.tsx`): `loadQueue()` was called without `.catch()` in `useEffect`. When the offline queue in AsyncStorage was corrupted, `loadQueue`'s inner catch also threw (second `AsyncStorage.removeItem` call had no error handling), producing an unhandled promise rejection. React Native 0.74 treats unhandled rejections as fatal in production → app closed ~1 second after splash.
+- **Unhandled rejection in networkMonitor** (`networkMonitor.ts`): `syncQueue()` was called without `.catch()` in the NetInfo callback — a sync error when coming back online could crash the app.
+- **Unhandled rejection in syncService loop** (`syncService.ts`): `store.updateItem()` was outside the per-item try/catch — an AsyncStorage write failure during sync could crash the app.
+- **Offline queue crash recovery** (`offlineStore.ts`): the catch block's `AsyncStorage.removeItem()` call is now wrapped in its own try/catch so a second storage failure cannot escape as an unhandled rejection.
+
+---
 
 ### v1.6.0 — 2026-07-03 — Full Mobile Parity Release
 

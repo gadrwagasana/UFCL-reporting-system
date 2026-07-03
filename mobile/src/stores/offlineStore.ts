@@ -34,8 +34,7 @@ export const useOfflineStore = create<OfflineState>((set, get) => ({
       const raw = await AsyncStorage.getItem(QUEUE_KEY);
       if (raw) set({ queue: JSON.parse(raw) as QueueItem[] });
     } catch {
-      // corrupt storage — start fresh
-      await AsyncStorage.removeItem(QUEUE_KEY);
+      try { await AsyncStorage.removeItem(QUEUE_KEY); } catch { /* ignore */ }
     }
   },
 
