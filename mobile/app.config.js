@@ -14,21 +14,33 @@ const variants = {
   development: {
     appName:   'UFCL Dev',
     packageId: 'com.ufcl.mobile.dev',
+    // LAN IP fallback is intentional for local development only
     apiUrl:    process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.5:3001',
   },
   staging: {
     appName:   'UFCL Staging',
     packageId: 'com.ufcl.mobile.staging',
-    apiUrl:    process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.5:3001',
+    apiUrl:    process.env.EXPO_PUBLIC_API_URL,
   },
   production: {
-    appName:   'UFCL Production',
+    appName:   'UFCL',
     packageId: 'com.ufcl.mobile',
-    apiUrl:    process.env.EXPO_PUBLIC_API_URL ?? 'http://192.168.1.5:3001',
+    apiUrl:    process.env.EXPO_PUBLIC_API_URL,
   },
 };
 
 const v = variants[APP_ENV] ?? variants.development;
+
+// Guard: production and staging builds must have a real API URL.
+// Replace the placeholder in eas.json, or set an EAS secret:
+//   eas secret:create --scope project --name EXPO_PUBLIC_API_URL --value <url>
+if (APP_ENV !== 'development' && (!v.apiUrl || v.apiUrl.startsWith('REPLACE_'))) {
+  throw new Error(
+    `[app.config] EXPO_PUBLIC_API_URL is not configured for APP_ENV="${APP_ENV}".\n` +
+    `Edit eas.json and replace "REPLACE_WITH_${APP_ENV.toUpperCase()}_URL" with your API base URL.\n` +
+    `Example: "https://api.ufcl.rw" or "http://192.168.1.5:3001" (LAN only).`
+  );
+}
 
 export default {
   expo: {

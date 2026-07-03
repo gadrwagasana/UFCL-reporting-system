@@ -17,7 +17,8 @@
     "staging": {
       "distribution": "internal",
       "env": {
-        "APP_ENV": "staging"
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "REPLACE_WITH_STAGING_URL"
       },
       "android": {
         "buildType": "apk",
@@ -27,7 +28,8 @@
     "production": {
       "distribution": "store",
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "REPLACE_WITH_PRODUCTION_URL"
       },
       "android": {
         "buildType": "app-bundle",
@@ -37,7 +39,8 @@
     "production-apk": {
       "distribution": "internal",
       "env": {
-        "APP_ENV": "production"
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "REPLACE_WITH_PRODUCTION_URL"
       },
       "android": {
         "buildType": "apk",
