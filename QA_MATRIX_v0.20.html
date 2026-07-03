@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFCL Mobile — QA Matrix v0.20</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px; line-height: 1.5; color: #1e293b; background: #f8fafc;
+  }
+
+  .cover {
+    background: #1e3a5f; color: #fff; padding: 48px 40px 40px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .cover h1 { font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
+  .cover .sub { font-size: 14px; color: #93c5fd; }
+  .cover .meta { font-size: 12px; color: #64748b; margin-top: 8px; }
+
+  .toc { background: #fff; border-bottom: 1px solid #e2e8f0; padding: 16px 40px; }
+  .toc ul { display: flex; flex-wrap: wrap; gap: 6px 24px; list-style: none; }
+  .toc a { color: #2563eb; text-decoration: none; font-size: 12px; font-weight: 500; }
+  .toc a:hover { text-decoration: underline; }
+
+  .page { max-width: 1100px; margin: 0 auto; padding: 32px 40px 64px; }
+
+  h2 {
+    font-size: 17px; font-weight: 700; color: #1e3a5f;
+    border-bottom: 2px solid #1e3a5f; padding-bottom: 6px;
+    margin: 40px 0 16px;
+  }
+  h3 { font-size: 14px; font-weight: 600; color: #334155; margin: 24px 0 10px; }
+  h4 { font-size: 12px; font-weight: 600; color: #475569; margin: 16px 0 6px; }
+
+  p { color: #475569; margin-bottom: 10px; }
+
+  /* ── Tables ─────────────────────────────────────────────── */
+  .wrap { overflow-x: auto; margin-bottom: 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; }
+  th {
+    background: #1e3a5f; color: #fff; font-weight: 600;
+    padding: 7px 10px; text-align: left; white-space: nowrap;
+  }
+  th.center { text-align: center; }
+  td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  tr:hover td { background: #f1f5f9; }
+  td.role { font-weight: 600; color: #1e3a5f; white-space: nowrap; }
+  td.center { text-align: center; }
+
+  /* ── Checkboxes ─────────────────────────────────────────── */
+  input[type=checkbox] {
+    width: 15px; height: 15px; cursor: pointer; accent-color: #2563eb;
+  }
+  .na { color: #94a3b8; font-size: 11px; text-align: center; }
+
+  /* ── Status badges ──────────────────────────────────────── */
+  .badge {
+    display: inline-block; padding: 1px 6px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .badge-green { background: #dcfce7; color: #166534; }
+  .badge-amber { background: #fef3c7; color: #92400e; }
+  .badge-red   { background: #fee2e2; color: #991b1b; }
+  .badge-blue  { background: #dbeafe; color: #1d4ed8; }
+  .badge-gray  { background: #f1f5f9; color: #475569; }
+
+  /* ── Checklist rows ─────────────────────────────────────── */
+  .cl { display: flex; flex-direction: column; gap: 3px; margin-bottom: 10px; }
+  .cl-item { display: flex; align-items: flex-start; gap: 8px; padding: 5px 8px; border-radius: 6px; }
+  .cl-item:hover { background: #f8fafc; }
+  .cl-item label { cursor: pointer; flex: 1; }
+  .cl-item .detail { color: #64748b; font-size: 11px; }
+  .cl-grp { background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .cl-grp-title { font-size: 12px; font-weight: 700; color: #1e3a5f; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; }
+
+  /* ── Tabs ────────────────────────────────────────────────── */
+  .tabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
+  .tab  {
+    display: inline-block; padding: 2px 8px; border-radius: 12px;
+    font-size: 11px; font-weight: 500; border: 1px solid #cbd5e1; color: #475569;
+    background: #fff;
+  }
+  .tab.yes { border-color: #2563eb; color: #1d4ed8; background: #eff6ff; }
+  .tab.no  { border-color: #e2e8f0; color: #cbd5e1; background: #f8fafc; text-decoration: line-through; }
+
+  /* ── Section cards ──────────────────────────────────────── */
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px 18px; margin-bottom: 16px; }
+  .card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .card-title { font-size: 13px; font-weight: 700; color: #1e3a5f; }
+  .card-sub { font-size: 11px; color: #64748b; }
+
+  /* ── Permission deny table ──────────────────────────────── */
+  .deny { color: #991b1b; font-size: 11px; }
+  .allow { color: #166534; font-size: 11px; }
+
+  /* ── Notes ───────────────────────────────────────────────── */
+  .note {
+    background: #fef9c3; border-left: 3px solid #eab308;
+    padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #713f12;
+    margin-bottom: 12px;
+  }
+  .info {
+    background: #eff6ff; border-left: 3px solid #2563eb;
+    padding: 8px 12px; border-radius: 4px; font-size: 12px; color: #1d4ed8;
+    margin-bottom: 12px;
+  }
+
+  /* ── Print ───────────────────────────────────────────────── */
+  @media print {
+    body { background: #fff; font-size: 11px; }
+    .cover { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2 { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ╔═══════════════════════════════════════════════════════════╗ -->
+<!--                        COVER                                -->
+<!-- ╚═══════════════════════════════════════════════════════════╝ -->
+<div class="cover">
+  <h1>UFCL Mobile ERP — QA Smoke-Test Matrix</h1>
+  <div class="sub">Baseline: v0.20-stable · First clean TypeScript build</div>
+  <div class="meta">Generated: 2026-07 · Tester: ______________ · Device: ______________</div>
+</div>
+
+<div class="toc">
+  <ul>
+    <li><a href="#s1">1 — Navigation by Role</a></li>
+    <li><a href="#s2">2 — Module CRUD Matrix</a></li>
+    <li><a href="#s3">3 — Permission Boundaries</a></li>
+    <li><a href="#s4">4 — End-to-End Workflows</a></li>
+    <li><a href="#s5">5 — Reports &amp; Intelligence</a></li>
+    <li><a href="#s6">6 — Sign-Off</a></li>
+    <li><a href="#s7">7 — Production Readiness</a></li>
+  </ul>
+</div>
+
+<div class="page">
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 1 — NAVIGATION AUDIT
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s1">Stage 1 — Navigation Audit by Role</h2>
+<p>Log in as each role. Verify every listed tab opens without a blank screen or crash, back navigation returns to the correct screen, and no tabs from other roles are visible.</p>
+
+<div class="info">For every screen: confirm back button (↩) appears and returns to the previous screen correctly. This was a systematic fix in v0.20 across all Admin screens.</div>
+
+<!-- CEO / Admin -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">admin / ceo</span>
+    <span class="card-title">22 tabs — full access</span>
+  </div>
+  <div class="wrap">
+    <table>
+      <tr>
+        <th>Tab / Screen</th><th class="center">Opens</th><th class="center">Back ↩</th><th class="center">Data loads</th><th>Notes</th>
+      </tr>
+      <tr><td>Dashboard</td><td class="center"><input type="checkbox"></td><td class="center">n/a</td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>CEO Overview</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>CEO Approvals</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Customers</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Products</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Vehicles</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Machines / KPI</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Workshop Overview</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Workshop Management</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Compartments</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Stock Catalog</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Stock Inventory</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Stock Movements</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Timber Inventory</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Stock Transfers</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Dispatch</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Sales Orders</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Deliveries</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Reports hub</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>All 9 report cards visible</td></tr>
+      <tr><td>Admin hub → all 7 sub-screens</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>Users, Roles, SecGov, Audit, Trash, Changes, Automation</td></tr>
+      <tr><td>Notifications</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+      <tr><td>Profile</td><td class="center"><input type="checkbox"></td><td class="center">n/a</td><td class="center"><input type="checkbox"></td><td></td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- Operations -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">operations</span>
+    <span class="card-title">20 tabs — no Vehicles, Deliveries; has MaterialReview, LabourReview</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Dashboard</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Pending Reviews</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Material Review</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Labour Review</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Sales Orders</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Reports hub</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>Weekly Cost, Weekly Perf, Executive, BI, Export, EPM visible; KPI/Monthly/Sage NOT visible</td></tr>
+    <tr><td>Admin hub</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>SecGov, Audit, Users (read), Trash, Changes, Automation visible; Roles NOT visible</td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Finance -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">finance</span>
+    <span class="card-title">3 tabs — Overview, Reports, My Requests</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Overview</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Reports hub</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>Weekly Cost, Monthly, Export, <strong>Sage</strong> visible; Executive/BI/EPM/KPI NOT visible</td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Logistics -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">logistics</span>
+    <span class="card-title">15 tabs — includes VehicleFuel, Dispatch, LogisticsDashboard</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Logistics Dashboard</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Delivery List</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Vehicles</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Vehicle Fuel</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Dispatch</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Stock (all 5 screens)</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Sales -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">sales</span>
+    <span class="card-title">6 tabs — Sales-focused; no stock or reports</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Dashboard</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Sales Orders</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Delivery Status</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Customers</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Products</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Supervisor -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">supervisor</span>
+    <span class="card-title">10 tabs — Today Dashboard, Material, Labour, Stock, Reports</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Today Dashboard</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Material Request</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Casual Labour</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Compartments</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Stock Movements / Timber / Transfers</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Reports (BI + Export only)</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td>Only BI and Export visible</td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Storekeeper -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">storekeeper</span>
+    <span class="card-title">10 tabs — Stock-focused; includes Material Review</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Dashboard</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Workshop Overview / Management</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Stock Catalog / Inventory / Movements / Transfers</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Material Review</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Reports (BI + Export only)</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+<!-- Production leaders -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">harvesting-leader / sawmill-leader / poles-leader / vat-leader</span>
+    <span class="card-title">7–9 tabs each — production-specific + requests + stock movements + reports (BI only)</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Role</th><th>Expected tabs</th><th class="center">Opens</th><th class="center">Data loads</th></tr>
+    <tr><td class="role">harvesting-leader</td><td>HarvestList, LogTransport, Material, Labour, StockMovements, Reports(BI), MyRequests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">sawmill-leader</td><td>SawmillList, Material, Labour, StockMovements, Reports(BI), MyRequests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">poles-leader</td><td>PolesList, Purchase, Delivery, QC, Material, StockMovements, Reports(BI), MyRequests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">vat-leader</td><td>VatInbound, VatEntries, Material, Labour, StockMovements, Reports(BI), MyRequests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+  </table></div>
+</div>
+
+<!-- Supervisors -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">*-supervisor roles</span>
+    <span class="card-title">3–4 tabs each — read-only production views + profile</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Role</th><th>Expected tabs</th><th class="center">Opens</th><th class="center">Data loads</th></tr>
+    <tr><td class="role">harvesting-supervisor</td><td>HarvestList, LogTransport, Reports(BI), Profile</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">sawmill-supervisor</td><td>SawmillList, Reports(BI), Profile</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">poles-supervisor</td><td>PolesList, PolesDelivery, Profile</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+    <tr><td class="role">vat-supervisor</td><td>VatInbound, VatEntries, Profile</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td></tr>
+  </table></div>
+</div>
+
+<!-- Mechanician -->
+<div class="card no-break">
+  <div class="card-header">
+    <span class="badge badge-blue">mechanician</span>
+    <span class="card-title">3 tabs — Machine logs, fuel logs, my requests</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Tab</th><th class="center">Opens</th><th class="center">Data loads</th><th>Notes</th></tr>
+    <tr><td>Machine Log List</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>Machine Fuel List</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+    <tr><td>My Requests</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  </table></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 2 — MODULE CRUD MATRIX
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s2">Stage 2 — Module CRUD Matrix</h2>
+<p>For each module, verify the listed operations work for the roles that should have access. A dash (—) means the operation does not apply to this module.</p>
+
+<div class="wrap">
+<table>
+  <tr>
+    <th>Module</th>
+    <th class="center">View</th>
+    <th class="center">Create</th>
+    <th class="center">Edit</th>
+    <th class="center">Delete</th>
+    <th class="center">Approve / Governance</th>
+    <th class="center">Export</th>
+    <th>Who can write</th>
+  </tr>
+
+  <tr><td><strong>Sales Orders</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>admin, ceo, operations, sales</td></tr>
+
+  <tr><td><strong>Sales — Payments</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, sales</td></tr>
+
+  <tr><td><strong>Deliveries</strong></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, sales, logistics</td></tr>
+
+  <tr><td><strong>Dispatch</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, logistics</td></tr>
+
+  <tr><td><strong>Stock Catalog</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, logistics, storekeeper</td></tr>
+
+  <tr><td><strong>Stock Inventory</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, logistics, storekeeper</td></tr>
+
+  <tr><td><strong>Stock Movements</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, logistics, supervisor, storekeeper, leaders</td></tr>
+
+  <tr><td><strong>Stock Transfers</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>Request: supervisor, leaders · Approve: admin, ceo, operations</td></tr>
+
+  <tr><td><strong>Timber Inventory</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, storekeeper, supervisor, leaders</td></tr>
+
+  <tr><td><strong>Compartments</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, supervisor</td></tr>
+
+  <tr><td><strong>Workshop Items</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, logistics, storekeeper</td></tr>
+
+  <tr><td><strong>Workshop Consumption</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>admin, ceo, operations, logistics, storekeeper</td></tr>
+
+  <tr><td><strong>Material Requests</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>Create: supervisor, leaders, storekeeper-asst · Review: admin, operations, storekeeper</td></tr>
+
+  <tr><td><strong>Casual Labour</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>Create: supervisor, leaders · Review: admin, operations</td></tr>
+
+  <tr><td><strong>Harvest Log</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>harvesting-leader</td></tr>
+
+  <tr><td><strong>Log Transport</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>harvesting-leader</td></tr>
+
+  <tr><td><strong>Sawmill</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>sawmill-leader</td></tr>
+
+  <tr><td><strong>Poles Production</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>poles-leader</td></tr>
+
+  <tr><td><strong>VAT</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>vat-leader</td></tr>
+
+  <tr><td><strong>Machine Logs</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>mechanician</td></tr>
+
+  <tr><td><strong>Machine Fuel</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>mechanician</td></tr>
+
+  <tr><td><strong>Vehicle Fuel</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>logistics</td></tr>
+
+  <tr><td><strong>Customers</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, sales</td></tr>
+
+  <tr><td><strong>Products</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, sales</td></tr>
+
+  <tr><td><strong>Vehicles</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, logistics</td></tr>
+
+  <tr><td><strong>Machines</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo, operations, logistics</td></tr>
+
+  <tr><td><strong>Users (Admin)</strong></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td>admin, ceo only</td></tr>
+
+  <tr><td><strong>Weekly Expenses (in reports)</strong></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo, finance</td></tr>
+
+  <tr><td><strong>Change Requests (My Requests)</strong></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="center"><input type="checkbox"></td><td class="na">—</td><td>All roles can submit; admin/ceo/operations review</td></tr>
+
+  <tr><td><strong>Notifications</strong></td><td class="center"><input type="checkbox"></td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td class="na">—</td><td>admin, ceo (others may receive push)</td></tr>
+</table>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 3 — PERMISSION BOUNDARIES
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s3">Stage 3 — Permission Boundary Tests</h2>
+<p>These tests verify that unauthorized access is blocked at <strong>both</strong> the UI layer (button/card not shown) and the API layer (HTTP 401/403 returned). Test each item with the listed role.</p>
+
+<div class="note">API rejection is as important as UI hiding. The API must still reject requests even if someone bypasses the UI. Test with a REST client or check server logs if possible.</div>
+
+<div class="cl-grp">
+  <div class="cl-grp-title">Reports — visibility by role</div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Finance sees <strong>Weekly Cost, Monthly, Export, Sage</strong> — and NO Executive, BI, KPI, EPM</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Supervisor / Storekeeper see <strong>BI and Export only</strong></label></div>
+    <div class="cl-item"><input type="checkbox"><label>Operations sees <strong>Weekly Cost, Weekly Perf, Executive, BI, Export, EPM</strong> — no KPI, no Monthly, no Sage</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Production leaders (harvesting/sawmill/poles/vat) see <strong>BI only</strong></label></div>
+    <div class="cl-item"><input type="checkbox"><label>Admin / CEO see all 9 report cards</label></div>
+  </div>
+</div>
+
+<div class="cl-grp">
+  <div class="cl-grp-title">Admin hub — visibility by role</div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Operations can see Automation Center but <strong>cannot Edit rules</strong> (edit button hidden)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Operations <strong>cannot see Roles</strong> in Admin hub</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Finance has <strong>no Admin hub tab</strong> at all</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Sales, logistics, supervisors have <strong>no Admin hub tab</strong></label></div>
+    <div class="cl-item"><input type="checkbox"><label>Only admin/ceo can see Users + button and delete buttons in UsersScreen</label></div>
+  </div>
+</div>
+
+<div class="cl-grp">
+  <div class="cl-grp-title">Write operations — UI gating</div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Sales Orders: <strong>Create/Edit/Delete</strong> buttons hidden from logistics, supervisor, storekeeper</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Stock Catalog: <strong>Edit/Delete</strong> not available to *-supervisor roles</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Automation Rules: <strong>Edit rule toggle</strong> hidden from operations (automation.edit_rules not granted)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>EPM Action Plans: <strong>read-only</strong> for all roles — no create/edit buttons visible</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Automation Escalations: <strong>Resolve button</strong> hidden for roles without automation.escalation_resolve</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Material Request priority <strong>"Critical"</strong> option appears correctly (no "High" option)</label></div>
+  </div>
+</div>
+
+<div class="cl-grp">
+  <div class="cl-grp-title">Governance flows — approval gating</div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Material Request: supervisor cannot approve their own request (operations/admin/storekeeper must review)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Stock Transfer: dispatch action requires transfer.act; approve requires transfer.approve</label></div>
+    <div class="cl-item"><input type="checkbox"><label>CEO Approvals tab: accessible to admin and ceo only — not visible to other roles</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Monthly report: "Approve" button only visible for admin/ceo (monthly.approve permission)</label></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 4 — END-TO-END WORKFLOWS
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s4">Stage 4 — End-to-End Workflow Audit</h2>
+<p>Each workflow spans multiple modules. Verify data flows correctly through the full chain — not just individual screens in isolation.</p>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow A — Production → Stock → Sales</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label><strong>Harvest entry created</strong> by harvesting-leader and appears in harvest list</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Log transport recorded</strong> and appears in transport list</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Sawmill entry created</strong> from timber; appears in sawmill list</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Stock movement recorded</strong>; Timber Inventory updated correctly</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Sales Order created</strong> for a customer; payment recorded</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Delivery status updated</strong> by logistics/sales</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Dispatch recorded</strong> and linked to delivery</label></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow B — Material Request → Approval → Inventory</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label><strong>Supervisor submits</strong> material request (priority: Normal or Urgent or Critical)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Request appears in <strong>Material Review</strong> screen for operations/storekeeper</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Operations <strong>approves</strong> request; stock consumption is recorded</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Rejected request appears in My Requests with rejected status</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Change Request</strong> submitted by leader; appears in Changes screen; admin reviews</label></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow C — Stock Transfer</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Supervisor <strong>creates transfer request</strong> between two locations</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Transfer appears in <strong>Stock Transfers list</strong> with Pending status</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Operations/admin <strong>approves transfer</strong>; status updates</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Logistics officer <strong>dispatches</strong> the transfer</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Inventory balances</strong> reflect the movement correctly</label></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow D — Casual Labour</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Leader <strong>submits casual labour</strong> request with workers and rates</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Request appears in <strong>Labour Review</strong> for operations/admin</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Operations <strong>approves</strong>; record is finalized</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Approved labour appears in <strong>monthly labour cost</strong> totals</label></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow E — CEO Approval flow</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Action requiring CEO approval is submitted (e.g. Poles delivery, sales order above threshold)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Item appears in <strong>CEO Approvals</strong> list</label></div>
+    <div class="cl-item"><input type="checkbox"><label>CEO <strong>approves or rejects</strong>; status propagates back to originating module</label></div>
+  </div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Workflow F — Automation Engine</span>
+  </div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>Admin opens Automation Center; <strong>system health</strong> card shows correct status</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Rule list</strong> loads with severity and enabled/disabled state</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Tapping a rule opens <strong>Rule Detail</strong>; admin can toggle enabled state and save</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Run Now</strong> button triggers automation check; recent runs update</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Escalations</strong> screen shows active escalations; Acknowledge and Resolve actions work</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>History</strong> tab shows past automation events with filter chips</label></div>
+    <div class="cl-item"><input type="checkbox"><label><strong>Jobs</strong> tab shows pending and failed jobs</label></div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 5 — REPORTS & INTELLIGENCE
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s5">Stage 5 — Reports &amp; Intelligence Audit</h2>
+<p>Verify each report loads real data, displays correctly, and exports/shares where applicable. Use a device with production-level data for this stage.</p>
+
+<div class="wrap"><table>
+  <tr>
+    <th>Report</th>
+    <th class="center">Loads</th>
+    <th class="center">Data correct</th>
+    <th class="center">Pull-to-refresh</th>
+    <th class="center">Export / Share</th>
+    <th>Key checks</th>
+  </tr>
+  <tr>
+    <td><strong>Weekly Cost</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>KPI banner totals match table; variance colors correct; finance can edit expense amounts</td>
+  </tr>
+  <tr>
+    <td><strong>Weekly Performance</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Production metrics load; machine downtime shows</td>
+  </tr>
+  <tr>
+    <td><strong>KPI Scorecard</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Budget targets per category; variance RAG correct</td>
+  </tr>
+  <tr>
+    <td><strong>Executive Dashboard</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Revenue trend LineChart renders; top machines/drivers list populates</td>
+  </tr>
+  <tr>
+    <td><strong>Business Intelligence</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Predictive analytics section; risk cards; recommendations list</td>
+  </tr>
+  <tr>
+    <td><strong>Monthly Dashboard</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Month selector works; approve button visible for admin/ceo only</td>
+  </tr>
+  <tr>
+    <td><strong>Export</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td><td class="center"><input type="checkbox"></td>
+    <td>CSV share sheet opens; file downloads correctly</td>
+  </tr>
+  <tr>
+    <td><strong>Enterprise Performance (EPM)</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Company score hero renders; exec scorecard dimensions load; dept drill-down opens correctly</td>
+  </tr>
+  <tr>
+    <td><strong>EPM → Departments</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>8 dept cards in 2-col grid; risk_level badge colors correct; tap → dept KPIs</td>
+  </tr>
+  <tr>
+    <td><strong>EPM → KPI Dashboard</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Search + dept chip + status chip filtering all combine correctly</td>
+  </tr>
+  <tr>
+    <td><strong>EPM → Action Plans</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>Status summary row; tap expands root cause; read-only (no edit buttons)</td>
+  </tr>
+  <tr>
+    <td><strong>EPM → Trends</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="na">n/a</td>
+    <td>6 LineChart widgets render with correct labels and period ranges</td>
+  </tr>
+  <tr>
+    <td><strong>Sage Reconciliation</strong></td>
+    <td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td>
+    <td>Period label correct; Clear/Monitor/Review needed badges; CSV export opens share sheet with .csv attachment</td>
+  </tr>
+</table></div>
+
+<h3>Edge cases — Reports</h3>
+<div class="cl">
+  <div class="cl-item"><input type="checkbox"><label>All reports show a graceful empty state when there is no data for the period</label></div>
+  <div class="cl-item"><input type="checkbox"><label>All reports show an error state + retry button when the API is unreachable</label></div>
+  <div class="cl-item"><input type="checkbox"><label>EPM trends render "Not enough data points" for series with fewer than 2 values</label></div>
+  <div class="cl-item"><input type="checkbox"><label>Sage CSV exported file can be opened in a spreadsheet application</label></div>
+  <div class="cl-item"><input type="checkbox"><label>Notifications empty state reads correctly (was a fixed bug in v0.20)</label></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 7 — PRODUCTION READINESS
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s7">Stage 7 — Production Readiness</h2>
+<p>Complete this stage before tagging a release candidate. All items must pass before a version tag is created on GitHub.</p>
+
+<div class="note">This is the gate between QA and release. A GitHub tag is the ONLY production release mechanism — never publish without completing this checklist.</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Code &amp; Build Integrity</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td><code>npx tsc --noEmit</code> exits with zero errors</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Baseline established at v0.20-stable — must remain clean</td>
+    </tr>
+    <tr>
+      <td>No <code>console.error</code> or unhandled promise rejections during full smoke test</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Check Expo dev tools / Metro logs throughout Stage 1–5</td>
+    </tr>
+    <tr>
+      <td>No React Native "yellow box" warnings in critical paths</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Warnings in vendor code are acceptable; own code must be clean</td>
+    </tr>
+    <tr>
+      <td>All <code>// TODO</code> / <code>// FIXME</code> comments reviewed and resolved or deferred</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Version field in <code>mobile/app.json</code> matches intended release tag</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>e.g. <code>version: "1.0.0"</code>, <code>buildNumber</code> / <code>versionCode</code> incremented</td>
+    </tr>
+  </table></div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Environment &amp; Configuration</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td>API base URL points to production server (not localhost / staging)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Verify <code>mobile/src/api/client.ts</code> or env config</td>
+    </tr>
+    <tr>
+      <td>JWT secret and token expiry configured correctly on production API</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Check <code>mobile-api/.env</code> is NOT committed; production secrets in server env only</td>
+    </tr>
+    <tr>
+      <td>All environment variables verified on the production server (DB connection, port, etc.)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Production API endpoints reachable from the test device over production network</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Test login, a data fetch, and a write from a fresh install</td>
+    </tr>
+    <tr>
+      <td>SSL certificate valid and not expiring within 30 days</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+  </table></div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">App Assets &amp; Identity</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td>App icon correct on launcher (Android) and home screen (iOS)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>UFCL branding, not Expo default</td>
+    </tr>
+    <tr>
+      <td>Splash screen displays correctly on first launch</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Verify on both small and large screen sizes</td>
+    </tr>
+    <tr>
+      <td>App name shown on launcher matches expected display name</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Bundle ID / application ID correct for distribution target</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+  </table></div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Offline &amp; Error Resilience</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td>Offline banner appears correctly when network is disabled</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Enable airplane mode; confirm OfflineBanner renders on screens that use it</td>
+    </tr>
+    <tr>
+      <td>Offline-queued actions (material requests) sync correctly on reconnect</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Submit a request offline; re-enable network; confirm it appears server-side</td>
+    </tr>
+    <tr>
+      <td>All screens show ErrorState + retry button when API is unreachable</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Spot-check 5 screens across different modules</td>
+    </tr>
+    <tr>
+      <td>Authentication token expiry handled gracefully (redirect to login, not crash)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Force-expire token in DB or wait for natural expiry</td>
+    </tr>
+  </table></div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Release Artefacts</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td>Release APK or AAB generated successfully via <code>eas build</code> or <code>expo build</code></td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Build must complete without errors; size within acceptable range</td>
+    </tr>
+    <tr>
+      <td>Generated APK installs and launches on a clean device (no Metro bundler running)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Critical — Expo dev builds behave differently from production bundles</td>
+    </tr>
+    <tr>
+      <td>CHANGELOG updated with all changes since last release</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Reference: <code>CHANGELOG.md</code> at project root</td>
+    </tr>
+    <tr>
+      <td>GitHub release tag created (<code>v1.x.x</code>) with release notes</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Tag is the ONLY production release mechanism — no local-only publishes</td>
+    </tr>
+    <tr>
+      <td>APK/AAB attached to the GitHub release as a downloadable asset</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+  </table></div>
+</div>
+
+<div class="card no-break">
+  <div class="card-header">
+    <span class="card-title">Database &amp; Operations</span>
+  </div>
+  <div class="wrap"><table>
+    <tr><th>Check</th><th class="center">Pass</th><th>Notes</th></tr>
+    <tr>
+      <td>All pending database migrations have been run on production (<code>npm run migrate</code>)</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Verify migration table matches the release's schema expectations</td>
+    </tr>
+    <tr>
+      <td>Production database has a verified backup taken within the last 24 hours</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Backup restore procedure documented and tested at least once</td>
+      <td class="center"><input type="checkbox"></td>
+      <td>Reference: deployment/admin documentation</td>
+    </tr>
+    <tr>
+      <td>PM2 / nginx service restarts verified post-deployment</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>Log rotation confirmed active; disk usage within acceptable limits</td>
+      <td class="center"><input type="checkbox"></td>
+      <td></td>
+    </tr>
+  </table></div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════════════════════
+     STAGE 6 — SIGN-OFF
+     ══════════════════════════════════════════════════════════════ -->
+<h2 id="s6">Stage 6 — Sign-Off</h2>
+
+<div class="card">
+  <div class="cl-grp-title" style="margin-bottom:12px">Overall QA verdict</div>
+  <div class="cl">
+    <div class="cl-item"><input type="checkbox"><label>All navigation routes open without crashes</label></div>
+    <div class="cl-item"><input type="checkbox"><label>All back buttons work (v0.20 fix)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>No role can access data or actions beyond their permission level</label></div>
+    <div class="cl-item"><input type="checkbox"><label>All CRUD operations work for authorized roles</label></div>
+    <div class="cl-item"><input type="checkbox"><label>All end-to-end workflows complete without breaking</label></div>
+    <div class="cl-item"><input type="checkbox"><label>All reports load with real data and display correctly</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Exports produce valid, openable files</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Empty states and error states render correctly throughout</label></div>
+    <div class="cl-item"><input type="checkbox"><label>Offline scenarios handle gracefully (where offline support is implemented)</label></div>
+    <div class="cl-item"><input type="checkbox"><label>All Stage 7 production readiness items passed — release artefact generated and tagged on GitHub</label></div>
+  </div>
+</div>
+
+<div class="wrap" style="margin-top:24px"><table>
+  <tr>
+    <th>Item</th><th>Detail</th><th class="center">Pass</th><th class="center">Fail</th><th>Notes / Bugs found</th>
+  </tr>
+  <tr><td>Stage 1 — Navigation</td><td>All roles, all tabs</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  <tr><td>Stage 2 — CRUD</td><td>All modules, all operations</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  <tr><td>Stage 3 — Permissions</td><td>UI + API boundaries</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  <tr><td>Stage 4 — Workflows</td><td>6 end-to-end flows</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  <tr><td>Stage 5 — Reports</td><td>13 report surfaces + edge cases</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+  <tr><td>Stage 7 — Production Readiness</td><td>Build, environment, assets, offline, release artefacts, DB ops</td><td class="center"><input type="checkbox"></td><td class="center"><input type="checkbox"></td><td></td></tr>
+</table></div>
+
+<div style="margin-top:32px; display:flex; gap:64px;">
+  <div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:24px">QA Tester</div>
+    <div style="border-top:1px solid #94a3b8;width:220px;padding-top:4px;font-size:11px;color:#94a3b8">Signature / Date</div>
+  </div>
+  <div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:24px">Product Owner</div>
+    <div style="border-top:1px solid #94a3b8;width:220px;padding-top:4px;font-size:11px;color:#94a3b8">Signature / Date</div>
+  </div>
+</div>
+
+</div><!-- /page -->
+</body>
+</html>

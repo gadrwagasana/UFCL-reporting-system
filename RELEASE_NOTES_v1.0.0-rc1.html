@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UFCL Mobile ERP — Release Notes v1.0.0-rc1</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 13px; line-height: 1.6; color: #1e293b; background: #f8fafc;
+  }
+
+  .cover {
+    background: #1e3a5f; color: #fff; padding: 48px 40px 40px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .cover h1 { font-size: 26px; font-weight: 700; letter-spacing: -.5px; }
+  .cover .version { font-size: 18px; color: #93c5fd; font-weight: 600; }
+  .cover .sub { font-size: 13px; color: #94a3b8; }
+  .cover .meta { display: flex; gap: 32px; margin-top: 8px; }
+  .cover .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .cover .meta-label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: .6px; }
+  .cover .meta-value { font-size: 13px; color: #e2e8f0; font-weight: 500; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 32px 40px 64px; }
+
+  h2 {
+    font-size: 16px; font-weight: 700; color: #1e3a5f;
+    border-bottom: 2px solid #1e3a5f; padding-bottom: 6px;
+    margin: 40px 0 16px;
+  }
+  h3 { font-size: 13px; font-weight: 700; color: #334155; margin: 20px 0 8px; }
+
+  p  { color: #475569; margin-bottom: 10px; }
+  ul { padding-left: 20px; margin-bottom: 10px; color: #475569; }
+  li { margin-bottom: 4px; }
+  code {
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+    font-size: 11px; background: #f1f5f9; border: 1px solid #e2e8f0;
+    padding: 1px 5px; border-radius: 3px; color: #0f172a;
+  }
+  pre {
+    background: #0f172a; color: #e2e8f0; padding: 16px 18px; border-radius: 8px;
+    font-size: 11px; overflow-x: auto; margin-bottom: 12px;
+    font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace; line-height: 1.7;
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  }
+  .rc    { background: #dbeafe; color: #1d4ed8; }
+  .new   { background: #dcfce7; color: #166534; }
+  .fix   { background: #fef3c7; color: #92400e; }
+  .note  { background: #fee2e2; color: #991b1b; }
+  .defer { background: #f1f5f9; color: #475569; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin-bottom: 16px; }
+  th { background: #1e3a5f; color: #fff; font-weight: 600; padding: 7px 10px; text-align: left; }
+  td { padding: 7px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  tr:hover td { background: #f8fafc; }
+
+  .card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+    padding: 16px 18px; margin-bottom: 14px;
+  }
+  .card-title { font-size: 12px; font-weight: 700; color: #1e3a5f; margin-bottom: 8px; }
+
+  .warn {
+    background: #fef9c3; border-left: 3px solid #eab308;
+    padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #713f12;
+    margin-bottom: 14px;
+  }
+  .info {
+    background: #eff6ff; border-left: 3px solid #2563eb;
+    padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #1e40af;
+    margin-bottom: 14px;
+  }
+  .danger {
+    background: #fee2e2; border-left: 3px solid #ef4444;
+    padding: 10px 14px; border-radius: 4px; font-size: 12px; color: #991b1b;
+    margin-bottom: 14px;
+  }
+
+  .module-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px; margin-bottom: 16px;
+  }
+  .module-card {
+    background: #fff; border: 1px solid #e2e8f0; border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .module-name { font-size: 12px; font-weight: 700; color: #1e3a5f; margin-bottom: 4px; }
+  .module-sub  { font-size: 11px; color: #64748b; }
+  .module-screens { font-size: 11px; color: #94a3b8; margin-top: 4px; }
+
+  .version-ladder {
+    display: flex; flex-direction: column; gap: 0; margin: 16px 0;
+  }
+  .vl-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+    background: #fff; border: 1px solid #e2e8f0; position: relative;
+  }
+  .vl-row:first-child { border-radius: 8px 8px 0 0; }
+  .vl-row:last-child  { border-radius: 0 0 8px 8px; }
+  .vl-row.current { background: #eff6ff; border-color: #2563eb; }
+  .vl-row.target  { background: #f0fdf4; border-color: #16a34a; }
+  .vl-tag  { font-family: monospace; font-size: 12px; font-weight: 700; color: #1e3a5f; min-width: 120px; }
+  .vl-desc { font-size: 12px; color: #475569; }
+
+  .sign-table { margin-top: 32px; }
+  .sign-row   { display: flex; gap: 64px; margin-top: 32px; }
+  .sign-block { display: flex; flex-direction: column; gap: 20px; }
+  .sign-label { font-size: 11px; color: #64748b; }
+  .sign-line  { border-top: 1px solid #94a3b8; width: 220px; padding-top: 4px; font-size: 10px; color: #94a3b8; }
+
+  @media print {
+    body { background: #fff; }
+    .cover { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    th { background: #1e3a5f !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    h2 { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div>
+    <div style="font-size:11px;color:#64748b;letter-spacing:.8px;text-transform:uppercase;margin-bottom:6px">UFCL Mobile ERP · Uganda Forestry &amp; Commercial Ltd</div>
+    <h1>Release Notes</h1>
+    <div class="version">v1.0.0-rc1 — Release Candidate 1</div>
+    <div class="sub">Mobile application for field operations, executive reporting, and enterprise governance</div>
+  </div>
+  <div class="meta">
+    <div class="meta-item"><span class="meta-label">Status</span><span class="meta-value">Release Candidate</span></div>
+    <div class="meta-item"><span class="meta-label">Baseline</span><span class="meta-value">v0.20-stable</span></div>
+    <div class="meta-item"><span class="meta-label">Platform</span><span class="meta-value">Android (React Native / Expo 51)</span></div>
+    <div class="meta-item"><span class="meta-label">Prepared by</span><span class="meta-value">__________________</span></div>
+    <div class="meta-item"><span class="meta-label">Date</span><span class="meta-value">__________________</span></div>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ── Version ladder ─────────────────────────────────────────── -->
+<h2>Release Sequence</h2>
+<div class="version-ladder">
+  <div class="vl-row"><span class="vl-tag">v0.20-stable</span><span class="vl-desc">Feature-complete baseline — first clean TypeScript build (zero <code>tsc --noEmit</code> errors)</span></div>
+  <div class="vl-row current"><span class="vl-tag">v1.0.0-rc1 ◀ here</span><span class="vl-desc">Tagged after first complete 7-stage QA matrix execution with no blocking defects</span></div>
+  <div class="vl-row"><span class="vl-tag">v1.0.0-rc2</span><span class="vl-desc">Only if rc1 reveals blocking defects that require fixes and a second full QA pass</span></div>
+  <div class="vl-row target"><span class="vl-tag">v1.0.0 ✓</span><span class="vl-desc">Production release — after navigation redesign (Phase 2) and final QA sign-off</span></div>
+</div>
+
+<div class="info"><strong>Feature freeze is in effect.</strong> No new features may be added between v0.20-stable and v1.0.0 unless directly required to resolve a QA finding. The navigation redesign (Phase 2) is scheduled after rc1 QA sign-off, not before.</div>
+
+
+<!-- ── What's in this release ─────────────────────────────────── -->
+<h2>Modules Included in This Release</h2>
+<p>All modules below have been implemented to match the desktop application (<code>renderer/app.js</code>) in screens, logic, permissions, approvals, and data layer.</p>
+
+<h3>Field Operations</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">Harvest &amp; Log Transport</div>
+    <div class="module-sub">Daily harvest logs and transport tracking</div>
+    <div class="module-screens">Roles: harvesting-leader, harvesting-supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Sawmill Production</div>
+    <div class="module-sub">Sawmill daily production entries with timber formulas</div>
+    <div class="module-screens">Roles: sawmill-leader, sawmill-supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Poles Production</div>
+    <div class="module-sub">Purchase, delivery, QC stages</div>
+    <div class="module-screens">Roles: poles-leader, poles-supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">VAT Operations</div>
+    <div class="module-sub">Inbound records and VAT entries</div>
+    <div class="module-screens">Roles: vat-leader, vat-supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Casual Labour</div>
+    <div class="module-sub">Submit and review casual workforce requests</div>
+    <div class="module-screens">Create: leaders · Review: operations, admin</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Material Requests</div>
+    <div class="module-sub">Offline-capable request queue + stock fulfilment</div>
+    <div class="module-screens">Create: supervisor, leaders · Review: operations, storekeeper</div>
+  </div>
+</div>
+
+<h3>Inventory &amp; Logistics</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">Stock Catalog</div>
+    <div class="module-sub">Item registry with UOM and category management</div>
+    <div class="module-screens">Roles: admin, ceo, operations, logistics, storekeeper</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Stock Inventory</div>
+    <div class="module-sub">Current stock levels and adjustments</div>
+    <div class="module-screens">Roles: admin, ceo, operations, logistics, storekeeper</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Stock Movements</div>
+    <div class="module-sub">Inbound / outbound movement ledger</div>
+    <div class="module-screens">Most field roles (read) · admin, operations (write)</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Stock Transfers</div>
+    <div class="module-sub">Inter-location transfer requests with approval flow</div>
+    <div class="module-screens">Request: supervisor, leaders · Approve: admin, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Timber Inventory</div>
+    <div class="module-sub">Graded timber stock per species and grade</div>
+    <div class="module-screens">Roles: admin, ceo, operations, storekeeper, supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Compartments</div>
+    <div class="module-sub">Forest compartment registry and assignments</div>
+    <div class="module-screens">Roles: admin, ceo, operations, supervisor</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Vehicle Fleet</div>
+    <div class="module-sub">Vehicle registry and fuel log</div>
+    <div class="module-screens">Roles: admin, ceo, logistics</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Dispatch</div>
+    <div class="module-sub">Outbound shipment dispatch records</div>
+    <div class="module-screens">Roles: admin, ceo, logistics</div>
+  </div>
+</div>
+
+<h3>Workshop &amp; Equipment</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">Workshop Management</div>
+    <div class="module-sub">Items, stock levels, consumption log, low-stock alerts</div>
+    <div class="module-screens">Roles: admin, ceo, operations, logistics, storekeeper</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Machine Registry &amp; KPI</div>
+    <div class="module-sub">Machine profiles, daily logs, performance KPIs</div>
+    <div class="module-screens">Roles: admin, ceo, operations, logistics · Logs: mechanician</div>
+  </div>
+</div>
+
+<h3>Sales &amp; Customer Management</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">Sales Orders</div>
+    <div class="module-sub">Order lifecycle from creation to payment</div>
+    <div class="module-screens">Roles: admin, ceo, operations, sales</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Deliveries</div>
+    <div class="module-sub">Delivery status tracking linked to sales orders</div>
+    <div class="module-screens">Roles: admin, ceo, sales, logistics</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Customers</div>
+    <div class="module-sub">Customer registry with contact and credit details</div>
+    <div class="module-screens">Roles: admin, ceo, operations, sales</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Products</div>
+    <div class="module-sub">Product catalog and pricing</div>
+    <div class="module-screens">Roles: admin, ceo, operations, sales</div>
+  </div>
+</div>
+
+<h3>Administration &amp; Governance</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">User Management</div>
+    <div class="module-sub">Create, edit, deactivate users; reset passwords</div>
+    <div class="module-screens">Roles: admin, ceo</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Role Definitions</div>
+    <div class="module-sub">View permission matrix per role</div>
+    <div class="module-screens">Roles: admin, ceo</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Security &amp; Governance</div>
+    <div class="module-sub">Failed logins, approval health, security event feed</div>
+    <div class="module-screens">Roles: admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Audit Trail</div>
+    <div class="module-sub">Full action log with role and module filtering</div>
+    <div class="module-screens">Roles: admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Trash &amp; Recovery</div>
+    <div class="module-sub">30-day soft-delete with restore and purge</div>
+    <div class="module-screens">Restore: admin, ceo, operations · Purge: admin, ceo</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Change Requests</div>
+    <div class="module-sub">Structured change request workflow with review</div>
+    <div class="module-screens">All roles · Review: admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Automation Center</div>
+    <div class="module-sub">Rule management, escalations, job queue, history</div>
+    <div class="module-screens">View: admin, ceo, operations · Edit rules: admin, ceo</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">CEO Approvals</div>
+    <div class="module-sub">Executive approval queue across all modules</div>
+    <div class="module-screens">Roles: admin, ceo</div>
+  </div>
+</div>
+
+<h3>Reports &amp; Intelligence</h3>
+<div class="module-grid">
+  <div class="module-card">
+    <div class="module-name">Weekly Cost Report</div>
+    <div class="module-sub">Expenses vs budget by category; finance can edit</div>
+    <div class="module-screens">admin, ceo, operations, finance</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Weekly Performance</div>
+    <div class="module-sub">Production output metrics and machine downtime</div>
+    <div class="module-screens">admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">KPI Scorecard</div>
+    <div class="module-sub">Budget targets per category with RAG variance</div>
+    <div class="module-screens">admin, ceo</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Executive Dashboard</div>
+    <div class="module-sub">Revenue trend, top drivers, machine performance</div>
+    <div class="module-screens">admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Business Intelligence</div>
+    <div class="module-sub">Predictive analytics, risk cards, recommendations</div>
+    <div class="module-screens">admin, ceo, operations, storekeeper, supervisor, leaders</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Monthly Dashboard</div>
+    <div class="module-sub">Month-over-month comparison with CEO approval</div>
+    <div class="module-screens">admin, ceo, finance</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Export</div>
+    <div class="module-sub">CSV/spreadsheet export of operational data</div>
+    <div class="module-screens">admin, ceo, operations, finance, storekeeper, supervisor, leaders</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Enterprise Performance (EPM)</div>
+    <div class="module-sub">5-screen suite: company score, departments, KPIs, action plans, trends</div>
+    <div class="module-screens">admin, ceo, operations</div>
+  </div>
+  <div class="module-card">
+    <div class="module-name">Sage Reconciliation</div>
+    <div class="module-sub">Weekly cost reconciliation with CSV export for Sage</div>
+    <div class="module-screens">admin, ceo, finance</div>
+  </div>
+</div>
+
+
+<!-- ── Deployment prerequisites ───────────────────────────────── -->
+<h2>Deployment Prerequisites</h2>
+
+<table>
+  <tr><th>Component</th><th>Requirement</th><th>Notes</th></tr>
+  <tr><td>Mobile API server</td><td>Node.js ≥ 18, PM2</td><td><code>mobile-api/</code> must be running before the app is installed</td></tr>
+  <tr><td>Database</td><td>PostgreSQL ≥ 14</td><td>All migrations must be applied — see below</td></tr>
+  <tr><td>Web server</td><td>nginx with SSL/TLS</td><td>Reverse proxy to mobile API port; valid certificate required</td></tr>
+  <tr><td>Expo / React Native</td><td>Expo SDK 51</td><td>Build with <code>eas build</code> or <code>expo build:android</code></td></tr>
+  <tr><td>New packages (v0.19+)</td><td><code>expo-file-system ~17.0.1</code>, <code>expo-sharing ~12.0.1</code></td><td>Required for Sage CSV export; already in <code>package.json</code></td></tr>
+  <tr><td>Android</td><td>API level 26+ (Android 8.0+)</td><td></td></tr>
+</table>
+
+
+<!-- ── Database migration status ──────────────────────────────── -->
+<h2>Database Migration Status</h2>
+
+<div class="warn"><strong>Action required:</strong> Run <code>npm run migrate</code> on the production database before deploying this release. Failure to do so will cause Machine KPI and Workshop modules to return errors.</div>
+
+<table>
+  <tr><th>Migration</th><th>Module</th><th>Status</th><th>Action</th></tr>
+  <tr><td>Machine registry tables (<code>machines</code>, <code>machine_logs</code>, <code>machine_fuel</code>, <code>machine_kpi</code>)</td><td>Machine Management</td><td><span class="badge fix">Required</span></td><td>Run <code>npm run migrate</code></td></tr>
+  <tr><td>Workshop tables (<code>wk_items</code>, <code>wk_stock</code>, <code>wk_consumption</code>)</td><td>Workshop Stock</td><td><span class="badge fix">Required</span></td><td>Included in <code>npm run migrate</code></td></tr>
+  <tr><td>All other tables</td><td>Core modules</td><td><span class="badge new">Already applied</span></td><td>No action needed</td></tr>
+</table>
+
+<p>To verify migration status after running:</p>
+<pre><code>psql -U ufcl -d ufcl_db -c "SELECT * FROM migrations ORDER BY run_at DESC LIMIT 10;"</code></pre>
+
+
+<!-- ── Known limitations ──────────────────────────────────────── -->
+<h2>Known Limitations</h2>
+<p>The following are documented limitations that are expected and acceptable for this release candidate. They do not block rc1.</p>
+
+<table>
+  <tr><th>ID</th><th>Area</th><th>Description</th><th>Planned fix</th></tr>
+  <tr>
+    <td>KL-01</td>
+    <td>Navigation</td>
+    <td>Bottom tab bar is crowded for high-access roles (admin/ceo: 22 tabs). Navigation redesign is scoped to Phase 2.</td>
+    <td>v1.0.0 — hub-based tab consolidation</td>
+  </tr>
+  <tr>
+    <td>KL-02</td>
+    <td>Offline support</td>
+    <td>Offline queuing is implemented only for Material Requests. All other modules require a live connection.</td>
+    <td>v1.1</td>
+  </tr>
+  <tr>
+    <td>KL-03</td>
+    <td>Push notifications</td>
+    <td>In-app notification screen is implemented; background push via FCM is not yet configured.</td>
+    <td>v1.1</td>
+  </tr>
+  <tr>
+    <td>KL-04</td>
+    <td>Password reset (Android)</td>
+    <td><code>Alert.prompt</code> is iOS-only. The password reset flow in UsersScreen may not render correctly on Android.</td>
+    <td>v1.0.0 — replace with modal form</td>
+  </tr>
+  <tr>
+    <td>KL-05</td>
+    <td>Code signing</td>
+    <td>Release builds are not yet code-signed for Play Store distribution. APK sideloading is the current distribution method.</td>
+    <td>v1.1</td>
+  </tr>
+  <tr>
+    <td>KL-06</td>
+    <td>Accessibility</td>
+    <td>Screen reader labels (accessibilityLabel, accessibilityRole) are not systematically applied.</td>
+    <td>v1.1</td>
+  </tr>
+</table>
+
+
+<!-- ── Breaking changes ───────────────────────────────────────── -->
+<h2>Breaking Changes</h2>
+
+<div class="info">This is the <strong>initial production release</strong> of the mobile application. There is no prior mobile version to upgrade from, so there are no breaking changes from a mobile perspective.</div>
+
+<p>The desktop application (<code>electron/</code>) is unaffected by this release. The mobile API (<code>mobile-api/</code>) runs as a separate service and does not modify any existing desktop API routes or database tables used exclusively by the desktop.</p>
+
+<p><strong>If upgrading the shared database schema</strong> (via <code>npm run migrate</code>), the desktop application should be tested after migration to confirm no regressions in its data layer.</p>
+
+
+<!-- ── Rollback procedure ──────────────────────────────────────── -->
+<h2>Rollback Procedure</h2>
+
+<div class="danger"><strong>Before any release deployment:</strong> take a full database backup. Rollback is only safe if a pre-deployment backup exists.</div>
+
+<h3>Step 1 — Stop the mobile API</h3>
+<pre><code>pm2 stop mobile-api</code></pre>
+
+<h3>Step 2 — Restore the pre-deployment database backup</h3>
+<pre><code>pg_restore -U ufcl -d ufcl_db /path/to/backup_pre_rc1.dump</code></pre>
+<p>If migrations were not run (i.e. the database schema is unchanged), this step may be skipped — the API will still function with the previous version's code.</p>
+
+<h3>Step 3 — Check out the previous release tag</h3>
+<pre><code>git checkout v0.20-stable     # or the previous known-good tag
+npm install --prefix mobile-api
+pm2 restart mobile-api</code></pre>
+
+<h3>Step 4 — Redistribute the previous APK</h3>
+<p>Reinstall the previous APK on affected devices. Because the app communicates exclusively via the mobile API, reverting the server is sufficient to restore prior functionality without touching client devices, provided the API contract has not changed.</p>
+
+<h3>Step 5 — Verify</h3>
+<pre><code>pm2 status
+curl https://your-server/api/health</code></pre>
+
+
+<!-- ── QA status ──────────────────────────────────────────────── -->
+<h2>QA Status</h2>
+
+<p>This release candidate is gated by the seven-stage QA Smoke-Test Matrix (<code>QA_MATRIX_v0.20.html</code>). The table below must be fully completed before <code>v1.0.0-rc1</code> is tagged.</p>
+
+<table>
+  <tr><th>Stage</th><th>Description</th><th>Status</th><th>Tester</th><th>Date</th><th>Blocking defects</th></tr>
+  <tr><td>1</td><td>Navigation by role</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>2</td><td>Module CRUD matrix</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>3</td><td>Permission boundaries</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>4</td><td>End-to-end workflows</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>5</td><td>Reports &amp; intelligence</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>6</td><td>Formal sign-off</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+  <tr><td>7</td><td>Production readiness</td><td>☐ Pending</td><td></td><td></td><td></td></tr>
+</table>
+
+<div class="info">All seven stages must show <strong>Pass</strong> with zero blocking defects before the release tag is created. Non-blocking defects may be deferred to <code>v1.0.0</code> via the known limitations register.</div>
+
+
+<!-- ── Sign-off ───────────────────────────────────────────────── -->
+<h2>Release Approval</h2>
+
+<table class="sign-table">
+  <tr>
+    <th>Role</th><th>Name</th><th>Signature</th><th>Date</th><th>Decision</th>
+  </tr>
+  <tr><td>QA Lead</td><td></td><td></td><td></td><td>☐ Approved &nbsp; ☐ Rejected</td></tr>
+  <tr><td>Product Owner</td><td></td><td></td><td></td><td>☐ Approved &nbsp; ☐ Rejected</td></tr>
+  <tr><td>Operations</td><td></td><td></td><td></td><td>☐ Approved &nbsp; ☐ Rejected</td></tr>
+</table>
+
+<div style="margin-top:16px;font-size:11px;color:#94a3b8">
+  Document: RELEASE_NOTES_v1.0.0-rc1.html · Baseline: v0.20-stable · QA gate: QA_MATRIX_v0.20.html
+</div>
+
+</div><!-- /page -->
+</body>
+</html>
