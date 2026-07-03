@@ -216,4 +216,9 @@ export const EP = {
   AUTOMATION_ESCALATIONS:       '/api/automation/escalations',
   AUTOMATION_ESCALATION_RESOLVE:(id: number) => `/api/automation/escalations/${id}/resolve`,
   AUTOMATION_ESCALATION_ACK:    (id: number) => `/api/automation/escalations/${id}/ack`,
+
+  // EPM
+  EPM_DASHBOARD:    '/api/epm/dashboard',
+  EPM_DEPARTMENTS:  '/api/epm/departments',
+  EPM_TRENDS:       '/api/epm/trends',
 } as const;

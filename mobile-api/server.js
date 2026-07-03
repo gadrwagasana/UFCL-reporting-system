@@ -186,6 +186,7 @@ app.use('/api/sales',            require('./routes/sales'));
 app.use('/api/reports',        require('./routes/reports'));
 app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/automation',     require('./routes/automation'));
+app.use('/api/epm',            require('./routes/epm'));
 
 // ── Monitoring dashboard (static HTML, no JWT) ────────────────────────────────
 // Served at /dashboard.html — admin opens in browser, fetches /api/metrics with token.

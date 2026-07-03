@@ -29,6 +29,7 @@ const REPORTS: ReportEntry[] = [
   { key: 'BI',           title: 'Business Intelligence',  description: 'Predictive analytics, risks and recommendations', icon: 'trending-up-outline', permission: 'reports.bi'         },
   { key: 'Monthly',      title: 'Monthly Dashboard',      description: 'Monthly production, sales and expense summary', icon: 'calendar-outline',   permission: 'reports.monthly'      },
   { key: 'Export',       title: 'Exports',                description: 'Share data as CSV via the native share sheet', icon: 'share-outline',        permission: 'reports.export'       },
+  { key: 'EpmHome',     title: 'Enterprise Performance', description: 'KPI scorecards, action plans and trends across all departments', icon: 'analytics-outline', permission: 'reports.epm' },
 ];
 
 function ReportCard({ item, onPress }: { item: ReportEntry; onPress: () => void }) {

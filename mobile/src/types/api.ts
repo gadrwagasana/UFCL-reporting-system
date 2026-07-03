@@ -1701,6 +1701,131 @@ export interface EscalationsResponse {
   escalations: EscalationRow[];
 }
 
+// ─── EPM — Enterprise Performance Management ─────────────────────────────────
+
+export type KpiStatus          = 'on-track' | 'at-risk' | 'off-track' | 'no-data';
+export type KpiTrend           = 'up' | 'stable' | 'down';
+export type ActionPlanStatus   = 'draft' | 'pending_approval' | 'approved' | 'in_progress' | 'completed' | 'rejected';
+export type ActionPlanPriority = 'critical' | 'high' | 'medium' | 'low';
+export type RagStatus          = 'green' | 'amber' | 'red';
+
+export interface PerformanceKpi {
+  id:          number;
+  kpi_key:     string;
+  name:        string;
+  department:  string;
+  module:      string | null;
+  owner:       string | null;
+  description: string | null;
+  target:      number;
+  current:     number | null;
+  previous:    number | null;
+  unit:        string;
+  direction:   string;
+  achievement: number | null;
+  status:      KpiStatus;
+  trend:       KpiTrend;
+  review_freq: string;
+}
+
+export interface ExecDimension {
+  name:   string;
+  score:  number;
+  status: RagStatus;
+  icon:   string;
+  detail: string;
+}
+
+export interface ExecScorecard {
+  ok:         true;
+  overall:    { score: number; status: RagStatus; period: string };
+  dimensions: ExecDimension[];
+}
+
+export interface ActionPlan {
+  id:                   number;
+  kpi_key:              string | null;
+  kpi_name:             string | null;
+  problem:              string;
+  root_cause:           string | null;
+  recommended_action:   string | null;
+  expected_improvement: string | null;
+  responsible_dept:     string;
+  department:           string | null;
+  priority:             ActionPlanPriority;
+  due_date:             string | null;
+  status:               ActionPlanStatus;
+  auto_generated:       boolean;
+  created_by_name:      string | null;
+  approved_by_name:     string | null;
+  created_at:           string;
+}
+
+export interface ActionPlanSummary {
+  total:            number;
+  draft:            number;
+  pending_approval: number;
+  approved:         number;
+  in_progress:      number;
+  completed:        number;
+}
+
+export interface EpmSummary {
+  company_score: number;
+  total_kpis:    number;
+  on_track:      number;
+  at_risk:       number;
+  off_track:     number;
+  departments:   number;
+  open_plans:    number;
+  period:        string;
+}
+
+export interface EpmDashboardResponse {
+  ok:        true;
+  summary:   EpmSummary;
+  kpis:      PerformanceKpi[];
+  executive: ExecScorecard | null;
+  plans:     { ok: true; plans: ActionPlan[]; summary: ActionPlanSummary } | null;
+}
+
+export interface DeptScorecard {
+  department:     string;
+  score:          number;
+  kpi_count:      number;
+  on_track:       number;
+  at_risk:        number;
+  off_track:      number;
+  risk_level:     'high' | 'medium' | 'low';
+  trend:          KpiTrend;
+  open_actions:   number;
+  done_actions:   number;
+  pending_approv: number;
+  kpis:           PerformanceKpi[];
+  icon:           string;
+  color:          string;
+}
+
+export interface EpmDepartmentsResponse {
+  ok:           true;
+  scorecards:   DeptScorecard[];
+  companyScore: number;
+}
+
+export interface TrendPoint { period: string; value: number | string; }
+
+export interface EpmTrendsResponse {
+  ok:     true;
+  trends: {
+    revenue:    TrendPoint[];
+    production: TrendPoint[];
+    harvest:    TrendPoint[];
+    fuel:       TrendPoint[];
+    stock:      TrendPoint[];
+    approvals:  TrendPoint[];
+  };
+}
+
 // ─── Reports — Monthly Dashboard ─────────────────────────────────────────────
 
 export interface MonthlyExpenseRow {

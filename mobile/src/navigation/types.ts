@@ -152,14 +152,21 @@ export type MyRequestsStackScreenProps<T extends keyof MyRequestsStackParamList>
 
 // ─── Reports stack ────────────────────────────────────────────────────────────
 export type ReportsStackParamList = {
-  ReportsHome:  undefined;
-  WeeklyCost:   undefined;
-  WeeklyPerf:   undefined;
-  KpiScorecard: undefined;
-  Executive:    undefined;
-  BI:           undefined;
-  Monthly:      undefined;
-  Export:       undefined;
+  ReportsHome:         undefined;
+  WeeklyCost:          undefined;
+  WeeklyPerf:          undefined;
+  KpiScorecard:        undefined;
+  Executive:           undefined;
+  BI:                  undefined;
+  Monthly:             undefined;
+  Export:              undefined;
+  // EPM (Module 17B)
+  EpmHome:             undefined;
+  EpmDepartments:      undefined;
+  EpmDepartmentKpis:   { department: string };
+  EpmKpis:             undefined;
+  EpmActionPlans:      undefined;
+  EpmTrends:           undefined;
 };
 
 export type ReportsStackScreenProps<T extends keyof ReportsStackParamList> =
