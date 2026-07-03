@@ -1,8 +1,8 @@
 'use strict';
 const express      = require('express');
 const router       = express.Router();
-const requireRoles = require('../middleware/authorize');
-const respond      = require('../middleware/respond');
+const { requireRoles } = require('../middleware/authorize');
+const { respond }      = require('../middleware/respond');
 const data         = require('../../db/services/data');
 
 const CATALOG_ROLES   = ['admin', 'ceo', 'operations', 'logistics', 'storekeeper'];

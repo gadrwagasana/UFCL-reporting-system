@@ -1,7 +1,7 @@
 'use strict';
 const router = require('express').Router();
 const data   = require('../../db/services/data');
-const { requireRoles } = require('../middleware/auth');
+const { requireRoles } = require('../middleware/authorize');
 const { respond }      = require('../middleware/respond');
 
 const VIEW_ROLES   = ['admin', 'ceo', 'operations', 'supervisor'];

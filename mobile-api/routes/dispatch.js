@@ -3,7 +3,7 @@
 const express = require('express');
 const router  = express.Router();
 const data    = require('../../db/services/data');
-const { requireRoles } = require('../middleware/auth');
+const { requireRoles } = require('../middleware/authorize');
 const { respond }      = require('../middleware/respond');
 
 const VIEW_ROLES    = ['admin', 'ceo', 'logistics'];

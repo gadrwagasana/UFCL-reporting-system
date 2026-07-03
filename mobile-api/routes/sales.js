@@ -1,9 +1,9 @@
 'use strict';
 const { Router }        = require('express');
-const { requireRoles }  = require('../middleware/auth');
+const { requireRoles }  = require('../middleware/authorize');
 const { respond }       = require('../middleware/respond');
 const data              = require('../../db/services/data');
-const pool              = require('../lib/pool');
+const { pool }          = require('../../db/pool');
 
 const router     = Router();
 const SALES_ROLES = ['admin', 'ceo', 'operations', 'sales'];
