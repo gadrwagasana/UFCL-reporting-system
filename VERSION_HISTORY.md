@@ -4,7 +4,8 @@
 
 | Version | Date | Status |
 |---|---|---|
-| **1.0.0** | 2026-06-29 | **CURRENT — Production** |
+| **1.6.0** | 2026-07-03 | **CURRENT — Production** |
+| 1.0.0 | 2026-06-29 | Superseded |
 
 ---
 
@@ -89,6 +90,46 @@ Rules:
 ---
 
 ## Version History
+
+### v1.6.0 — 2026-07-03 — Full Mobile Parity Release
+
+**Desktop (Electron) · Mobile (React Native / Expo 51) · Mobile API (Express.js)**
+All three components versioned at 1.6.0.
+
+#### Mobile — New Modules (Modules 1–17)
+- **Module 1–8** (commit `3ece9dd`): Dashboard, CEO Overview, Approvals, Material Requests, Casual Labour, Harvest, Log Transport, Compartments — all with full desktop parity
+- **Module 9** — Stock Management: catalog, categories, inventory overview, movements, CRUD with role-gated edit/delete
+- **Module 10** — Timber Inventory: lot tracking, status workflows, volume calculation
+- **Module 11** — Dispatch: create/list dispatch orders, status transitions, reason modal
+- **Module 12** — Stock Transfers: cross-workshop transfers, approval workflow, dispatch confirmation
+- **Module 13** — Sales Orders: full lifecycle (Pending → Confirmed → In Progress → Delivered → Closed), payment status, close-short
+- **Module 14** — Deliveries: create from Sales Order, POD capture, partial/full delivery, status transitions
+- **Module 15** — Reports & Analytics: executive, KPI, weekly performance, weekly cost, monthly, BI, export
+- **Module 16** — Administration: user management (create/edit/reset password), roles, permissions, audit log, trash, changes log, security governance
+- **Module 17A** — Automation Center: rules, jobs, history, escalations
+- **Module 17B** — Enterprise Performance Management (EPM): departments, KPIs, department KPIs, trends, action plans
+- **Module 17C** — Sage Reconciliation: reconciliation dashboard and period views
+
+#### Mobile — Bug Fixes
+- **KL-04** resolved: `Alert.prompt` (iOS-only) replaced with cross-platform `Modal + TextInput` for password reset on Android (commit `039cb77`)
+- **12 TypeScript errors** resolved — all `any` casts, missing type imports, and navigation prop types corrected (commit `3913799`)
+
+#### Mobile API — Critical Fixes
+- **CORS gap**: `PATCH` and `DELETE` added to `Access-Control-Allow-Methods` — all edit/delete operations across 13 route files were silently failing on every CORS-compliant client (commit `61a0cb6`)
+- **Import errors**: 6 route files corrected from `middleware/auth` → `middleware/authorize` for `requireRoles`; `stock.js` fixed missing destructuring (commit `ef0ca91`)
+- **Missing module**: `sales.js` pool path corrected from `'../lib/pool'` (non-existent) to `'../../db/pool'` (commit `ef0ca91`)
+
+#### Release Hardening
+- Production API URL guard: staging/production builds fail loudly if `EXPO_PUBLIC_API_URL` is not set — prevents accidental APK with wrong endpoint (commit `2bc20c9`)
+- Release governance package: `QA_MATRIX_v0.20.html`, `RELEASE_NOTES_v1.0.0-rc1.html`, `DEPLOYMENT_RUNBOOK_v1.0.0.md`, `OPERATIONS_CONTACTS.md` (commit `c6aad5b`)
+
+#### No Breaking Changes
+- Authentication: JWT (unchanged)
+- Database schema: additive only — no drops, no renames
+- API contract: all existing endpoints preserved; new endpoints added only
+- Navigation: existing deep links intact
+
+---
 
 ### v1.0.0 — 2026-06-29 — Initial Production Release
 
