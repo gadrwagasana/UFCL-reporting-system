@@ -12,7 +12,10 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { useAuthStore }  from '../../stores/authStore';
 import { hasPermission } from '../../utils/permissions';
 import type { UserRole } from '../../types/auth';
-import { useAutomationRule, useUpdateAutomationRule } from '../../hooks/useAutomation';
+import {
+  useAutomationRule, useUpdateAutomationRule,
+  useCreateAutomationRule, useDeleteAutomationRule,
+} from '../../hooks/useAutomation';
 import { AdminStackParamList } from '../../navigation/types';
 import type { AutomationSeverity, AutomationAction } from '../../types/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
@@ -26,17 +29,29 @@ const ACTIONS: AutomationAction[]      = ['notify', 'draft_request', 'escalate',
 const SEV_BG: Record<string, string> = { critical:'#FEE2E2', high:'#FEF3C7', medium:'#DBEAFE', low:'#DCFCE7', info:'#E0E7FF' };
 const SEV_FG: Record<string, string> = { critical:'#DC2626', high:'#D97706', medium:'#1D4ED8', low:'#16A34A', info:'#4F46E5' };
 
+// Master Professionalization Phase C3 (PR-22/23) — createAutomationRule/
+// deleteAutomationRule were already fully built and desktop-wired; this
+// screen previously only supported edit. `ruleKey` omitted from route
+// params now puts the screen in create mode (same dual-mode pattern the
+// Sales Order Form screen already established in Phase C1), and a Delete
+// action was added to edit mode.
 export function AutomationRuleDetailScreen() {
   const navigation = useNavigation<Nav>();
   const route      = useRoute<Props['route']>();
-  const { ruleKey } = route.params;
+  const { ruleKey } = route.params || {};
+  const isCreateMode = !ruleKey;
 
   const role     = useAuthStore(s => s.user?.role as UserRole | undefined);
   const canEdit  = !!(role && hasPermission(role, 'automation.edit_rules'));
 
-  const { data: res, isLoading } = useAutomationRule(ruleKey);
+  const { data: res, isLoading } = useAutomationRule(ruleKey || '');
   const updateRule = useUpdateAutomationRule();
+  const createRule  = useCreateAutomationRule();
+  const deleteRule  = useDeleteAutomationRule();
 
+  const [newRuleKey,    setNewRuleKey]   = useState('');
+  const [newLabel,      setNewLabel]     = useState('');
+  const [newDescription,setNewDescription] = useState('');
   const [severity,      setSeverity]     = useState<AutomationSeverity>('medium');
   const [autoAction,    setAutoAction]   = useState<AutomationAction>('notify');
   const [cooldownHours, setCooldownHours]= useState('4');
@@ -62,7 +77,7 @@ export function AutomationRuleDetailScreen() {
     }
     const roles = notifyRoles.split(',').map(r => r.trim()).filter(Boolean);
     updateRule.mutate(
-      { ruleKey, severity, auto_action: autoAction, cooldown_hours: cd, notify_roles: roles },
+      { ruleKey: ruleKey!, severity, auto_action: autoAction, cooldown_hours: cd, notify_roles: roles },
       {
         onSuccess: (r: any) => {
           if (r?.ok) { setDirty(false); Alert.alert('Saved', 'Rule updated.'); }
@@ -70,6 +85,165 @@ export function AutomationRuleDetailScreen() {
         },
         onError: () => Alert.alert('Error', 'Network error.'),
       },
+    );
+  }
+
+  function handleCreate() {
+    const key = newRuleKey.trim();
+    const label = newLabel.trim();
+    if (!key || !label) {
+      Alert.alert('Validation', 'Rule key and label are both required.');
+      return;
+    }
+    if (!/^[a-z0-9_]{2,64}$/.test(key)) {
+      Alert.alert('Validation', 'Rule key must be 2-64 lowercase letters, digits, or underscores.');
+      return;
+    }
+    const cd = Number(cooldownHours);
+    if (!Number.isFinite(cd) || cd < 0) {
+      Alert.alert('Validation', 'Cooldown must be a non-negative number.');
+      return;
+    }
+    const roles = notifyRoles.split(',').map(r => r.trim()).filter(Boolean);
+    createRule.mutate(
+      {
+        rule_key: key, label, description: newDescription.trim() || null,
+        severity, auto_action: autoAction, cooldown_hours: cd, notify_roles: roles,
+        // Threshold JSON editing is desktop-only, same established precedent
+        // as this screen's own edit-mode note below — a new custom rule
+        // starts with an empty threshold and can be tuned from desktop.
+        threshold: {},
+      },
+      {
+        onSuccess: (r: any) => {
+          if (r?.ok) { Alert.alert('Created', 'Rule created.', [{ text: 'OK', onPress: () => navigation.goBack() }]); }
+          else Alert.alert('Error', r?.error || 'Create failed.');
+        },
+        onError: () => Alert.alert('Error', 'Network error.'),
+      },
+    );
+  }
+
+  function handleDelete() {
+    if (!ruleKey) return;
+    Alert.alert(
+      'Delete Rule',
+      `Delete automation rule "${res?.ok ? res.rule.label : ruleKey}"? This cannot be undone. Built-in rules cannot be deleted — disable them instead.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete', style: 'destructive',
+          onPress: () => deleteRule.mutate(ruleKey, {
+            onSuccess: (r: any) => {
+              if (r?.ok) navigation.goBack();
+              else Alert.alert('Error', r?.error || 'Delete failed.');
+            },
+            onError: () => Alert.alert('Error', 'Network error.'),
+          }),
+        },
+      ],
+    );
+  }
+
+  if (isCreateMode) {
+    return (
+      <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
+        <StatusBar style="light" />
+        <OfflineBanner />
+        <AppHeader title="New Automation Rule" onBack={() => navigation.goBack()} />
+        <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false}>
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Rule Identity</Text>
+            <Text style={s.label}>Rule Key</Text>
+            <TextInput
+              style={s.input} value={newRuleKey}
+              onChangeText={setNewRuleKey}
+              placeholder="e.g. custom_low_fuel_alert"
+              placeholderTextColor={Colors.textMuted}
+              autoCapitalize="none"
+            />
+            <Text style={[s.label, { marginTop: Spacing.md }]}>Label</Text>
+            <TextInput
+              style={s.input} value={newLabel}
+              onChangeText={setNewLabel}
+              placeholder="e.g. Custom Low Fuel Alert"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={[s.label, { marginTop: Spacing.md }]}>Description (optional)</Text>
+            <TextInput
+              style={s.input} value={newDescription}
+              onChangeText={setNewDescription}
+              placeholderTextColor={Colors.textMuted}
+            />
+          </View>
+
+          <View style={s.card}>
+            <Text style={s.cardTitle}>Configuration</Text>
+            <Text style={s.label}>Severity</Text>
+            <View style={s.chipRow}>
+              {SEVERITIES.map(sev => {
+                const active = severity === sev;
+                return (
+                  <TouchableOpacity
+                    key={sev}
+                    style={[s.chip, { backgroundColor: active ? (SEV_BG[sev] || '#F3F4F6') : Colors.bg, borderColor: active ? (SEV_FG[sev] || '#374151') : Colors.border }]}
+                    onPress={() => setSeverity(sev)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.chipText, { color: active ? (SEV_FG[sev] || '#374151') : Colors.textMuted }]}>
+                      {sev.charAt(0).toUpperCase() + sev.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[s.label, { marginTop: Spacing.md }]}>Auto Action</Text>
+            <View style={s.chipRow}>
+              {ACTIONS.map(action => {
+                const active = autoAction === action;
+                return (
+                  <TouchableOpacity
+                    key={action}
+                    style={[s.chip, { backgroundColor: active ? Colors.navyBg : Colors.bg, borderColor: active ? Colors.navy : Colors.border }]}
+                    onPress={() => setAutoAction(action)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[s.chipText, { color: active ? Colors.navy : Colors.textMuted }]}>
+                      {action.replace('_', ' ')}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <Text style={[s.label, { marginTop: Spacing.md }]}>Cooldown (hours)</Text>
+            <TextInput
+              style={s.input} value={cooldownHours}
+              onChangeText={setCooldownHours}
+              keyboardType="numeric"
+            />
+
+            <Text style={[s.label, { marginTop: Spacing.md }]}>Notify Roles (comma-separated)</Text>
+            <TextInput
+              style={s.input} value={notifyRoles}
+              onChangeText={setNotifyRoles}
+              placeholder="admin, ceo, operations"
+              placeholderTextColor={Colors.textMuted}
+            />
+            <Text style={s.threshNote}>Threshold starts empty — tune it from the desktop application after creating the rule.</Text>
+          </View>
+
+          <TouchableOpacity
+            style={[s.saveBtn, createRule.isPending && s.saveBtnDisabled]}
+            onPress={handleCreate}
+            disabled={createRule.isPending}
+            activeOpacity={0.8}
+          >
+            <Text style={s.saveBtnText}>{createRule.isPending ? 'Creating…' : 'Create Rule'}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
     );
   }
 
@@ -217,6 +391,19 @@ export function AutomationRuleDetailScreen() {
             <Text style={s.saveBtnText}>{updateRule.isPending ? 'Saving…' : 'Save Changes'}</Text>
           </TouchableOpacity>
         )}
+
+        {/* Delete — custom rules only; built-in rules are rejected server-side
+            with a friendly message rather than duplicating that rule list here */}
+        {canEdit && (
+          <TouchableOpacity
+            style={[s.deleteBtn, deleteRule.isPending && s.saveBtnDisabled]}
+            onPress={handleDelete}
+            disabled={deleteRule.isPending}
+            activeOpacity={0.8}
+          >
+            <Text style={s.deleteBtnText}>{deleteRule.isPending ? 'Deleting…' : 'Delete Rule'}</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -254,4 +441,7 @@ const s = StyleSheet.create({
   saveBtn:         { backgroundColor: Colors.navy, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center' },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText:     { color: '#fff', fontSize: Typography.base, fontWeight: Typography.semibold },
+
+  deleteBtn:      { backgroundColor: Colors.errorBg, borderRadius: Radius.md, padding: Spacing.md, alignItems: 'center', borderWidth: 1, borderColor: Colors.error },
+  deleteBtnText:  { color: Colors.error, fontSize: Typography.base, fontWeight: Typography.semibold },
 });

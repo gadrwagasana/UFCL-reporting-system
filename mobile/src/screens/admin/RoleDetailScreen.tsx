@@ -21,7 +21,7 @@ const PERM_GROUPS: { label: string; items: { id: string; label: string }[] }[] =
   { label: 'Overview',        items: [{ id: 'dashboard', label: 'Dashboard' }, { id: 'ceo', label: 'CEO Overview' }] },
   { label: 'Production',      items: [
     { id: 'daily-harvest', label: 'Daily Harvest' }, { id: 'daily-timber', label: 'Daily Timber' },
-    { id: 'daily-poles', label: 'Daily Poles' }, { id: 'value-added-timber', label: 'Value-Added Timber' },
+    { id: 'daily-poles', label: 'Daily Poles' }, { id: 'value-added-production', label: 'Value-Added Production' },
     { id: 'machine-logs', label: 'Machine Logs' },
   ]},
   { label: 'Forestry',        items: [

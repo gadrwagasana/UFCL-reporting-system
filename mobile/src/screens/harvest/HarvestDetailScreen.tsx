@@ -1,10 +1,15 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { AppHeader } from '../../components/AppHeader';
+import { ReasonModal } from '../../components/ReasonModal';
+import { useHarvestDelete } from '../../hooks/useHarvest';
+import { useAuth } from '../../hooks/useAuth';
+import { useOfflineStore } from '../../stores/offlineStore';
+import { MachinePendingApproval } from '../../types/api';
 import { HarvestStackScreenProps } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
@@ -21,16 +26,51 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
 }
 
 export function HarvestDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<Props['navigation']>();
   const route      = useRoute<Props['route']>();
   const { entry }  = route.params;
 
+  const { can } = useAuth();
+  const { isOnline } = useOfflineStore();
+  const { deleteEntry } = useHarvestDelete();
+  const canWrite = can('harvest.write');
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const hasLogs = (entry.logs_crosscut ?? 0) > 0 || (entry.logs_handrolled ?? 0) > 0;
+
+  // Harvesting Phase 1 (Workstream 1) — harvestDelete had backend/IPC wiring
+  // (desktop) with no REST route or mobile UI at all.
+  async function handleDelete(reason: string) {
+    setDeleteLoading(true);
+    try {
+      const result = await deleteEntry(entry.id, reason);
+      if (result && (result as MachinePendingApproval).pendingApproval) {
+        Alert.alert('Submitted for Review', (result as MachinePendingApproval).message);
+      }
+      setDeleteOpen(false);
+      navigation.goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not delete harvest entry.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Harvest Entry" dark onBack={() => navigation.goBack()} />
+      <AppHeader
+        title="Harvest Entry"
+        dark
+        onBack={() => navigation.goBack()}
+        actions={canWrite ? [{
+          icon: 'create-outline',
+          label: 'Edit entry',
+          onPress: () => navigation.navigate('HarvestCreate', { entry }),
+        }] : []}
+      />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
@@ -93,7 +133,32 @@ export function HarvestDetailScreen() {
           </View>
         )}
 
+        {canWrite && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            disabled={!isOnline}
+            onPress={() => {
+              if (!isOnline) { Alert.alert('Online Required', 'Deleting a harvest entry requires an active connection.'); return; }
+              setDeleteOpen(true);
+            }}
+            accessibilityRole="button"
+          >
+            <Ionicons name="trash-outline" size={16} color={Colors.error} />
+            <Text style={styles.deleteBtnText}>Delete Entry</Text>
+          </TouchableOpacity>
+        )}
+
       </ScrollView>
+
+      <ReasonModal
+        visible={deleteOpen}
+        title="Delete Harvest Entry"
+        message={`Move the ${entry.species} entry from ${entry.harvest_date} to Trash?`}
+        confirmLabel="Delete"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -136,4 +201,11 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: Typography.sm, fontWeight: Typography.medium, color: Colors.textPrimary },
 
   notes: { fontSize: Typography.sm, color: Colors.textSecondary, lineHeight: 20 },
+
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,
+    borderWidth: 1, borderColor: Colors.error, borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm,
+  },
+  deleteBtnText: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.error },
 });

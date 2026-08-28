@@ -20,7 +20,7 @@ export function useProductsActive(type: 'Timber' | 'Poles') {
 }
 
 export interface ProductPayload {
-  type:         'Timber' | 'Poles';
+  type:         'Timber' | 'Poles' | 'Manufactured Product';
   sub_type?:    string;
   size:         string;
   reason:       string;

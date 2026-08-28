@@ -217,7 +217,15 @@ export function SalesOrderFormScreen() {
                   placeholder="Select size…"
                   onChange={v => {
                     if (String(v) === '__other__') { setUseManualSize(true); setProductSize(''); }
-                    else setProductSize(String(v));
+                    else {
+                      setProductSize(String(v));
+                      // Sawmill Phase 2 — prefill the negotiated price from
+                      // the catalog's Default Selling Price; still editable,
+                      // and never written back to the Product Catalog (see
+                      // salesCreate — this order's unit_price is its own field).
+                      const matched = filteredProducts.find(p => p.size === String(v));
+                      if (matched?.default_price != null) setUnitPrice(String(matched.default_price));
+                    }
                   }}
                   required
                 />

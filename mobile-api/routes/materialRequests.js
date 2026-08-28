@@ -11,7 +11,9 @@ const router = express.Router();
 // ── GET /api/material-requests ────────────────────────────────────────────────
 // List material requests for the caller's workshop + stock catalog + workshop list.
 // data.js: materialRequestsList(userId, workshopId?)
-//   Requires: stock-movements page (storekeeper; supervisor needs Gap A fix applied)
+//   Requires: 'material-requests' OR 'stock-movements' page
+//   (Mechanician Phase 1 — Gap A closed: mechanician/supervisor/sawmill-leader/
+//   poles-leader/vat-leader hold 'material-requests' and can now reach this.)
 //   Workshop isolation: YES — isWorkshopRestricted applied inside function
 
 router.get('/', async (req, res) => {
@@ -25,7 +27,7 @@ router.get('/', async (req, res) => {
 //   Optional: reason, priority ("normal"|"urgent"|"critical")
 //   workshop_id is auto-set from user for workshop-restricted roles.
 // data.js: materialRequestsCreate(userId, payload)
-//   Requires: stock-movements page
+//   Requires: 'material-requests' OR 'stock-movements' page (Gap A closed, see above)
 //   Workshop isolation: YES
 
 router.post('/', async (req, res) => {
@@ -37,13 +39,17 @@ router.post('/', async (req, res) => {
 // Body:
 //   Required: action ("approve"|"reject")
 //   Optional: approvedQty, reviewNotes, sourceWarehouseId
-// Gap C fix: if caller is supervisor, verify their workshop matches the request's
-//   workshop before calling data.js.
+// Gap C: if caller is supervisor, verify their workshop matches the request's
+//   workshop before calling data.js. (Mechanician Phase 1 — data.js's own
+//   materialRequestsApprove now enforces this same workshop check internally
+//   too, so desktop callers get the same protection this route always gave
+//   mobile; this route-level guard is kept as defense-in-depth, not removed.)
 // data.js: materialRequestsApprove(userId, requestId, action, approvedQty, reviewNotes, sourceWarehouseId)
-//   Requires role: admin|ceo|operations|logistics|supervisor
+//   Requires role: admin|ceo|operations|logistics (via 'stock-movements'), or
+//   supervisor (via 'material-requests' + own-workshop check)
 
 router.post('/:id/approve', async (req, res) => {
-  const { action, approvedQty, reviewNotes, sourceWarehouseId } = req.body || {};
+  const { action, approvedQty, reviewNotes, sourceWarehouseId, destinationWorkshopId } = req.body || {};
   if (!action) return res.status(400).json({ ok: false, error: '"action" (approve or reject) is required' });
 
   // Gap C: supervisors may only approve their own workshop's requests
@@ -64,7 +70,8 @@ router.post('/:id/approve', async (req, res) => {
     action,
     approvedQty || null,
     reviewNotes || null,
-    sourceWarehouseId ? Number(sourceWarehouseId) : null
+    sourceWarehouseId ? Number(sourceWarehouseId) : null,
+    destinationWorkshopId ? Number(destinationWorkshopId) : null
   ));
 });
 

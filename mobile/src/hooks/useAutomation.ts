@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { get, post, put } from '../api/client';
+import { get, post, put, del } from '../api/client';
 import { EP } from '../api/endpoints';
 import type {
   AutomationDashboardResponse,
@@ -55,6 +55,42 @@ export function useUpdateAutomationRule() {
       put<{ ok: boolean; error?: string }>(EP.AUTOMATION_RULE(ruleKey), updates),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['automation'] });
+    },
+  });
+}
+
+// Master Professionalization Phase C3 (PR-22/23) — createAutomationRule/
+// deleteAutomationRule were already fully built and desktop-wired; mobile had
+// neither a REST route nor a hook for either (only view/edit existed).
+export interface CreateRulePayload {
+  rule_key:        string;
+  label:           string;
+  description?:    string | null;
+  severity?:       AutomationSeverity;
+  auto_action?:    AutomationAction;
+  cooldown_hours?: number;
+  notify_roles?:   string[];
+  threshold?:      Record<string, unknown>;
+}
+
+export function useCreateAutomationRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateRulePayload) =>
+      post<{ ok: boolean; rule_key?: string; error?: string }>(EP.AUTOMATION_RULES, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.dashboard });
+    },
+  });
+}
+
+export function useDeleteAutomationRule() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ruleKey: string) =>
+      del<{ ok: boolean; error?: string }>(EP.AUTOMATION_RULE(ruleKey)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.dashboard });
     },
   });
 }

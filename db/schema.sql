@@ -605,9 +605,6 @@ create table if not exists poles_deliveries (
   created_at          timestamptz not null default now()
 );
 
--- ADM-31: link VAT entries to their source stock transfer
-alter table value_added_timber add column if not exists source_transfer_id bigint references stock_transfers(id);
-
 -- ── Log Transport ─────────────────────────────────────────────────────────────
 
 create table if not exists log_transport (
@@ -622,28 +619,22 @@ create table if not exists log_transport (
   created_at timestamptz not null default now()
 );
 
--- ── Value-Added Timber ───────────────────────────────────────────────────────
-
-create table if not exists value_added_timber (
-  id bigserial primary key,
-  entry_date date not null,
-  type_value_added text not null, -- 'Kiln-dried timber' | 'CCA treated timber'
-  product_size text not null,
-  num_timber int not null,
-  created_by bigint references app_users(id),
-  created_at timestamptz not null default now()
-);
+-- Value-Added Timber: table permanently retired by the Nyanza Value-Added
+-- Production migration (db/migrate.js createNyanzaValueAddedProduction),
+-- superseded by value_added_production_batches/inputs/outputs. Removed here
+-- entirely rather than recreated-then-dropped on every migrate() run, which
+-- is what happened before this fix (schema.sql created it, then the Nyanza
+-- migration step always dropped it again at the end of the same run) — see
+-- that function for the permanent repoint of every FK that used to target it.
 
 create index if not exists idx_compartments_status on compartments(status);
 create index if not exists idx_log_transport_date on log_transport(transport_date desc);
-create index if not exists idx_value_added_timber_date on value_added_timber(entry_date desc);
 
 -- ── Workshop Isolation ────────────────────────────────────────────────────────
 -- Each production, sales, and labour record is tagged with the warehouse/workshop
 -- that owns it. NULL means legacy (pre-isolation) — visible to all authorised roles.
 alter table daily_logs             add column if not exists workshop_id bigint references warehouses(id);
 alter table harvest_logs           add column if not exists workshop_id bigint references warehouses(id);
-alter table value_added_timber     add column if not exists workshop_id bigint references warehouses(id);
 alter table machine_daily_logs     add column if not exists workshop_id bigint references warehouses(id);
 alter table log_transport          add column if not exists workshop_id bigint references warehouses(id);
 alter table sales_orders           add column if not exists workshop_id bigint references warehouses(id);
@@ -655,7 +646,6 @@ alter table kpi_budgets            add column if not exists workshop_id bigint r
 -- Partial indexes on active records for fast per-workshop filtering
 create index if not exists idx_daily_logs_workshop   on daily_logs(workshop_id)          where deleted_at is null;
 create index if not exists idx_harvest_logs_workshop  on harvest_logs(workshop_id)         where deleted_at is null;
-create index if not exists idx_vat_workshop           on value_added_timber(workshop_id)   where deleted_at is null;
 create index if not exists idx_mdl_workshop           on machine_daily_logs(workshop_id)   where deleted_at is null;
 create index if not exists idx_log_transport_workshop on log_transport(workshop_id)        where deleted_at is null;
 create index if not exists idx_sales_orders_workshop  on sales_orders(workshop_id)         where deleted_at is null;

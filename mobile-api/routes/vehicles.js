@@ -7,13 +7,30 @@ const { respond }      = require('../middleware/respond');
 
 const router = express.Router();
 
-// Roles with 'vehicles' in ROLE_PAGES (data.js): admin, ceo, logistics
-const VEHICLE_ROLES = ['admin', 'ceo', 'logistics'];
+// Roles with 'vehicles' in ROLE_PAGES (data.js): admin, ceo, logistics, logistics-officer.
+// Phase 1 Logistics fix — logistics-officer already has 'vehicles' granted via
+// db/migrate.js but this route excluded it, so the mobile Vehicles tab always
+// 403'd for that role despite being shown in LogisticsNavigator.
+const VEHICLE_ROLES = ['admin', 'ceo', 'logistics', 'logistics-officer'];
 
 // GET /api/vehicles/transport-dropdown — auth-only, used to populate Third-Party owner picker.
 // Must be registered before /:id to prevent Express matching 'transport-dropdown' as an id.
 router.get('/transport-dropdown', async (req, res) => {
   respond(res, await data.transportCompaniesForDropdown(req.user.userId), 120);
+});
+
+// GET /api/vehicles/dashboard — Fleet & Equipment Phase 2 executive dashboard
+// (vehicle + machine KPIs, operational widgets). Must be registered before
+// /:id for the same reason as transport-dropdown above.
+router.get('/dashboard', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.fleetDashboard(req.user.userId), 30);
+});
+
+// GET /api/vehicles/intelligence — Fleet & Equipment Phase 3 operational
+// intelligence (trends, top lists, forecasting, cross-department visibility).
+// Must be registered before /:id for the same reason as transport-dropdown above.
+router.get('/intelligence', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  respond(res, await data.fleetIntelligence(req.user.userId), 60);
 });
 
 // GET /api/vehicles — fleet list with server-computed summary metrics.
@@ -65,7 +82,9 @@ router.put('/:id', requireRoles(...VEHICLE_ROLES), async (req, res) => {
   respond(res, await data.vehiclesUpdate(req.user.userId, Number(req.params.id), req.body));
 });
 
-// DELETE /api/vehicles/:id — delete vehicle (cascades fuel logs + maintenance records)
+// DELETE /api/vehicles/:id — soft-delete vehicle (governed; moves to Trash,
+// restorable within 30 days; fuel logs and maintenance records are
+// preserved, not cascaded)
 router.delete('/:id', requireRoles(...VEHICLE_ROLES), async (req, res) => {
   respond(res, await data.vehiclesDelete(req.user.userId, Number(req.params.id), req.body.reason));
 });
@@ -95,6 +114,19 @@ router.post('/:id/maintenance', requireRoles(...VEHICLE_ROLES), async (req, res)
   respond(res, await data.maintenanceCreate(req.user.userId, {
     ...req.body, vehicle_id: req.params.id,
   }));
+});
+
+// PUT /api/vehicles/maintenance/:recordId — edit a maintenance record.
+// Two-segment path, same convention as the DELETE route below.
+// Stabilization Phase 5 (F-16) — maintenanceUpdate had backend/IPC wiring
+// (desktop) with no REST route or mobile UI at all.
+// data.js maintenanceUpdate uses applyGovernance — passthrough as 200 success when pending.
+router.put('/maintenance/:recordId', requireRoles(...VEHICLE_ROLES), async (req, res) => {
+  const result = await data.maintenanceUpdate(req.user.userId, Number(req.params.recordId), req.body);
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
 });
 
 // DELETE /api/vehicles/maintenance/:recordId — delete a maintenance record.

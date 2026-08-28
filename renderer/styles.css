@@ -13,6 +13,21 @@
   --sh-md:0 4px 16px rgba(0,0,0,.08);
   --sidebar:220px;--topbar:54px;
   --ff:'DM Sans',sans-serif;--fm:'DM Mono',monospace;
+  --gray-l:#F3F4F6;--gray:#374151;
+  /* Phase 1 audit flagged --bdr as referenced 86x across app.js/styles.css but
+     never defined. Aliasing to the existing --border token (rather than
+     rewriting every call site) fixes every module that already uses it, not
+     just Procurement, with zero risk of behavior change elsewhere. */
+  --bdr:var(--border);
+  --hover:var(--surf);
+  --green:var(--g-mid);
+
+  /* Enterprise UI/UX Standardization Phase 1, Workstream B — spacing/font-size
+     scale. Purely additive: no existing hardcoded px value is changed by
+     adding these, so this carries zero visual-regression risk. New/touched
+     code should prefer these tokens over hardcoded px going forward. */
+  --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-5:24px;--sp-6:32px;
+  --fs-xs:11px;--fs-sm:12px;--fs-md:13px;--fs-lg:15px;--fs-xl:18px;
 }
 html,body{height:100%;font-family:var(--ff);background:var(--bg);color:var(--t1);font-size:14px;line-height:1.6}
 ::-webkit-scrollbar{width:4px;height:4px}
@@ -84,6 +99,7 @@ html,body{height:100%;font-family:var(--ff);background:var(--bg);color:var(--t1)
 .prod-tab.active{background:var(--green);border-color:var(--green);color:#fff;font-weight:600}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:1.125rem}
 .mc{background:var(--card);border:1px solid var(--border);border-radius:var(--r-md);padding:.75rem 1rem;box-shadow:var(--sh)}
+.mc[data-page]{cursor:pointer}
 .mclbl{font-size:11px;color:var(--t3);margin-bottom:3px;font-weight:500}
 .mcval{font-size:22px;font-weight:600;color:var(--t1);letter-spacing:-.4px;line-height:1.2}
 .mcsub{font-size:11px;margin-top:3px;display:flex;align-items:center;gap:3px}
@@ -255,6 +271,17 @@ table.dt tr:hover td{background:var(--surf)}
 .ex-badge-red{background:var(--red-l);color:var(--red)}
 .ex-badge-amber{background:var(--amber-l);color:var(--amber)}
 .ex-badge-blue{background:var(--blue-l);color:var(--blue)}
+
+/* Harvesting Phase 4 (Workstream 4) — End-to-End pipeline visual, a clearer
+   stepper/funnel replacement for a plain stat list, used on the Executive
+   Dashboard's Harvest cross-department panel. Visibility only — no logic. */
+.hv-pipeline-flow{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;padding:.75rem}
+.hv-pipeline-stage{flex:1;min-width:100px;text-align:center;padding:.6rem .5rem;border-radius:8px;background:var(--surf);border:1px solid var(--border)}
+.hv-pipeline-stage-amber{background:var(--amber-l);border-color:var(--amber)}
+.hv-pipeline-stage-green{background:var(--g-light);border-color:var(--g-soft)}
+.hv-pipeline-val{font-size:16px;font-weight:700;color:var(--t1)}
+.hv-pipeline-lbl{font-size:10px;color:var(--t3);margin-top:2px;line-height:1.3}
+.hv-pipeline-arrow{color:var(--t4);font-size:16px;flex-shrink:0}
 .ex-badge-gray{background:#F3F4F6;color:#374151}
 @media print{
   .topbar,.sidebar,.ex-actions,.bi-actions{display:none!important}
@@ -388,7 +415,135 @@ table.dt tr:hover td{background:var(--surf)}
 /* OVERLAY */
 .overlay{position:fixed;inset:0;background:rgba(17,24,39,.55);z-index:999;display:flex;align-items:flex-start;justify-content:center;padding:40px 18px;overflow:auto}
 .ow{background:var(--card);border:1px solid var(--border);border-radius:var(--r-xl);width:100%;max-width:720px;box-shadow:0 30px 80px rgba(0,0,0,.25)}
+.ow-wide{max-width:980px}
+.smo-tabs{display:flex;gap:.4rem;margin-bottom:1rem;flex-wrap:wrap}
+.smo-tab{border:1px solid var(--border);background:var(--surf);color:var(--t2);border-radius:999px;padding:.35rem .8rem;font-size:11.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.smo-tab.active{background:var(--g-soft);border-color:var(--g-soft);color:#fff}
 .owh{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--surf)}
 .owh h3{font-size:12px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.06em;display:flex;gap:8px;align-items:center}
 .owc{padding:16px 18px}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   ENTERPRISE TABLE + LAYOUT SYSTEM (Phase 2A)
+   Applies to every module using .tbl (Procurement plus every pre-existing
+   screen that already used this class name with no styling behind it —
+   .tbl had zero CSS rules before this block, confirmed by grep). Built on
+   the existing token set only — no new color hues except one gray pairing
+   promoted from values already used ad-hoc elsewhere in this file
+   (#F3F4F6/#374151, see .ncat-system/.ex-badge-gray).
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Sticky page header — title/subtitle/primary-action row that was previously
+   a plain block scrolling away with page content. Wrap a page's header row
+   in this container to pin it under the topbar while the table beneath it
+   scrolls. Opt-in per page (existing pages without it are unaffected). */
+.page-head{position:sticky;top:0;z-index:20;background:var(--bg);padding-bottom:.75rem;margin-bottom:.75rem;display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.page-head::after{content:'';position:absolute;left:-1.375rem;right:-1.375rem;bottom:0;height:1px;background:var(--border)}
+.page-head-text .ptitle{margin-bottom:.15rem}
+.page-head-text .psub{margin-bottom:0}
+
+/* Professional action toolbar — groups primary/secondary actions with
+   consistent spacing, replacing ad-hoc flex rows. */
+.toolbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.toolbar-spacer{flex:1}
+
+/* Filter bar — search input + filter chips/selects, consistent placement
+   directly under the sticky page header on every list screen. */
+.filter-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.75rem;background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh);margin-bottom:.875rem}
+.filter-search{position:relative;flex:1;min-width:180px;max-width:320px}
+.filter-search i{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--t4);font-size:14px;pointer-events:none}
+.filter-search input{width:100%;padding:7px 11px 7px 30px;font-size:13px;font-family:var(--ff);border:1px solid var(--border2);border-radius:var(--r-sm);background:var(--surf);color:var(--t1);outline:none;transition:.15s}
+.filter-search input:focus{border-color:var(--g-soft);box-shadow:0 0 0 3px rgba(46,139,87,.1);background:#fff}
+.filter-select{padding:7px 10px;font-size:12.5px;font-family:var(--ff);border:1px solid var(--border2);border-radius:var(--r-sm);background:var(--surf);color:var(--t2);outline:none;cursor:pointer}
+.filter-chip{border:1px solid var(--border2);border-radius:20px;padding:4px 12px;font-size:12px;font-weight:500;cursor:pointer;background:var(--surf);color:var(--t2);transition:.12s;font-family:var(--ff);display:inline-flex;align-items:center;gap:5px}
+.filter-chip:hover{border-color:var(--g-soft);color:var(--t1)}
+.filter-chip.active{background:var(--g-mid);color:#fff;border-color:var(--g-mid)}
+.filter-clear{font-size:12px;color:var(--t4);cursor:pointer;background:none;border:none;font-family:var(--ff);display:inline-flex;align-items:center;gap:4px;padding:4px 6px}
+.filter-clear:hover{color:var(--red)}
+.bulk-bar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.6rem .75rem;background:var(--g-mid);color:#fff;border-radius:var(--r-lg);margin-bottom:.875rem;font-size:12.5px;font-weight:500}
+.bulk-bar select.filter-select{background:#fff;color:var(--t1)}
+
+/* KPI cards — richer variant of .mc for dashboards, with an accent bar and
+   trend indicator, reusing the same shadow/radius/color tokens. */
+.kpi-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r-lg);padding:.875rem 1rem;box-shadow:var(--sh);position:relative;overflow:hidden;transition:.15s}
+.kpi-card:hover{box-shadow:var(--sh-md)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--g-soft);opacity:.4}
+.kpi-card.kpi-amber::before{background:var(--amber);opacity:1}
+.kpi-card.kpi-red::before{background:var(--red);opacity:1}
+.kpi-card.kpi-blue::before{background:var(--blue);opacity:1}
+.kpi-card.kpi-green::before{background:var(--g-soft);opacity:1}
+.kpi-lbl{font-size:11px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.kpi-val{font-size:26px;font-weight:700;color:var(--t1);letter-spacing:-.4px;line-height:1.25;margin-top:2px}
+.kpi-sub{font-size:11px;color:var(--t4);margin-top:3px;display:flex;align-items:center;gap:4px}
+
+/* Section header — sits above a .card or table block to separate sections
+   within a page (distinct from .ptitle, which is the whole-page title). */
+.section-hdr{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:1.25rem 0 .625rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.section-hdr h4{font-size:13px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:7px}
+.section-hdr h4 i{color:var(--g-soft);font-size:15px}
+
+/* .tbl — the primary list-table class used across this app (Procurement,
+   Vehicles, Material Requests, etc.) which had no CSS behind it at all
+   before this block. Zebra rows, hover state, sticky header, sortable
+   column affordance, consistent row-action alignment. */
+table.tbl{width:100%;border-collapse:collapse;font-size:13px}
+table.tbl thead th{position:sticky;top:0;z-index:5;background:var(--surf);font-weight:600;font-size:11px;color:var(--t3);padding:9px 12px;text-align:left;border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.04em;white-space:nowrap}
+table.tbl thead th[data-sort]{cursor:pointer;user-select:none}
+table.tbl thead th[data-sort]:hover{color:var(--t1);background:var(--border2)}
+table.tbl thead th[data-sort]::after{content:'\2195';margin-left:5px;opacity:.35;font-size:10px}
+table.tbl thead th[data-sort="asc"]::after{content:'\2191';opacity:.9;color:var(--g-soft)}
+table.tbl thead th[data-sort="desc"]::after{content:'\2193';opacity:.9;color:var(--g-soft)}
+table.tbl tbody td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--t1);vertical-align:middle}
+table.tbl tbody tr:last-child td{border-bottom:none}
+table.tbl tbody tr:nth-child(even){background:var(--surf)}
+table.tbl tbody tr:hover td{background:var(--g-pale)}
+table.tbl tbody td:last-child{white-space:nowrap}
+table.tbl .row-actions,table.dt .row-actions{display:flex;gap:5px;justify-content:flex-end}
+.tbl-pager{display:flex;align-items:center;justify-content:flex-end;gap:.75rem;padding:.625rem 1rem;border-top:1px solid var(--border);font-size:12px;color:var(--t3)}
+.tbl-pager button{background:var(--surf);border:1px solid var(--border2);color:var(--t2);width:26px;height:26px;border-radius:var(--r-sm);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.tbl-pager button:disabled{opacity:.35;cursor:not-allowed}
+.tbl-pager button:not(:disabled):hover{background:var(--card);border-color:var(--g-soft)}
+
+/* Icon-aware status badges — standardizes the full procurement status
+   vocabulary (draft/submitted/pending/approved/rejected/issued/received/
+   paid/cancelled) onto the existing 6 badge colors plus one neutral gray
+   promoted from values already used elsewhere in this file. */
+.bn{background:var(--gray-l);color:var(--gray)}
+.badge-ic{display:inline-flex;align-items:center;gap:4px}
+.badge-ic i{font-size:11px}
+
+/* Loading skeleton — shimmer placeholder rows, reusing the app's existing
+   spin/loading color language instead of introducing a new one. */
+@keyframes skel-shimmer{0%{background-position:-200px 0}100%{background-position:calc(200px + 100%) 0}}
+.skel-row{height:14px;border-radius:4px;background:linear-gradient(90deg,var(--surf) 25%,var(--border) 37%,var(--surf) 63%);background-size:400px 100%;animation:skel-shimmer 1.4s ease infinite;margin:6px 0}
+.skel-row.w-60{width:60%}.skel-row.w-40{width:40%}.skel-row.w-80{width:80%}.skel-row.w-25{width:25%}
+.skel-table td{padding:9px 12px;border-bottom:1px solid var(--border)}
+
+/* Toast — lightweight success/error feedback, used where the existing
+   showOverlaySuccess helper isn't applicable (e.g. actions taken without an
+   open overlay, like a row-level quick action). */
+.toast-host{position:fixed;bottom:22px;right:22px;z-index:1200;display:flex;flex-direction:column;gap:8px;align-items:flex-end}
+.toast{background:var(--t1);color:#fff;padding:10px 16px;border-radius:var(--r-md);font-size:13px;box-shadow:var(--sh-md);display:flex;align-items:center;gap:8px;max-width:360px;animation:toast-in .18s ease}
+.toast i{font-size:15px}
+.toast.toast-success{background:var(--g-dark)}
+.toast.toast-error{background:#7F1D1D}
+.toast.toast-pending{background:#92400E}
+.toast.toast-warning{background:#B45309}
+.toast.toast-info{background:var(--blue)}
+@keyframes toast-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:960px){
+  .filter-bar{flex-direction:column;align-items:stretch}
+  .filter-search{max-width:none}
+  .page-head{flex-direction:column;align-items:stretch}
+}
+
+/* Phase 5D — print-friendly layout for Executive Reports ("Print" button
+   calls window.print()). Hides interactive chrome; leaves report tables/
+   summaries as clean black-on-white content. */
+@media print{
+  .sidebar,.topbar,#pr-rep-tabs,.filter-bar,.bs1,.bp1,#overlay{display:none!important}
+  body,.tbl,.tbl td,.tbl th{color:#000!important;background:#fff!important}
+  .card{box-shadow:none!important;border:1px solid #ccc!important}
+}
 

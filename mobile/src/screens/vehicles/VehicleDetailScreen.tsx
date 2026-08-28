@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, Alert,
   TouchableOpacity, ActivityIndicator,
@@ -12,6 +12,7 @@ import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
+import { ReasonModal }  from '../../components/ReasonModal';
 import {
   useVehicleDetail,
   useVehicleDelete,
@@ -84,8 +85,8 @@ function FuelLogRow({
 }
 
 function MaintenanceRow({
-  record, onDelete, isOnline,
-}: { record: MaintenanceRecord; onDelete: () => void; isOnline: boolean }) {
+  record, onEdit, onDelete, isOnline,
+}: { record: MaintenanceRecord; onEdit: () => void; onDelete: () => void; isOnline: boolean }) {
   return (
     <View style={styles.subCard}>
       <View style={styles.subCardTop}>
@@ -99,10 +100,16 @@ function MaintenanceRow({
       {record.performed_by ? <Text style={styles.subCardNote}>By: {record.performed_by}</Text> : null}
       {record.next_due_date ? <Text style={styles.subCardNote}>Next due: {record.next_due_date}</Text> : null}
       {isOnline && (
-        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete} activeOpacity={0.7}>
-          <Ionicons name="trash-outline" size={13} color={Colors.error} />
-          <Text style={styles.deleteBtnText}>Delete</Text>
-        </TouchableOpacity>
+        <View style={styles.subCardActions}>
+          <TouchableOpacity style={styles.editBtn} onPress={onEdit} activeOpacity={0.7}>
+            <Ionicons name="create-outline" size={13} color={Colors.navy} />
+            <Text style={styles.editBtnText}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.deleteBtn, styles.subCardActionBtn]} onPress={onDelete} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={13} color={Colors.error} />
+            <Text style={styles.deleteBtnText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -125,29 +132,30 @@ export function VehicleDetailScreen() {
   const { vehicle, fuelLogs, maintenance } = data;
   const isCompany = vehicle.ownership_type !== 'Third-Party Car';
 
-  async function handleDeleteVehicle() {
-    Alert.alert(
-      'Delete Vehicle',
-      `Delete ${vehicle.registration}?\n\nThis permanently removes the vehicle. All fuel logs will be deleted, maintenance records will be archived according to existing business rules, and delivery references will be cleared. This action cannot be undone.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete', style: 'destructive',
-          onPress: async () => {
-            if (!isOnline) {
-              Alert.alert('Online Required', 'Vehicle deletion requires an active connection.');
-              return;
-            }
-            try {
-              await deleteVehicle(vehicleId);
-              navigation.goBack();
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'Could not delete vehicle.');
-            }
-          },
-        },
-      ],
-    );
+  // Fleet & Equipment Phase 1 (Priority 2/5) — vehiclesDelete is now a
+  // governed soft-delete (moves to Trash, restorable within 30 days; fuel
+  // logs and maintenance history are preserved, not removed) instead of an
+  // ungoverned hard delete that cascaded hard-deletes of both. A reason is
+  // now collected, matching handleDeleteFuelLog/handleDeleteMaintenance's
+  // own pattern below, and a pendingApproval response is handled the same
+  // way those two already do.
+  //
+  // ERP UI/UX Completion Phase 8 (audit finding H-13 pattern) — Alert.prompt
+  // is iOS-only; state for the cross-platform ReasonModal replacement,
+  // shared across all 3 delete flows via a discriminated union.
+  type DeleteTarget =
+    | { kind: 'vehicle' }
+    | { kind: 'fuel'; entry: FuelLog }
+    | { kind: 'maintenance'; record: MaintenanceRecord };
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  function handleDeleteVehicle() {
+    if (!isOnline) {
+      Alert.alert('Online Required', 'Vehicle deletion requires an active connection.');
+      return;
+    }
+    setDeleteTarget({ kind: 'vehicle' });
   }
 
   function handleDeleteFuelLog(entry: FuelLog) {
@@ -155,22 +163,7 @@ export function VehicleDetailScreen() {
       Alert.alert('Online Required', 'Fuel log deletion requires an active connection.');
       return;
     }
-    Alert.prompt(
-      'Delete Fuel Log',
-      `Enter a reason for deleting this fuel log (${entry.liters} L on ${entry.log_date}):`,
-      async (reason) => {
-        if (!reason?.trim()) return;
-        try {
-          const result = await deleteFuelLog(Number(entry.id), vehicleId, reason.trim());
-          if (result && (result as VehiclePendingApproval).pendingApproval) {
-            Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
-          }
-        } catch (err: any) {
-          Alert.alert('Error', err?.message ?? 'Could not delete fuel log.');
-        }
-      },
-      'plain-text',
-    );
+    setDeleteTarget({ kind: 'fuel', entry });
   }
 
   function handleDeleteMaintenance(record: MaintenanceRecord) {
@@ -178,23 +171,54 @@ export function VehicleDetailScreen() {
       Alert.alert('Online Required', 'Maintenance record deletion requires an active connection.');
       return;
     }
-    Alert.prompt(
-      'Delete Maintenance Record',
-      `Enter a reason for deleting "${record.description}":`,
-      async (reason) => {
-        if (!reason?.trim()) return;
-        try {
-          const result = await deleteMaintenance(Number(record.id), vehicleId, reason.trim());
-          if (result && (result as VehiclePendingApproval).pendingApproval) {
-            Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
-          }
-        } catch (err: any) {
-          Alert.alert('Error', err?.message ?? 'Could not delete maintenance record.');
-        }
-      },
-      'plain-text',
-    );
+    setDeleteTarget({ kind: 'maintenance', record });
   }
+
+  async function submitDelete(reason: string) {
+    if (!deleteTarget || !reason.trim()) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'vehicle') {
+        const result = await deleteVehicle(vehicleId, reason.trim());
+        setDeleteTarget(null);
+        if (result && (result as VehiclePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
+        }
+        navigation.goBack();
+      } else if (deleteTarget.kind === 'fuel') {
+        const result = await deleteFuelLog(Number(deleteTarget.entry.id), vehicleId, reason.trim());
+        setDeleteTarget(null);
+        if (result && (result as VehiclePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
+        }
+      } else {
+        const result = await deleteMaintenance(Number(deleteTarget.record.id), vehicleId, reason.trim());
+        setDeleteTarget(null);
+        if (result && (result as VehiclePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
+        }
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not complete delete.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const deleteModalProps = !deleteTarget ? null : deleteTarget.kind === 'vehicle'
+    ? {
+        title: 'Move Vehicle to Trash',
+        message: `Enter a reason for moving ${vehicle.registration} to Trash. Fuel logs and maintenance history are preserved and the vehicle can be restored within 30 days.`,
+      }
+    : deleteTarget.kind === 'fuel'
+    ? {
+        title: 'Delete Fuel Log',
+        message: `Enter a reason for deleting this fuel log (${deleteTarget.entry.liters} L on ${deleteTarget.entry.log_date}):`,
+      }
+    : {
+        title: 'Delete Maintenance Record',
+        message: `Enter a reason for deleting "${deleteTarget.record.description}":`,
+      };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -360,6 +384,9 @@ export function VehicleDetailScreen() {
                 key={String(record.id)}
                 record={record}
                 isOnline={isOnline}
+                onEdit={() => navigation.navigate('VehicleMaintenanceCreate', {
+                  vehicleId, registration: vehicle.registration, record,
+                })}
                 onDelete={() => handleDeleteMaintenance(record)}
               />
             ))
@@ -375,6 +402,16 @@ export function VehicleDetailScreen() {
         )}
 
       </ScrollView>
+
+      <ReasonModal
+        visible={!!deleteTarget}
+        title={deleteModalProps?.title ?? ''}
+        message={deleteModalProps?.message ?? ''}
+        confirmLabel="Delete"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={submitDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -442,6 +479,10 @@ const styles = StyleSheet.create({
 
   deleteBtn:     { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
   deleteBtnText: { fontSize: Typography.xs, color: Colors.error },
+  subCardActions:   { flexDirection: 'row', gap: Spacing.base, marginTop: 4 },
+  subCardActionBtn: { marginTop: 0 },
+  editBtn:       { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  editBtnText:   { fontSize: Typography.xs, color: Colors.navy },
 
   deleteVehicleBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,

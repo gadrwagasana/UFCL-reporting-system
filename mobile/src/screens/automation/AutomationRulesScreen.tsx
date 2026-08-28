@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   StyleSheet, View, Text, FlatList, Switch,
-  TouchableOpacity, RefreshControl, ActivityIndicator, Alert,
+  TouchableOpacity, RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +10,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }     from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
+import { LoadingState }  from '../../components/LoadingState';
+import { EmptyState }    from '../../components/EmptyState';
 import { useAuthStore }  from '../../stores/authStore';
 import { hasPermission } from '../../utils/permissions';
 import type { UserRole } from '../../types/auth';
@@ -54,7 +56,7 @@ export function AutomationRulesScreen() {
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <StatusBar style="light" />
         <AppHeader title="Automation Rules" onBack={() => navigation.goBack()} />
-        <View style={s.center}><ActivityIndicator color={Colors.navy} /></View>
+        <LoadingState message="Loading automation rules…" fullScreen />
       </SafeAreaView>
     );
   }
@@ -65,7 +67,11 @@ export function AutomationRulesScreen() {
     <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Automation Rules" onBack={() => navigation.goBack()} />
+      <AppHeader
+        title="Automation Rules"
+        onBack={() => navigation.goBack()}
+        actions={canEdit ? [{ icon: 'add', onPress: () => navigation.navigate('AutomationRuleDetail', {}) }] : []}
+      />
 
       {!canEdit && (
         <View style={s.readOnlyBanner}>
@@ -117,10 +123,7 @@ export function AutomationRulesScreen() {
         contentContainerStyle={s.list}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
         ListEmptyComponent={
-          <View style={s.empty}>
-            <Ionicons name="hardware-chip-outline" size={32} color={Colors.textMuted} />
-            <Text style={s.emptyText}>No automation rules found.</Text>
-          </View>
+          <EmptyState icon="hardware-chip-outline" title="No automation rules found" subtitle="Automation rules will appear here once configured." />
         }
         ItemSeparatorComponent={() => <View style={{ height: Spacing.xs }} />}
       />
@@ -130,7 +133,6 @@ export function AutomationRulesScreen() {
 
 const s = StyleSheet.create({
   safe:   { flex: 1, backgroundColor: Colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:   { padding: Spacing.base, paddingBottom: Spacing.xxxl },
 
   readOnlyBanner: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, backgroundColor: Colors.warningBg, paddingHorizontal: Spacing.base, paddingVertical: Spacing.xs },
@@ -144,7 +146,4 @@ const s = StyleSheet.create({
   badgeRow:  { flexDirection: 'row', gap: Spacing.xs },
   badge:     { paddingHorizontal: 7, paddingVertical: 2, borderRadius: 10 },
   badgeText: { fontSize: 10, fontWeight: '600' },
-
-  empty:     { alignItems: 'center', gap: Spacing.sm, paddingTop: 64 },
-  emptyText: { fontSize: Typography.sm, color: Colors.textMuted },
 });

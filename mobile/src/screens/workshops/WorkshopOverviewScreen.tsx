@@ -1,24 +1,107 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  StyleSheet, View, Text, ScrollView, RefreshControl, Alert, TouchableOpacity, ActivityIndicator,
+  StyleSheet, View, Text, ScrollView, RefreshControl, Alert, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar }    from 'expo-status-bar';
 import { Ionicons }     from '@expo/vector-icons';
+import { LineChart }    from 'react-native-gifted-charts';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useAuthStore }    from '../../stores/authStore';
 import { AppHeader }       from '../../components/AppHeader';
 import { LoadingState }    from '../../components/LoadingState';
 import { ErrorState }      from '../../components/ErrorState';
 import { EmptyState }      from '../../components/EmptyState';
+import { FormSelect }      from '../../components/FormSelect';
+import { ReasonModal }     from '../../components/ReasonModal';
+import { MRApproveModal }  from '../../components/MRApproveModal';
 import {
   useWorkshopOverview,
-  useTransferApprove,
   useMaterialRequestApproveFromOverview,
 } from '../../hooks/useWorkshops';
+// Phase 1 (Inventory consolidation) — pending transfers now come from
+// stock_transfers (the dedicated request→approve→dispatch→receive
+// lifecycle), not the retired stock_movements shortcut, so approval here
+// uses the same mutation the Stock Transfers screens already use.
+import { useStockTransferApprove } from '../../hooks/useStockTransfers';
 import { hasPermission } from '../../utils/permissions';
-import type { OverviewWorkshopCard, PendingTransfer, PendingMaterialRequest, LowStockItem } from '../../types/api';
+import type { OverviewWorkshopCard, PendingTransfer, PendingMaterialRequest, LowStockItem, WorkshopCostTrendMonth, WorkshopMaintenanceTrendMonth } from '../../types/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
+
+// Phase 2 — compact 2/3-column KPI tile, same pattern as the Logistics
+// Dashboard's MiniKpi (mirrors the desktop Executive KPI strip's `.mc` card).
+function MiniKpi({ label, value, warn }: { label: string; value: string | number; warn?: boolean }) {
+  return (
+    <View style={styles.miniKpi}>
+      <Text style={[styles.miniKpiValue, warn ? { color: Colors.warning } : null]}>{value}</Text>
+      <Text style={styles.miniKpiLabel}>{label}</Text>
+    </View>
+  );
+}
+
+// Phase 2 — "what needs attention" list widget, same pattern as the
+// Logistics Dashboard's Widget component.
+function OpsWidget({ title, items, emptyMsg }: { title: string; items: { label: string; sub?: string; badge?: string; warn?: boolean }[]; emptyMsg: string }) {
+  const shown = items.slice(0, 5);
+  return (
+    <View style={styles.widgetCard}>
+      <Text style={styles.widgetTitle}>{title} <Text style={styles.widgetCount}>({items.length})</Text></Text>
+      {shown.length === 0 ? (
+        <Text style={styles.emptyText}>{emptyMsg}</Text>
+      ) : shown.map((it, i) => (
+        <View key={i} style={styles.widgetRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.widgetLabel} numberOfLines={1}>{it.label}</Text>
+            {it.sub ? <Text style={styles.widgetSub} numberOfLines={1}>{it.sub}</Text> : null}
+          </View>
+          {it.badge ? <Text style={[styles.widgetBadge, it.warn ? styles.widgetBadgeWarn : null]}>{it.badge}</Text> : null}
+        </View>
+      ))}
+      {items.length > 5 ? <Text style={styles.widgetMore}>+{items.length - 5} more</Text> : null}
+    </View>
+  );
+}
+
+// Phase 3 — 6-month trend chart, following the same inline `LineChart`
+// (react-native-gifted-charts, already a dependency) pattern already used
+// by EpmTrendsScreen — no new chart component/library introduced.
+function TrendChart({ title, points, color, suffix }: { title: string; points: { month: string; value: number }[]; color: string; suffix?: string }) {
+  const vals = points.map(p => ({ value: p.value }));
+  const latest = points.length ? points[points.length - 1] : null;
+  return (
+    <View style={styles.widgetCard}>
+      <Text style={styles.widgetTitle}>{title}</Text>
+      {latest ? <Text style={styles.miniKpiValue}>{latest.value.toLocaleString()}{suffix ?? ''}</Text> : null}
+      {vals.some(v => v.value > 0) ? (
+        <View style={{ marginTop: Spacing.xs }}>
+          <LineChart
+            data={vals}
+            width={260}
+            height={60}
+            hideDataPoints
+            color={color}
+            thickness={2}
+            hideYAxisText
+            hideAxesAndRules
+            areaChart
+            startFillColor={color + '22'}
+            endFillColor={color + '00'}
+            curved
+            noOfSections={3}
+            initialSpacing={0}
+            endSpacing={0}
+          />
+        </View>
+      ) : <Text style={styles.emptyText}>No data yet.</Text>}
+      {points.length >= 2 ? (
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
+          <Text style={styles.widgetSub}>{points[0].month}</Text>
+          <Text style={styles.widgetSub}>{points[points.length - 1].month}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
 
 function MetricsBanner({ total, active, transfers, requests, lowStockCount }: {
   total: number; active: number; transfers: number; requests: number; lowStockCount: number;
@@ -165,8 +248,18 @@ export function WorkshopOverviewScreen() {
   const canApprove = hasPermission(role as any, 'workshop.approve');
 
   const { data, isLoading, isError, refetch, isRefetching } = useWorkshopOverview();
-  const { approveTransfer }        = useTransferApprove();
+  const approveTransferMutation     = useStockTransferApprove();
   const { approveMaterialRequest } = useMaterialRequestApproveFromOverview();
+  const [mrApproveTarget, setMrApproveTarget] = useState<PendingMaterialRequest | null>(null);
+  const [mrApproveLoading, setMrApproveLoading] = useState(false);
+  // Enterprise UI/UX Standardization Phase 3 — reject now goes through
+  // ReasonModal (typed reason required, matching desktop's openRejectOverlay
+  // and the reviewNotes field the reject mutation already accepts) instead
+  // of a plain Alert.alert with no reason collection at all — previously the
+  // same verb family (approve/reject) used two unrelated mechanisms on this
+  // one screen, and reject silently dropped the reason desktop requires.
+  const [mrRejectTarget, setMrRejectTarget] = useState<PendingMaterialRequest | null>(null);
+  const [mrRejectLoading, setMrRejectLoading] = useState(false);
 
   function confirmTransfer(item: PendingTransfer, action: 'approve' | 'reject') {
     if (!isOnline) { Alert.alert('Online Required', 'Approvals require an active connection.'); return; }
@@ -180,7 +273,7 @@ export function WorkshopOverviewScreen() {
           text: verb, style: action === 'reject' ? 'destructive' : 'default',
           onPress: async () => {
             try {
-              await approveTransfer({ movementId: item.id, action });
+              await approveTransferMutation.mutateAsync({ id: item.id, action });
             } catch (err: any) {
               Alert.alert('Error', err?.message ?? 'Could not process transfer.');
             }
@@ -192,28 +285,47 @@ export function WorkshopOverviewScreen() {
 
   function confirmMR(item: PendingMaterialRequest, action: 'approve' | 'reject') {
     if (!isOnline) { Alert.alert('Online Required', 'Approvals require an active connection.'); return; }
-    const verb = action === 'approve' ? 'Approve' : 'Reject';
-    Alert.alert(
-      `${verb} Request`,
-      `${verb} request for ${item.requested_qty} ${item.uom} "${item.item_name}" from ${item.workshop_name}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: verb, style: action === 'reject' ? 'destructive' : 'default',
-          onPress: async () => {
-            try {
-              await approveMaterialRequest({
-                requestId:   item.id,
-                action,
-                approvedQty: action === 'approve' ? item.requested_qty : undefined,
-              });
-            } catch (err: any) {
-              Alert.alert('Error', err?.message ?? 'Could not process request.');
-            }
-          },
-        },
-      ],
-    );
+    if (action === 'approve') { setMrApproveTarget(item); return; }
+    setMrRejectTarget(item);
+  }
+
+  async function handleMrReject(reason: string) {
+    if (!mrRejectTarget) return;
+    setMrRejectLoading(true);
+    try {
+      const res = await approveMaterialRequest({ requestId: mrRejectTarget.id, action: 'reject', reviewNotes: reason });
+      if (!(res as any)?.ok) {
+        Alert.alert('Error', (res as any)?.error ?? 'Could not process request.');
+      } else {
+        setMrRejectTarget(null);
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not process request.');
+    } finally {
+      setMrRejectLoading(false);
+    }
+  }
+
+  async function handleMrApprove(qty: number, sourceWarehouseId: number, destinationWorkshopId: number | null, notes: string) {
+    if (!mrApproveTarget) return;
+    const requestId = mrApproveTarget.id;
+    setMrApproveLoading(true);
+    try {
+      const res = await approveMaterialRequest({
+        requestId, action: 'approve', approvedQty: qty, reviewNotes: notes || undefined,
+        sourceWarehouseId, destinationWorkshopId: destinationWorkshopId ?? undefined,
+      });
+      if (!(res as any)?.ok) {
+        Alert.alert('Error', (res as any)?.error ?? 'Could not approve request.');
+      } else {
+        setMrApproveTarget(null);
+        Alert.alert('Approved', 'Request approved — a stock transfer was created and is ready for dispatch.');
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not process request.');
+    } finally {
+      setMrApproveLoading(false);
+    }
   }
 
   if (isLoading) return <LoadingState message="Loading overview…" fullScreen />;
@@ -234,6 +346,74 @@ export function WorkshopOverviewScreen() {
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
       >
+        {/* Phase 2 — Executive KPIs */}
+        <Text style={styles.sectionTitle}>Executive KPIs</Text>
+        <View style={styles.kpiGrid}>
+          <MiniKpi label="Machines" value={data?.totalMachines ?? 0} />
+          <MiniKpi label="Machines available" value={data?.availableMachines ?? 0} />
+          <MiniKpi label="Active maintenance" value={data?.activeMaintenanceCount ?? 0} warn={(data?.activeMaintenanceCount ?? 0) > 0} />
+          <MiniKpi label="Scheduled (7d)" value={data?.scheduledMaintenanceCount ?? 0} />
+          <MiniKpi label="Overdue maintenance" value={data?.overdueMaintenanceCount ?? 0} warn={(data?.overdueMaintenanceCount ?? 0) > 0} />
+          <MiniKpi label="Maintenance this month" value={data?.maintenanceThisMonthCount ?? 0} />
+          <MiniKpi label="Workshop utilization" value={`${data?.workshopUtilizationPct ?? 0}%`} />
+          <MiniKpi label="Fuel this month (L)" value={(data?.fuelConsumedThisMonth ?? 0).toLocaleString()} />
+          <MiniKpi label="Availability" value={`${data?.machineAvailabilityPct ?? 0}%`} />
+          <MiniKpi label="Downtime (hrs)" value={(data?.downtimeHoursThisMonth ?? 0).toLocaleString()} warn={(data?.downtimeHoursThisMonth ?? 0) > 0} />
+          <MiniKpi label="Material requests" value={requests.length} warn={requests.length > 0} />
+          {data?.financeVisibility ? (
+            <>
+              <MiniKpi label="Workshop costs" value={(data.workshopCostsThisMonth ?? 0).toLocaleString()} />
+              <MiniKpi label="Maintenance costs" value={data.financeVisibility.maintenanceCostThisMonth.toLocaleString()} />
+            </>
+          ) : null}
+        </View>
+
+        {/* Phase 2 — Operational Widgets */}
+        <Text style={styles.sectionTitle}>Operational Widgets</Text>
+        <OpsWidget
+          title="Today's Maintenance"
+          items={(data?.todaysMaintenance ?? []).map(s => ({ label: `${s.machine_code} — ${s.machine_name}`, sub: s.maintenance_type, badge: 'Today', warn: true }))}
+          emptyMsg="Nothing scheduled for today."
+        />
+        <OpsWidget
+          title="Upcoming Maintenance"
+          items={(data?.upcomingMaintenance ?? []).map(s => ({ label: `${s.machine_code} — ${s.machine_name}`, sub: s.maintenance_type, badge: new Date(s.next_due).toLocaleDateString() }))}
+          emptyMsg="Nothing due in the next 7 days."
+        />
+        <OpsWidget
+          title="Overdue Jobs"
+          items={(data?.overdueMaintenanceList ?? []).map(s => ({ label: `${s.machine_code} — ${s.machine_name}`, sub: s.maintenance_type, badge: new Date(s.next_due).toLocaleDateString(), warn: true }))}
+          emptyMsg="Nothing overdue."
+        />
+        <OpsWidget
+          title="Equipment Alerts"
+          items={(data?.equipmentAlerts ?? []).map(m => ({ label: `${m.machine_code} — ${m.name}`, sub: m.status, badge: m.status, warn: true }))}
+          emptyMsg="No equipment issues."
+        />
+        {data?.financeVisibility ? (
+          <OpsWidget
+            title="Fleet Alerts"
+            items={(data?.fleetAlerts ?? []).map(v => ({ label: v.vehicle_registration, sub: v.maintenance_type, badge: v.next_due_date, warn: true }))}
+            emptyMsg="No vehicle maintenance due soon."
+          />
+        ) : null}
+
+        {/* Phase 3 — Operational Intelligence trends */}
+        <Text style={styles.sectionTitle}>Trends</Text>
+        <TrendChart
+          title="Maintenance Trend (6 mo)"
+          points={(data?.maintenanceTrendMonths ?? []).map((m: WorkshopMaintenanceTrendMonth) => ({ month: m.month, value: m.cnt }))}
+          color={Colors.navy}
+        />
+        {data?.financeVisibility ? (
+          <TrendChart
+            title="Cost Trend (6 mo)"
+            points={(data?.costTrendMonths ?? []).map((m: WorkshopCostTrendMonth) => ({ month: m.month, value: m.total }))}
+            color={Colors.warning}
+            suffix=" RWF"
+          />
+        ) : null}
+
         <MetricsBanner
           total={workshops.length}
           active={workshops.filter(w => w.active).length}
@@ -293,6 +473,24 @@ export function WorkshopOverviewScreen() {
           <EmptyState icon="business-outline" title="No data" subtitle="Workshop data will appear here." />
         )}
       </ScrollView>
+
+      <MRApproveModal
+        item={mrApproveTarget}
+        workshops={workshops}
+        onClose={() => setMrApproveTarget(null)}
+        onConfirm={handleMrApprove}
+        loading={mrApproveLoading}
+      />
+
+      <ReasonModal
+        visible={!!mrRejectTarget}
+        title="Reject Request"
+        message={mrRejectTarget ? `Reject request for ${mrRejectTarget.requested_qty} ${mrRejectTarget.uom} "${mrRejectTarget.item_name}" from ${mrRejectTarget.workshop_name}?` : ''}
+        confirmLabel="Reject"
+        loading={mrRejectLoading}
+        onCancel={() => setMrRejectTarget(null)}
+        onConfirm={handleMrReject}
+      />
     </SafeAreaView>
   );
 }
@@ -301,6 +499,8 @@ const styles = StyleSheet.create({
   safe:    { flex: 1, backgroundColor: Colors.bg },
   scroll:  { flex: 1 },
   content: { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
+
+  // MR approve modal
 
   banner: {
     flexDirection: 'row', backgroundColor: Colors.navy,
@@ -363,4 +563,52 @@ const styles = StyleSheet.create({
   },
   stockBadge:     { backgroundColor: Colors.error + '20', borderRadius: Radius.md, paddingHorizontal: 8, paddingVertical: 4 },
   stockBadgeText: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.error },
+
+  emptyText: { fontSize: Typography.sm, color: Colors.textMuted },
+
+  kpiGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginBottom: Spacing.sm,
+  },
+  miniKpi: {
+    flexBasis: '31%', flexGrow: 1,
+    backgroundColor: Colors.card, borderRadius: Radius.md,
+    padding: Spacing.sm, ...Shadow.sm,
+  },
+  miniKpiValue: {
+    fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.textPrimary,
+  },
+  miniKpiLabel: {
+    fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2,
+  },
+
+  widgetCard: {
+    backgroundColor: Colors.card, borderRadius: Radius.lg,
+    padding: Spacing.md, ...Shadow.sm, marginBottom: Spacing.sm,
+  },
+  widgetTitle: {
+    fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.textPrimary, marginBottom: Spacing.xs,
+  },
+  widgetCount: {
+    color: Colors.textMuted, fontWeight: Typography.regular,
+  },
+  widgetRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: Colors.divider, gap: Spacing.sm,
+  },
+  widgetLabel: {
+    fontSize: Typography.xs, fontWeight: Typography.medium, color: Colors.textPrimary,
+  },
+  widgetSub: {
+    fontSize: 11, color: Colors.textMuted,
+  },
+  widgetBadge: {
+    fontSize: 11, color: Colors.textMuted, backgroundColor: Colors.bg,
+    borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2, flexShrink: 0,
+  },
+  widgetBadgeWarn: {
+    color: Colors.error, backgroundColor: Colors.errorBg,
+  },
+  widgetMore: {
+    fontSize: 11, color: Colors.textMuted, marginTop: 4,
+  },
 });

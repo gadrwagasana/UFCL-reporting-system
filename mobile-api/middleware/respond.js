@@ -36,6 +36,24 @@ function buildEnvelope(ok, payload, cacheSeconds = 0) {
  *   respond(res, await data.someFunction(...), 30)
  */
 function respond(res, result, cacheSeconds = 0) {
+  // Fleet & Equipment Phase 1 fix — a governed action queued for approval
+  // (applyGovernance's `{ ok:false, pendingApproval:true, level, message }`
+  // response) is not an error, but it was falling into the generic
+  // `ok===false` branch below, which discards everything except a mapped
+  // .error string (pendingApproval/message/level have no .error field, so
+  // it defaulted to "An unexpected error occurred.") and returns a non-2xx
+  // status. Axios then rejects the request before the mobile hooks'
+  // `if (result.pendingApproval)` checks (useFuelLogDelete,
+  // useMaintenanceDelete, useVehicleUpdate/Delete) ever ran — every governed
+  // mobile action showed a generic error instead of "Submitted for Review",
+  // even though the desktop/web client already handled this correctly.
+  // Sent as a 200 success envelope so the client resolves normally; the
+  // nested `result.ok: false` is preserved (object spread order) so
+  // unwrapEnvelope's reconstructed object still reads pendingApproval/
+  // message/level exactly as the mobile hooks expect.
+  if (result && result.ok === false && result.pendingApproval) {
+    return res.json(buildEnvelope(true, result, cacheSeconds));
+  }
   if (!result || result.ok === false) {
     const rawError = result?.error ?? 'An unexpected error occurred.';
     let code;

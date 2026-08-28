@@ -1,11 +1,13 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { get, post, put } from '../api/client';
+import { get, post, put, del } from '../api/client';
 import { EP } from '../api/endpoints';
 import {
   MachineListResponse,
   MachineDetailResponse,
   MachineCategoryListResponse,
   MachinePendingApproval,
+  MachineKpiPerformanceResponse,
+  MaintScheduleListAllResponse,
 } from '../types/api';
 
 // ── List (registry + categories + workshops + metrics) ────────────────────────
@@ -26,6 +28,16 @@ export function useMachineDetail(machineId: number) {
     queryFn:   () => get<MachineDetailResponse>(EP.MACHINES_DETAIL(machineId)),
     staleTime: 2 * 60_000,
     enabled:   machineId > 0,
+  });
+}
+
+// ── KPI Performance (Phase 1 Workshop parity fix) ──────────────────────────────
+
+export function useMachineKpiPerformance(month?: string) {
+  return useQuery<MachineKpiPerformanceResponse>({
+    queryKey:  ['machine-kpi-performance', month ?? 'current'],
+    queryFn:   () => get<MachineKpiPerformanceResponse>(EP.MACHINE_KPI_PERFORMANCE(month)),
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -85,6 +97,21 @@ export function useMachineUpdate() {
   return { updateMachine };
 }
 
+// Stabilization Phase 5 (F-19) — machinesDelete (soft-deactivate) had a
+// working backend/IPC path on desktop but no mobile route/hook at all.
+export function useMachineDelete() {
+  const qc = useQueryClient();
+  async function deleteMachine(machineId: number): Promise<MachinePendingApproval | void> {
+    const { del } = await import('../api/client');
+    const result = await del<MachinePendingApproval | { ok: true }>(EP.MACHINES_DELETE(machineId));
+    if ('pendingApproval' in result && result.pendingApproval) {
+      return result as MachinePendingApproval;
+    }
+    await qc.invalidateQueries({ queryKey: ['machine-list'] });
+  }
+  return { deleteMachine };
+}
+
 // ── Category mutations ────────────────────────────────────────────────────────
 
 interface CategoryPayload { name: string; description?: string | null }
@@ -131,6 +158,16 @@ interface MaintSchedulePayload {
   notes?:            string | null;
 }
 
+// Mechanician Phase 2 (Priority 3) — cross-machine list, the missing screen
+// identified in MECHANICIAN_PHASE2_OPERATIONAL_AUDIT.md §8.
+export function useMaintScheduleListAll() {
+  return useQuery<MaintScheduleListAllResponse>({
+    queryKey:  ['maint-schedules-all'],
+    queryFn:   () => get<MaintScheduleListAllResponse>(EP.MACHINES_MAINT_SCHEDULES_ALL),
+    staleTime: 2 * 60_000,
+  });
+}
+
 export function useMaintScheduleCreate() {
   const qc = useQueryClient();
   async function createSchedule(machineId: number, payload: MaintSchedulePayload): Promise<void> {
@@ -139,4 +176,32 @@ export function useMaintScheduleCreate() {
     await qc.invalidateQueries({ queryKey: ['machine-list'] });
   }
   return { createSchedule };
+}
+
+// ERP Remaining Departments Completion Program — the REST route
+// (mobile-api/routes/machines.js) and backend (machineMaintScheduleUpdate/
+// Delete, both already Workshop-Isolation-checked) have existed since "ERP
+// Final Enterprise Completion Gate", but no mobile hook ever called them —
+// editing/deleting a maintenance schedule entry was desktop-only despite the
+// full mobile-facing stack already being in place.
+export function useMaintScheduleUpdate() {
+  const qc = useQueryClient();
+  async function updateSchedule(machineId: number, scheduleId: number, payload: MaintSchedulePayload): Promise<void> {
+    await put(EP.MACHINES_MAINT_SCHEDULE_UPDATE(scheduleId), payload);
+    await qc.invalidateQueries({ queryKey: ['machine-detail', machineId] });
+    await qc.invalidateQueries({ queryKey: ['machine-list'] });
+    await qc.invalidateQueries({ queryKey: ['maint-schedules-all'] });
+  }
+  return { updateSchedule };
+}
+
+export function useMaintScheduleDelete() {
+  const qc = useQueryClient();
+  async function deleteSchedule(machineId: number, scheduleId: number): Promise<void> {
+    await del(EP.MACHINES_MAINT_SCHEDULE_DELETE(scheduleId));
+    await qc.invalidateQueries({ queryKey: ['machine-detail', machineId] });
+    await qc.invalidateQueries({ queryKey: ['machine-list'] });
+    await qc.invalidateQueries({ queryKey: ['maint-schedules-all'] });
+  }
+  return { deleteSchedule };
 }

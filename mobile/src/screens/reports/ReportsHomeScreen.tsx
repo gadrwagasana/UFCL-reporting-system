@@ -57,7 +57,7 @@ export function ReportsHomeScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Reports" dark />
+      <AppHeader title="Reports" searchModule="reports" dark />
       <FlatList
         data={visible}
         keyExtractor={item => item.key}

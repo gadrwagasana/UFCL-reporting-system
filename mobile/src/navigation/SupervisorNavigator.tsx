@@ -13,6 +13,8 @@ import { StockTransfersStack } from './stacks/StockTransfersStack';
 import { MyRequestsStack }       from './stacks/MyRequestsStack';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 import { ReportsStack }          from './stacks/ReportsStack';
+import { ProcurementStack }      from './stacks/ProcurementStack';
+import { MaintenanceJobsStack }  from './MaintenanceJobsStack';
 
 const Tab = createBottomTabNavigator<SupervisorTabParamList>();
 
@@ -25,7 +27,9 @@ const tabIcons: Record<keyof SupervisorTabParamList, [string, string]> = {
   TimberInventory: ['leaf',           'leaf-outline'],
   StockTransfers:  ['swap-vertical', 'swap-vertical-outline'],
   Reports:         ['stats-chart',  'stats-chart-outline'],
+  Procurement:     ['cart',   'cart-outline'],
   MyRequests:      ['list',    'list-outline'],
+  MaintenanceJobs: ['construct', 'construct-outline'],
   Profile:         ['person',  'person-outline'],
 };
 
@@ -38,7 +42,9 @@ const tabLabels: Record<keyof SupervisorTabParamList, string> = {
   TimberInventory: 'Timber Inv.',
   StockTransfers:  'Transfers',
   Reports:         'Reports',
+  Procurement:     'Procurement',
   MyRequests:      'My Requests',
+  MaintenanceJobs: 'Jobs',
   Profile:         'Profile',
 };
 
@@ -66,7 +72,9 @@ export function SupervisorNavigator() {
       <Tab.Screen name="TimberInventory" component={TimberInventoryStack}  options={{ title: 'Timber Inv.' }} />
       <Tab.Screen name="StockTransfers"  component={StockTransfersStack}  options={{ title: 'Transfers' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
+      <Tab.Screen name="Procurement"     component={ProcurementStack}      options={{ title: 'Procurement' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsStack}       options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MaintenanceJobs" component={MaintenanceJobsStack}  options={{ title: 'Jobs' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

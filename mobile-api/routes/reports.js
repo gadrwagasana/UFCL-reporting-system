@@ -18,7 +18,7 @@ const BI_ROLES = [
 router.get('/weekly-cost',
   requireRoles('ceo', 'operations', 'finance', 'admin'),
   async (req, res) => {
-    const result = await data.weeklyCostReport(req.user.id);
+    const result = await data.weeklyCostReport(req.user.userId);
     respond(res, result, 60);
   });
 
@@ -26,7 +26,7 @@ router.get('/weekly-cost',
 router.post('/weekly-expenses',
   requireRoles('ceo', 'finance', 'admin'),
   async (req, res) => {
-    const result = await data.weeklyExpensesSave(req.user.id, req.body);
+    const result = await data.weeklyExpensesSave(req.user.userId, req.body);
     respond(res, result);
   });
 
@@ -34,7 +34,7 @@ router.post('/weekly-expenses',
 router.get('/weekly-perf',
   requireRoles('ceo', 'operations', 'admin'),
   async (req, res) => {
-    const result = await data.weeklyPerformanceReport(req.user.id);
+    const result = await data.weeklyPerformanceReport(req.user.userId);
     respond(res, result, 60);
   });
 
@@ -42,7 +42,7 @@ router.get('/weekly-perf',
 router.get('/kpi',
   requireRoles('ceo', 'admin'),
   async (req, res) => {
-    const result = await data.kpiBudgetsList(req.user.id, req.query.month);
+    const result = await data.kpiBudgetsList(req.user.userId, req.query.month);
     respond(res, result, 60);
   });
 
@@ -50,7 +50,7 @@ router.get('/kpi',
 router.post('/kpi',
   requireRoles('ceo', 'admin'),
   async (req, res) => {
-    const result = await data.kpiBudgetSave(req.user.id, req.body);
+    const result = await data.kpiBudgetSave(req.user.userId, req.body);
     respond(res, result);
   });
 
@@ -58,7 +58,7 @@ router.post('/kpi',
 router.get('/executive',
   requireRoles('ceo', 'operations', 'admin'),
   async (req, res) => {
-    const result = await data.executiveDashboard(req.user.id);
+    const result = await data.executiveDashboard(req.user.userId);
     respond(res, result, 60);
   });
 
@@ -66,7 +66,7 @@ router.get('/executive',
 router.get('/bi',
   requireRoles(...BI_ROLES),
   async (req, res) => {
-    const result = await data.businessIntelligenceDashboard(req.user.id);
+    const result = await data.businessIntelligenceDashboard(req.user.userId);
     respond(res, result, 60);
   });
 
@@ -74,7 +74,7 @@ router.get('/bi',
 router.get('/monthly',
   requireRoles('ceo', 'finance', 'admin'),
   async (req, res) => {
-    const result = await data.monthlyDashboard(req.user.id, req.query.month);
+    const result = await data.monthlyDashboard(req.user.userId, req.query.month);
     respond(res, result, 60);
   });
 
@@ -82,7 +82,7 @@ router.get('/monthly',
 router.post('/monthly/approve',
   requireRoles('ceo'),
   async (req, res) => {
-    const result = await data.monthlyApprove(req.user.id, req.body.month);
+    const result = await data.monthlyApprove(req.user.userId, req.body.month);
     respond(res, result);
   });
 

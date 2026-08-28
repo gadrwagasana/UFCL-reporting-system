@@ -1,14 +1,21 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader } from '../../components/AppHeader';
-import { SawmillStackScreenProps } from '../../navigation/types';
+import { ReasonModal } from '../../components/ReasonModal';
+import { useSawmillDelete } from '../../hooks/useSawmill';
+import { useAuth } from '../../hooks/useAuth';
+import { useOfflineStore } from '../../stores/offlineStore';
+import { MachinePendingApproval } from '../../types/api';
+import { SawmillStackScreenProps, SawmillStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type Props = SawmillStackScreenProps<'SawmillProductionDetail'>;
+type NavProp = NativeStackNavigationProp<SawmillStackParamList, 'SawmillProductionDetail'>;
 
 function DetailRow({ label, value }: { label: string; value?: string | number | null }) {
   if (value === undefined || value === null || value === '' || value === 0) return null;
@@ -21,9 +28,16 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
 }
 
 export function SawmillProductionDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<NavProp>();
   const route      = useRoute<Props['route']>();
   const { entry }  = route.params;
+  const { can }    = useAuth();
+  const canWrite   = can('sawmill.write');
+  const { isOnline } = useOfflineStore();
+  const { deleteEntry } = useSawmillDelete();
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const totalTimber =
     (Number(entry.timber_kiln_dried ?? 0) +
@@ -32,10 +46,29 @@ export function SawmillProductionDetailScreen() {
 
   const hasTimber = totalTimber > 0;
 
+  async function handleDelete(reason: string) {
+    setDeleteLoading(true);
+    try {
+      const result = await deleteEntry(entry.id, reason);
+      if (result && 'pendingApproval' in result && (result as MachinePendingApproval).pendingApproval) {
+        Alert.alert('Submitted for Review', (result as MachinePendingApproval).message);
+      }
+      setDeleteOpen(false);
+      navigation.goBack();
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Production Record" dark onBack={() => navigation.goBack()} />
+      <AppHeader
+        title="Production Record"
+        dark
+        onBack={() => navigation.goBack()}
+        actions={canWrite ? [{ icon: 'create-outline', label: 'Edit entry', onPress: () => navigation.navigate('SawmillProductionCreate', { entry }) }] : []}
+      />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
@@ -79,12 +112,54 @@ export function SawmillProductionDetailScreen() {
           </View>
         )}
 
+        {/* Sawmill Timber Entry enhancement — sizes produced + volume recovery */}
+        {(entry.timberSizes?.length || (entry.expectedVolumeM3 ?? 0) > 0) && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Volume &amp; Recovery</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statCell}>
+                <Text style={styles.statValue}>{(entry.expectedVolumeM3 ?? 0).toFixed(2)}</Text>
+                <Text style={styles.statLabel}>Expected (m³)</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statCell}>
+                <Text style={styles.statValue}>{(entry.actualVolumeM3 ?? 0).toFixed(3)}</Text>
+                <Text style={styles.statLabel}>Actual (m³)</Text>
+              </View>
+              {(entry.expectedVolumeM3 ?? 0) > 0 && (
+                <>
+                  <View style={styles.statDivider} />
+                  <View style={styles.statCell}>
+                    <Text style={styles.statValue}>{Math.round(((entry.actualVolumeM3 ?? 0) / (entry.expectedVolumeM3 ?? 1)) * 100)}%</Text>
+                    <Text style={styles.statLabel}>Recovery</Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {!!entry.timberSizes?.length && (
+              <View style={styles.breakdown}>
+                {entry.timberSizes.map((s, i) => (
+                  <View key={i} style={styles.row}>
+                    <Text style={styles.rowLabel}>{s.widthMm}×{s.thicknessMm}×{s.lengthM}m ×{s.quantity}</Text>
+                    <Text style={styles.rowValue}>{s.volumeM3.toFixed(3)} m³</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         {/* Input / Downtime */}
-        {((entry.logs_received ?? 0) > 0 || (entry.downtime_hours ?? 0) > 0) && (
+        {((entry.logs_received ?? 0) > 0 || (entry.downtime_hours ?? 0) > 0 || entry.start_time || entry.end_time) && (
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Operations</Text>
-            <DetailRow label="Logs Received"  value={entry.logs_received} />
-            <DetailRow label="Downtime Hours" value={entry.downtime_hours} />
+            <DetailRow label="Intake Logs"     value={entry.logs_received} />
+            <DetailRow label="Log Diameter"    value={entry.log_diameter_cm ? `${entry.log_diameter_cm} cm` : undefined} />
+            <DetailRow label="Start Time"      value={entry.start_time} />
+            <DetailRow label="End Time"        value={entry.end_time} />
+            <DetailRow label="Downtime"        value={entry.downtime_hours ? `${entry.downtime_hours}h` : undefined} />
+            <DetailRow label="Downtime Reason" value={entry.downtime_reason} />
           </View>
         )}
 
@@ -105,7 +180,30 @@ export function SawmillProductionDetailScreen() {
           </View>
         )}
 
+        {canWrite && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => {
+              if (!isOnline) { Alert.alert('Online Required', 'Deleting a production entry requires an active connection.'); return; }
+              setDeleteOpen(true);
+            }}
+          >
+            <Ionicons name="trash-outline" size={16} color={Colors.error} />
+            <Text style={styles.deleteBtnText}>Delete Entry</Text>
+          </TouchableOpacity>
+        )}
+
       </ScrollView>
+
+      <ReasonModal
+        visible={deleteOpen}
+        title="Delete Production Entry"
+        message={`Move the ${entry.date} production entry to Trash? This also reverses any Finished Timber Inventory it posted.`}
+        confirmLabel="Delete"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -155,4 +253,11 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: Typography.sm, fontWeight: Typography.medium, color: Colors.textPrimary },
 
   notes: { fontSize: Typography.sm, color: Colors.textSecondary, lineHeight: 20 },
+
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,
+    borderWidth: 1, borderColor: Colors.error, borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm,
+  },
+  deleteBtnText: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.error },
 });

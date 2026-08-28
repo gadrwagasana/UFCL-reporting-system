@@ -16,6 +16,7 @@ import { useOfflineStore } from '../../stores/offlineStore';
 import {
   VehicleOwnership, VehicleStatus, VehicleCategory,
   VehicleFuelType, VehicleOwnerType, VehiclePayMethod,
+  VehiclePendingApproval,
 } from '../../types/api';
 import { VehiclesStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
@@ -268,7 +269,12 @@ export function VehicleFormScreen() {
     setSubmitting(true);
     try {
       if (isEdit && existing) {
-        await updateVehicle(Number(existing.id), payload as any);
+        const result = await updateVehicle(Number(existing.id), payload as any);
+        if (result && (result as VehiclePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message ?? 'Your edit has been sent for approval.');
+          navigation.goBack();
+          return;
+        }
       } else {
         await createVehicle(payload as any);
       }

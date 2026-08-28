@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl, TouchableOpacity,
 } from 'react-native';
@@ -13,6 +13,7 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState }  from '../../components/LoadingState';
 import { ErrorState }    from '../../components/ErrorState';
 import { EmptyState }    from '../../components/EmptyState';
+import { ListSearchBar } from '../../components/ListSearchBar';
 import { useSawmillList } from '../../hooks/useSawmill';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useAuth }          from '../../hooks/useAuth';
@@ -95,6 +96,12 @@ function DailyLogCard({
             <Text style={styles.statText}>{entry.downtime_hours}h downtime</Text>
           </View>
         )}
+        {(entry.actualVolumeM3 ?? 0) > 0 && (
+          <View style={styles.stat}>
+            <Ionicons name="cube-outline" size={14} color={Colors.success} />
+            <Text style={styles.statText}>{entry.actualVolumeM3!.toFixed(2)} m³</Text>
+          </View>
+        )}
       </View>
 
       {entry.product_size && (
@@ -122,7 +129,12 @@ function QueueCard() {
 export function SawmillProductionListScreen() {
   const navigation = useNavigation<NavProp>();
   const { can }    = useAuth();
-  const { data, isLoading, isError, refetch, isRefetching } = useSawmillList();
+  // Sawmill Phase 3 (Workstream 1) — production search; the backend also
+  // supports date_from/date_to (see the desktop Daily Timber page), search
+  // is the mobile-appropriate minimum (a full date-range picker adds a
+  // native dependency this app doesn't otherwise use — see completion report).
+  const [search, setSearch] = useState('');
+  const { data, isLoading, isError, refetch, isRefetching } = useSawmillList({ search: search.trim() || undefined });
   const queue      = useOfflineStore((s) => s.queue);
 
   const pendingQueue = useMemo(
@@ -138,12 +150,28 @@ export function SawmillProductionListScreen() {
       <OfflineBanner />
       <AppHeader
         title="Sawmill Production"
+        searchModule="production"
         dark
-        actions={can('sawmill.write') ? [{
-          icon: 'add',
-          onPress: () => navigation.navigate('SawmillProductionCreate'),
-        }] : []}
+        actions={[
+          // Sawmill Phase 3 (Workstream 4) — same audience as Timber Inventory
+          // (both gated on the production-visibility permission this role tier holds).
+          ...(can('timber.inventory') ? [{
+            icon: 'speedometer-outline' as const,
+            label: 'Dashboard',
+            onPress: () => navigation.navigate('SawmillDashboard'),
+          }] : []),
+          ...(can('timber.inventory') ? [{
+            icon: 'layers-outline' as const,
+            label: 'Timber Inventory',
+            onPress: () => navigation.navigate('SawmillTimberInventory'),
+          }] : []),
+          ...(can('sawmill.write') ? [{
+            icon: 'add' as const,
+            onPress: () => navigation.navigate('SawmillProductionCreate'),
+          }] : []),
+        ]}
       />
+      <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search supervisor, operator, machine…" />
 
       {isError ? (
         <ErrorState message="Could not load production records" onRetry={refetch} fullScreen />
@@ -170,8 +198,10 @@ export function SawmillProductionListScreen() {
           ListEmptyComponent={pendingQueue.length === 0 ? (
             <EmptyState
               icon="layers-outline"
-              title="No production records"
-              subtitle={can('sawmill.write') ? 'Tap + to log today\'s production.' : 'No records found.'}
+              title={search.trim() ? 'No matching records' : 'No production records'}
+              subtitle={search.trim()
+                ? `No entries match "${search.trim()}".`
+                : (can('sawmill.write') ? 'Tap + to log today\'s production.' : 'No records found.')}
             />
           ) : null}
           renderItem={({ item }) => (

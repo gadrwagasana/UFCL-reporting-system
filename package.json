@@ -16,6 +16,8 @@
     "bcryptjs": "^3.0.2",
     "dotenv": "^17.2.2",
     "electron-updater": "^6.8.9",
+    "exceljs": "^4.4.0",
+    "jsonwebtoken": "^9.0.3",
     "pg": "^8.16.3"
   },
   "devDependencies": {

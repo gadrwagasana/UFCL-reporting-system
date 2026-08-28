@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { get, post } from '../api/client';
+import { get, post, put, del } from '../api/client';
 import { EP } from '../api/endpoints';
-import { MachineFuelListResponse, MachineFuelTargetsResponse } from '../types/api';
+import { MachineFuelListResponse, MachineFuelTargetsResponse, MachinePendingApproval } from '../types/api';
 
 export function useMachineFuelList() {
   return useQuery<MachineFuelListResponse>({
@@ -41,4 +41,39 @@ export function useMachineFuelCreate() {
   }
 
   return { createLog };
+}
+
+// Stabilization Phase 5 (F-21) — machineFuelLogsUpdate had backend/IPC wiring
+// (desktop) with no REST route or mobile UI at all.
+export function useMachineFuelUpdate() {
+  const qc = useQueryClient();
+
+  async function updateLog(id: number, payload: CreateMachineFuelPayload): Promise<MachinePendingApproval | void> {
+    const result = await put<MachinePendingApproval | { ok: true }>(EP.MACHINE_FUEL_UPDATE(id), payload);
+    if ('pendingApproval' in result && result.pendingApproval) {
+      return result as MachinePendingApproval;
+    }
+    await qc.invalidateQueries({ queryKey: ['machine-fuel-list'] });
+    await qc.invalidateQueries({ queryKey: ['machine-log-list'] });
+  }
+
+  return { updateLog };
+}
+
+// Remediation Phase 2 — machineFuelLogsDelete had backend/IPC wiring
+// (desktop) with no REST route or mobile UI at all, same gap class as the
+// Update fix above.
+export function useMachineFuelDelete() {
+  const qc = useQueryClient();
+
+  async function deleteLog(id: number, reason?: string): Promise<MachinePendingApproval | void> {
+    const result = await del<MachinePendingApproval | { ok: true }>(EP.MACHINE_FUEL_DELETE(id), { reason });
+    if ('pendingApproval' in result && result.pendingApproval) {
+      return result as MachinePendingApproval;
+    }
+    await qc.invalidateQueries({ queryKey: ['machine-fuel-list'] });
+    await qc.invalidateQueries({ queryKey: ['machine-log-list'] });
+  }
+
+  return { deleteLog };
 }

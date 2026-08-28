@@ -1,10 +1,14 @@
-import React from 'react';
-import { StyleSheet, View, Text, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { AppHeader } from '../../components/AppHeader';
+import { ReasonModal } from '../../components/ReasonModal';
+import { useLogTransportDelete } from '../../hooks/useLogTransport';
+import { useOfflineStore } from '../../stores/offlineStore';
+import { MachinePendingApproval } from '../../types/api';
 import { LogTransportStackScreenProps } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
@@ -21,14 +25,48 @@ function DetailRow({ label, value }: { label: string; value?: string | number | 
 }
 
 export function LogTransportDetailScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<Props['navigation']>();
   const route      = useRoute<Props['route']>();
   const { entry }  = route.params;
+
+  const { isOnline } = useOfflineStore();
+  const { deleteEntry } = useLogTransportDelete();
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // ERP Final Enterprise Completion Gate — logTransportDelete had backend/IPC
+  // wiring (desktop) with no REST route or mobile UI at all — same gap
+  // pattern already closed for Update in Remediation Phase 2.
+  async function handleDelete(reason: string) {
+    setDeleteLoading(true);
+    try {
+      const result = await deleteEntry(entry.id, reason);
+      if (result && (result as MachinePendingApproval).pendingApproval) {
+        Alert.alert('Submitted for Review', (result as MachinePendingApproval).message);
+      }
+      setDeleteOpen(false);
+      navigation.goBack();
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not delete log transport entry.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Transport Record" dark onBack={() => navigation.goBack()} />
+      <AppHeader
+        title="Transport Record"
+        dark
+        onBack={() => navigation.goBack()}
+        actions={[{
+          icon: 'create-outline',
+          label: 'Edit transport record',
+          onPress: () => navigation.navigate('LogTransportCreate', { entry }),
+        }]}
+      />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
 
@@ -76,7 +114,30 @@ export function LogTransportDetailScreen() {
           </View>
         )}
 
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          disabled={!isOnline}
+          onPress={() => {
+            if (!isOnline) { Alert.alert('Online Required', 'Deleting a transport record requires an active connection.'); return; }
+            setDeleteOpen(true);
+          }}
+          accessibilityRole="button"
+        >
+          <Ionicons name="trash-outline" size={16} color={Colors.error} />
+          <Text style={styles.deleteBtnText}>Delete Record</Text>
+        </TouchableOpacity>
+
       </ScrollView>
+
+      <ReasonModal
+        visible={deleteOpen}
+        title="Delete Transport Record"
+        message={`Move this ${entry.qty_transported} ${entry.unit ?? 'logs'} transport record from ${entry.date_fmt ?? entry.transport_date} to Trash?`}
+        confirmLabel="Delete"
+        loading={deleteLoading}
+        onCancel={() => setDeleteOpen(false)}
+        onConfirm={handleDelete}
+      />
     </SafeAreaView>
   );
 }
@@ -114,4 +175,11 @@ const styles = StyleSheet.create({
   rowValue: { fontSize: Typography.sm, fontWeight: Typography.medium, color: Colors.textPrimary },
 
   notes: { fontSize: Typography.sm, color: Colors.textSecondary, lineHeight: 20 },
+
+  deleteBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs,
+    borderWidth: 1, borderColor: Colors.error, borderRadius: Radius.lg,
+    paddingVertical: Spacing.sm,
+  },
+  deleteBtnText: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.error },
 });

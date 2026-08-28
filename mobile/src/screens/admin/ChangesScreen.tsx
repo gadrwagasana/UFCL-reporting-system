@@ -13,6 +13,7 @@ import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
 import { StatusBadge }  from '../../components/StatusBadge';
+import { ReasonModal }  from '../../components/ReasonModal';
 import { useChanges, useSubmitChange, useReviewChange } from '../../hooks/useAdmin';
 import type { ChangeRequest } from '../../types/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
@@ -83,6 +84,10 @@ export function ChangesScreen() {
   const [requestText,  setRequestText]  = useState('');
   const [submitting,   setSubmitting]   = useState(false);
   const [showForm,     setShowForm]     = useState(true);
+  // ERP UI/UX Completion Phase 8 (audit finding H-13 pattern) — Alert.prompt
+  // is iOS-only; state for the cross-platform ReasonModal replacement.
+  const [reviewTarget, setReviewTarget] = useState<{ item: ChangeRequest; status: 'Approved' | 'Rejected' } | null>(null);
+  const [reviewing,    setReviewing]    = useState(false);
 
   const isMgr = data?.isMgr ?? false;
 
@@ -109,25 +114,25 @@ export function ChangesScreen() {
   }
 
   function promptReview(item: ChangeRequest, status: 'Approved' | 'Rejected') {
-    Alert.prompt(
-      `${status === 'Approved' ? 'Approve' : 'Reject'} Request`,
-      'Add a note (optional):',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: status,
-          onPress: (note) =>
-            reviewChange.mutate(
-              { id: item.id, status, response: note?.trim() || undefined },
-              {
-                onSuccess: (res) => {
-                  if (!res.ok) Alert.alert('Error', res.error ?? 'Review failed');
-                },
-              },
-            ),
+    setReviewTarget({ item, status });
+  }
+
+  function submitReview(note: string) {
+    if (!reviewTarget) return;
+    setReviewing(true);
+    reviewChange.mutate(
+      { id: reviewTarget.item.id, status: reviewTarget.status, response: note?.trim() || undefined },
+      {
+        onSuccess: (res) => {
+          setReviewing(false);
+          setReviewTarget(null);
+          if (!res.ok) Alert.alert('Error', res.error ?? 'Review failed');
         },
-      ],
-      'plain-text',
+        onError: () => {
+          setReviewing(false);
+          Alert.alert('Error', 'Review failed');
+        },
+      },
     );
   }
 
@@ -137,7 +142,7 @@ export function ChangesScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Change Requests" onBack={() => navigation.goBack()} />
+      <AppHeader title="Change Requests" searchModule="change_requests" onBack={() => navigation.goBack()} />
 
       <FlatList
         data={data?.rows ?? []}
@@ -231,6 +236,17 @@ export function ChangesScreen() {
       {isError && (
         <ErrorState message="Could not load change requests" onRetry={refetch} fullScreen />
       )}
+
+      <ReasonModal
+        visible={!!reviewTarget}
+        title={reviewTarget ? `${reviewTarget.status === 'Approved' ? 'Approve' : 'Reject'} Request` : ''}
+        message="Add a note (optional):"
+        confirmLabel={reviewTarget?.status}
+        allowEmpty
+        loading={reviewing}
+        onCancel={() => setReviewTarget(null)}
+        onConfirm={submitReview}
+      />
     </SafeAreaView>
   );
 }

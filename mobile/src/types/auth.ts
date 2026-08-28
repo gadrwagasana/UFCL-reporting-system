@@ -20,7 +20,10 @@ export type UserRole =
   | 'harvesting-supervisor'
   | 'sawmill-supervisor'
   | 'poles-supervisor'
-  | 'vat-supervisor';
+  | 'vat-supervisor'
+  | 'procurement-officer'
+  | 'procurement-manager'
+  | 'department-manager';
 
 // Shape returned by GET /api/auth/me and POST /api/auth/login
 export interface User {

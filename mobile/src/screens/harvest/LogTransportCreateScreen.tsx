@@ -5,35 +5,43 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { format } from 'date-fns';
 import { AppHeader }       from '../../components/AppHeader';
 import { FormInput }       from '../../components/FormInput';
 import { FormSelect }      from '../../components/FormSelect';
 import { DatePickerField } from '../../components/DatePickerField';
-import { useLogTransportCreate } from '../../hooks/useLogTransport';
+import { useLogTransportCreate, useLogTransportUpdate } from '../../hooks/useLogTransport';
 import { useCompartments }       from '../../hooks/useHarvest';
 import { useOfflineStore }        from '../../stores/offlineStore';
 import { EP }                     from '../../api/endpoints';
-import { LogTransportStackParamList } from '../../navigation/types';
+import { LogTransportStackParamList, LogTransportStackScreenProps } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
-type NavProp = NativeStackNavigationProp<LogTransportStackParamList, 'LogTransportCreate'>;
+type NavProp   = NativeStackNavigationProp<LogTransportStackParamList, 'LogTransportCreate'>;
+type RouteProp = LogTransportStackScreenProps<'LogTransportCreate'>['route'];
 
+// Remediation Phase 2 — this screen is now dual-purpose (create when no
+// `entry` route param, edit when one is passed from LogTransportDetailScreen),
+// mirroring the pattern desktop's openRequisitionEditOverlay already uses
+// for the same create-vs-edit-one-form choice.
 export function LogTransportCreateScreen() {
   const navigation = useNavigation<NavProp>();
+  const route       = useRoute<RouteProp>();
+  const existing    = route.params?.entry;
   const { createEntry }       = useLogTransportCreate();
+  const { updateEntry }       = useLogTransportUpdate();
   const { data: comptData }   = useCompartments();
   const { isOnline, enqueue } = useOfflineStore();
 
-  const [transportDate, setTransportDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [qty,           setQty]           = useState('');
-  const [tractorPlate,  setTractorPlate]  = useState('');
-  const [loggersNumber, setLoggersNumber] = useState('');
-  const [comptId,       setComptId]       = useState('');
-  const [subName,       setSubName]       = useState('');
-  const [notes,         setNotes]         = useState('');
+  const [transportDate, setTransportDate] = useState(existing?.transport_date ?? format(new Date(), 'yyyy-MM-dd'));
+  const [qty,           setQty]           = useState(existing ? String(existing.qty_transported) : '');
+  const [tractorPlate,  setTractorPlate]  = useState(existing?.tractor_plate ?? '');
+  const [loggersNumber, setLoggersNumber] = useState(existing?.loggers_number ?? '');
+  const [comptId,       setComptId]       = useState(existing?.compt_id ? String(existing.compt_id) : '');
+  const [subName,       setSubName]       = useState(existing?.sub_name ?? '');
+  const [notes,         setNotes]         = useState(existing?.notes ?? '');
   const [submitting,    setSubmitting]    = useState(false);
 
   const compartmentOptions = (comptData?.rows ?? []).map((c) => ({
@@ -60,12 +68,23 @@ export function LogTransportCreateScreen() {
     setSubmitting(true);
     try {
       if (!isOnline) {
-        enqueue({ endpoint: EP.LOG_TRANSPORT_CREATE, method: 'POST', body: payload, context: 'log-transport' });
+        if (existing) {
+          enqueue({ endpoint: EP.LOG_TRANSPORT_UPDATE(existing.id), method: 'PUT', body: payload, context: 'log-transport' });
+        } else {
+          enqueue({ endpoint: EP.LOG_TRANSPORT_CREATE, method: 'POST', body: payload, context: 'log-transport' });
+        }
         Alert.alert('Saved Offline', 'Transport record will sync when connected.');
         navigation.goBack();
         return;
       }
-      await createEntry(payload);
+      if (existing) {
+        const result = await updateEntry(existing.id, payload);
+        if (result && 'pendingApproval' in result && result.pendingApproval) {
+          Alert.alert('Submitted for Review', result.message);
+        }
+      } else {
+        await createEntry(payload);
+      }
       navigation.goBack();
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Could not save transport record.');
@@ -77,7 +96,7 @@ export function LogTransportCreateScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Log Transport" dark onBack={() => navigation.goBack()} />
+      <AppHeader title={existing ? 'Edit Transport Record' : 'Log Transport'} dark onBack={() => navigation.goBack()} />
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
@@ -156,7 +175,7 @@ export function LogTransportCreateScreen() {
         >
           {submitting
             ? <ActivityIndicator color={Colors.white} />
-            : <Text style={styles.submitText}>{isOnline ? 'Save Record' : 'Save Offline'}</Text>}
+            : <Text style={styles.submitText}>{isOnline ? (existing ? 'Save Changes' : 'Save Record') : 'Save Offline'}</Text>}
         </TouchableOpacity>
 
       </ScrollView>

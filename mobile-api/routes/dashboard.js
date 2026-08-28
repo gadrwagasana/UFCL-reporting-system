@@ -214,4 +214,16 @@ router.get('/stats', requireRoles(...DASHBOARD_ROLES), async (req, res) => {
   }, 30);
 });
 
+// ── GET /api/dashboard/mechanician ───────────────────────────────────────────
+// Mechanician Phase 1 (Priority 5) — tailored dashboard for the mechanician
+// role (my requests + counts, machines requiring attention, upcoming
+// maintenance), replacing the generic /stats dashboard this role was never
+// granted (see DASHBOARD_ROLES comment above) and never had a mobile
+// equivalent for either. No independent gate here beyond requireRoles —
+// data.mechanicianDashboard() itself checks 'material-requests'.
+
+router.get('/mechanician', requireRoles('mechanician', 'admin', 'ceo'), async (req, res) => {
+  respond(res, await data.mechanicianDashboard(req.user.userId), 30);
+});
+
 module.exports = router;

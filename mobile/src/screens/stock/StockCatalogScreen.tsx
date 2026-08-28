@@ -13,6 +13,7 @@ import { LoadingState }       from '../../components/LoadingState';
 import { ErrorState }         from '../../components/ErrorState';
 import { EmptyState }         from '../../components/EmptyState';
 import { ReasonModal } from '../../components/ReasonModal';
+import { AlertBanner } from '../../components/AlertBanner';
 import { useStockItems, useStockItemDelete, useStockConsume } from '../../hooks/useStock';
 import { useAuthStore }   from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
@@ -205,12 +206,10 @@ export function StockCatalogScreen() {
 
             {/* Low-stock alert */}
             {lowStock.length > 0 && (
-              <View style={styles.alertBanner}>
-                <Ionicons name="warning-outline" size={14} color={Colors.warning} />
-                <Text style={styles.alertText}>
-                  {lowStock.length} item{lowStock.length > 1 ? 's' : ''} at or below reorder level
-                </Text>
-              </View>
+              <AlertBanner
+                type="warning"
+                message={`${lowStock.length} item${lowStock.length > 1 ? 's' : ''} at or below reorder level`}
+              />
             )}
 
             {/* Search */}
@@ -342,13 +341,6 @@ const styles = StyleSheet.create({
   stat:      { alignItems: 'center', gap: 2 },
   statValue: { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.white },
   statLabel: { fontSize: 9, color: Colors.tabInactive, textTransform: 'uppercase', letterSpacing: 0.4 },
-
-  alertBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
-    backgroundColor: Colors.warning + '15', borderRadius: Radius.md,
-    padding: Spacing.sm, marginBottom: Spacing.xs,
-  },
-  alertText: { fontSize: Typography.xs, color: Colors.warning, fontWeight: Typography.medium },
 
   searchRow: {
     flexDirection: 'row', alignItems: 'center',

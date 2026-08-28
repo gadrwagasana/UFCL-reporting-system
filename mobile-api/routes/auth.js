@@ -15,14 +15,18 @@ function clientIp(req) {
     || null;
 }
 
-async function auditLogin(userId, username, fullName, role, actionType, action, ip, meta) {
+// Phase C6 (NF-01 remediation) — `workshopId` is the authenticated user's own
+// workshop_id (already looked up by the caller from app_users before this is
+// invoked), or null for the "user not found" case where no user, and
+// therefore no workshop, can be determined — never guessed.
+async function auditLogin(userId, username, fullName, role, actionType, action, ip, meta, workshopId) {
   try {
     await pool.query(
       `insert into audit_log(
          user_id, username, full_name, role,
          action, icon, meta,
-         module, action_type, ip_address
-       ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10)`,
+         module, action_type, ip_address, workshop_id
+       ) values ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10,$11)`,
       [
         userId   || null,
         username || null,
@@ -34,6 +38,7 @@ async function auditLogin(userId, username, fullName, role, actionType, action, 
         'auth',
         actionType,
         ip,
+        workshopId != null ? workshopId : null,
       ]
     );
   } catch (e) {
@@ -78,7 +83,7 @@ router.post('/login', async (req, res) => {
       await auditLogin(user.id, user.username, user.name, user.role,
         'login_denied',
         `Mobile login denied: "${user.username}" — account deactivated`,
-        ip, {});
+        ip, {}, user.workshop_id);
       return res.status(403).json({ ok: false, error: 'Account is deactivated — contact your administrator' });
     }
 
@@ -87,7 +92,7 @@ router.post('/login', async (req, res) => {
       await auditLogin(user.id, user.username, user.name, user.role,
         'login_failed',
         `Mobile login failed: "${user.username}" — wrong password`,
-        ip, {});
+        ip, {}, user.workshop_id);
       return res.status(401).json({ ok: false, error: 'Invalid username or password' });
     }
 
@@ -106,7 +111,7 @@ router.post('/login', async (req, res) => {
     await auditLogin(user.id, user.username, user.name, user.role,
       'login',
       `Mobile login: "${user.username}" (${user.role})`,
-      ip, { workshop_id: user.workshop_id });
+      ip, { workshop_id: user.workshop_id }, user.workshop_id);
 
     return res.json({
       ok: true,

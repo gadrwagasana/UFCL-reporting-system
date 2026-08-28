@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet, View, Text, FlatList, TouchableOpacity,
   RefreshControl, ActivityIndicator, Alert,
@@ -10,6 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }     from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
+import { ReasonModal }   from '../../components/ReasonModal';
 import { useAuthStore }  from '../../stores/authStore';
 import { hasPermission } from '../../utils/permissions';
 import type { UserRole } from '../../types/auth';
@@ -48,29 +49,28 @@ export function AutomationEscalationsScreen() {
   const resolveMut = useResolveEscalation();
   const ackMut     = useAckEscalation();
 
+  // ERP UI/UX Completion Phase 8 (audit finding H-13 pattern) — Alert.prompt
+  // is iOS-only; state for the cross-platform ReasonModal replacement.
+  const [resolveTarget, setResolveTarget] = useState<EscalationRow | null>(null);
+
   function handleResolve(esc: EscalationRow) {
-    Alert.prompt(
-      'Resolve Escalation',
-      `Resolve "${esc.entity_ref || esc.entity_type}"? Enter reason:`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Resolve',
-          onPress: (reason) => {
-            if (!reason?.trim()) return;
-            resolveMut.mutate(
-              { id: esc.id, reason: reason.trim() },
-              {
-                onSuccess: (r: any) => {
-                  if (!r?.ok) Alert.alert('Error', r?.error || 'Resolve failed.');
-                },
-                onError: () => Alert.alert('Error', 'Network error.'),
-              },
-            );
-          },
+    setResolveTarget(esc);
+  }
+
+  function submitResolve(reason: string) {
+    if (!resolveTarget || !reason.trim()) return;
+    resolveMut.mutate(
+      { id: resolveTarget.id, reason: reason.trim() },
+      {
+        onSuccess: (r: any) => {
+          setResolveTarget(null);
+          if (!r?.ok) Alert.alert('Error', r?.error || 'Resolve failed.');
         },
-      ],
-      'plain-text',
+        onError: () => {
+          setResolveTarget(null);
+          Alert.alert('Error', 'Network error.');
+        },
+      },
     );
   }
 
@@ -162,6 +162,16 @@ export function AutomationEscalationsScreen() {
           </View>
         }
         ItemSeparatorComponent={() => <View style={{ height: Spacing.xs }} />}
+      />
+
+      <ReasonModal
+        visible={!!resolveTarget}
+        title="Resolve Escalation"
+        message={resolveTarget ? `Resolve "${resolveTarget.entity_ref || resolveTarget.entity_type}"? Enter reason:` : ''}
+        confirmLabel="Resolve"
+        loading={resolveMut.isPending}
+        onCancel={() => setResolveTarget(null)}
+        onConfirm={submitResolve}
       />
     </SafeAreaView>
   );

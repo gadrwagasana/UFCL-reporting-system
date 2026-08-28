@@ -67,6 +67,58 @@ function ProductionCard({
   );
 }
 
+// Pole Production Phase 1 — entry point into the new batch+output-lines
+// capability (real Finished Pole Inventory + Quality Inspection), reached as
+// a stack push from this screen rather than a new tab (matching Sawmill's
+// own SawmillTimberInventory/SawmillDashboard pattern).
+function ProductionBatchesBanner({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.batchBanner} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.batchBannerIcon}>
+        <Ionicons name="build-outline" size={20} color={Colors.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.batchBannerTitle}>Pole Production Batches</Text>
+        <Text style={styles.batchBannerSubtitle}>Manufacture pole specs with Quality Inspection &amp; real inventory</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+// Pole Production Phase 2 — Purchased Finished Poles + the mobile
+// rejection-holds screen Phase 1 deferred. Same stack-push entry-point
+// pattern as ProductionBatchesBanner above.
+function PurchasedPoleQCBanner({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.batchBanner} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.batchBannerIcon}>
+        <Ionicons name="cube-outline" size={20} color={Colors.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.batchBannerTitle}>Purchased Pole QC</Text>
+        <Text style={styles.batchBannerSubtitle}>Inspect poles received via Procurement before they enter sellable stock</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
+function PoleRejectionHoldsBanner({ onPress }: { onPress: () => void }) {
+  return (
+    <TouchableOpacity style={styles.batchBanner} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.batchBannerIcon}>
+        <Ionicons name="refresh-outline" size={20} color={Colors.navy} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.batchBannerTitle}>Rejection Holds</Text>
+        <Text style={styles.batchBannerSubtitle}>Rework, Return, or Resolve rejected poles — manufactured or purchased</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+    </TouchableOpacity>
+  );
+}
+
 function QueueCard() {
   return (
     <View style={[styles.card, styles.queueCard]}>
@@ -107,6 +159,7 @@ export function PolesProductionScreen() {
       <OfflineBanner />
       <AppHeader
         title="Poles Production"
+        searchModule="production"
         dark
         actions={can('poles.write') ? [{
           icon: 'add',
@@ -131,6 +184,9 @@ export function PolesProductionScreen() {
                   approvedTotal={polesData.approved_total}
                 />
               )}
+              <ProductionBatchesBanner onPress={() => navigation.navigate('PoleBatchList')} />
+              <PurchasedPoleQCBanner onPress={() => navigation.navigate('PurchasedPoleQC')} />
+              <PoleRejectionHoldsBanner onPress={() => navigation.navigate('PoleRejectionHolds')} />
               {pendingQueue.length > 0 && (
                 <View style={styles.pendingSection}>
                   <Text style={styles.pendingSectionTitle}>
@@ -174,6 +230,18 @@ const styles = StyleSheet.create({
   bannerDivider: { width: 1, backgroundColor: Colors.border },
   bannerValue:   { fontSize: Typography.xl, fontWeight: Typography.bold },
   bannerLabel:   { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2 },
+
+  batchBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
+    backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, marginBottom: Spacing.sm,
+    ...Shadow.sm,
+  },
+  batchBannerIcon: {
+    width: 36, height: 36, borderRadius: Radius.full, backgroundColor: Colors.navyBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  batchBannerTitle:    { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.textPrimary },
+  batchBannerSubtitle: { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 1 },
 
   pendingSection:      { marginBottom: Spacing.sm },
   pendingSectionTitle: {

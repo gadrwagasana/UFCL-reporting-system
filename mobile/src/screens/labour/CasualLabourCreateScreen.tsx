@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, TouchableOpacity,
-  ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -13,11 +13,12 @@ import { AppHeader }        from '../../components/AppHeader';
 import { OfflineBanner }    from '../../components/OfflineBanner';
 import { FormInput }        from '../../components/FormInput';
 import { DatePickerField }  from '../../components/DatePickerField';
+import { Button }           from '../../components/Button';
 import { useCasualLabourCreate } from '../../hooks/useCasualLabour';
 import { useOfflineStore }  from '../../stores/offlineStore';
 import { EP }               from '../../api/endpoints';
 import { CasualLabourStackParamList } from '../../navigation/types';
-import { Colors, Spacing, Typography, Radius, Shadow, Layout } from '../../theme';
+import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<CasualLabourStackParamList, 'CasualLabourCreate'>;
 
@@ -253,20 +254,12 @@ export function CasualLabourCreateScreen() {
             />
           </View>
 
-          <TouchableOpacity
-            style={[styles.submitBtn, submitting && styles.submitBtnDisabled]}
+          <Button
+            label={isOnline ? 'Submit Request' : 'Save Offline'}
             onPress={handleSubmit}
-            disabled={submitting}
-            activeOpacity={0.8}
-          >
-            {submitting
-              ? <ActivityIndicator size="small" color={Colors.white} />
-              : (
-                <Text style={styles.submitBtnText}>
-                  {isOnline ? 'Submit Request' : 'Save Offline'}
-                </Text>
-              )}
-          </TouchableOpacity>
+            loading={submitting}
+            fullWidth
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -354,21 +347,5 @@ const styles = StyleSheet.create({
     height: 60,
     paddingTop: Spacing.md,
     textAlignVertical: 'top',
-  },
-
-  submitBtn: {
-    height: Layout.buttonHeight,
-    backgroundColor: Colors.green,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  submitBtnDisabled: {
-    opacity: 0.6,
-  },
-  submitBtnText: {
-    fontSize: Typography.base,
-    fontWeight: Typography.semibold,
-    color: Colors.white,
   },
 });

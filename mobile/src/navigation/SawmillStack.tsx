@@ -4,6 +4,8 @@ import { SawmillStackParamList } from './types';
 import { SawmillProductionListScreen }   from '../screens/sawmill/SawmillProductionListScreen';
 import { SawmillProductionCreateScreen } from '../screens/sawmill/SawmillProductionCreateScreen';
 import { SawmillProductionDetailScreen } from '../screens/sawmill/SawmillProductionDetailScreen';
+import { TimberInventoryScreen } from '../screens/timberInventory/TimberInventoryScreen';
+import { SawmillDashboardScreen } from '../screens/sawmill/SawmillDashboardScreen';
 
 const Stack = createNativeStackNavigator<SawmillStackParamList>();
 
@@ -13,6 +15,8 @@ export function SawmillStack() {
       <Stack.Screen name="SawmillProductionList"   component={SawmillProductionListScreen} />
       <Stack.Screen name="SawmillProductionCreate" component={SawmillProductionCreateScreen} />
       <Stack.Screen name="SawmillProductionDetail" component={SawmillProductionDetailScreen} />
+      <Stack.Screen name="SawmillTimberInventory"  component={TimberInventoryScreen} />
+      <Stack.Screen name="SawmillDashboard"        component={SawmillDashboardScreen} />
     </Stack.Navigator>
   );
 }

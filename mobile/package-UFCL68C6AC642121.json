@@ -1,0 +1,53 @@
+{
+  "name": "ufcl-mobile",
+  "version": "1.0.0",
+  "main": "App.tsx",
+  "scripts": {
+    "start": "expo start",
+    "start:dev": "APP_ENV=development expo start",
+    "start:staging": "APP_ENV=staging expo start",
+    "android": "expo run:android",
+    "web": "expo start --web",
+    "prebuild": "expo prebuild --platform android --clean",
+    "build:debug": "cd android && gradlew.bat assembleDebug",
+    "build:release": "APP_ENV=production cd android && gradlew.bat assembleRelease",
+    "build:aab": "APP_ENV=production cd android && gradlew.bat bundleRelease",
+    "type-check": "tsc --noEmit",
+    "clean": "cd android && gradlew.bat clean",
+    "ios": "expo run:ios"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.2",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-native-community/datetimepicker": "8.0.1",
+    "@react-native-community/netinfo": "11.3.1",
+    "@react-navigation/bottom-tabs": "^6.5.20",
+    "@react-navigation/native": "^6.1.17",
+    "@react-navigation/native-stack": "^6.9.26",
+    "@tanstack/react-query": "^5.51.1",
+    "axios": "^1.7.3",
+    "date-fns": "^3.6.0",
+    "expo": "~51.0.28",
+    "expo-font": "~12.0.10",
+    "expo-secure-store": "~13.0.2",
+    "expo-splash-screen": "~0.27.5",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-gesture-handler": "~2.16.1",
+    "react-native-modal-datetime-picker": "^17.1.0",
+    "react-native-reanimated": "~3.10.1",
+    "react-native-safe-area-context": "4.10.5",
+    "react-native-screens": "~3.31.1",
+    "uuid": "^10.0.0",
+    "zustand": "^4.5.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@types/react": "~18.2.79",
+    "@types/uuid": "^10.0.0",
+    "babel-plugin-module-resolver": "^5.0.3",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}

@@ -74,6 +74,7 @@ export function PolesPurchaseRequestsScreen() {
       <OfflineBanner />
       <AppHeader
         title="Purchase Requests"
+        searchModule="purchase_requests"
         dark
         actions={can('poles.purchase') ? [{
           icon: 'add',

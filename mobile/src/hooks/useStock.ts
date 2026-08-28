@@ -2,12 +2,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { get, post, put, del } from '../api/client';
 import { EP } from '../api/endpoints';
 import type {
-  StockItemListResponse, InventoryListResponse,
+  StockItemListResponse, InventoryListResponse, InventoryDashboardResponse, InventoryIntelligenceResponse,
   StockMovementListResponse, StockItem,
 } from '../types/api';
 
 const CATALOG_KEY   = ['stock-items']   as const;
 const INVENTORY_KEY = ['stock-inventory'] as const;
+const INVENTORY_DASHBOARD_KEY = ['stock-inventory-dashboard'] as const;
+const INVENTORY_INTELLIGENCE_KEY = ['stock-inventory-intelligence'] as const;
 const MOVEMENTS_KEY = ['stock-movements'] as const;
 const CATS_KEY      = ['stock-categories'] as const;
 
@@ -106,6 +108,25 @@ export function useStockInventory() {
   });
 }
 
+// Phase 2 — Inventory Dashboard (Executive KPIs + Operational Widgets).
+export function useInventoryDashboard() {
+  return useQuery<InventoryDashboardResponse>({
+    queryKey:  INVENTORY_DASHBOARD_KEY,
+    queryFn:   () => get<InventoryDashboardResponse>(EP.STOCK_INVENTORY_DASHBOARD),
+    staleTime: 60_000,
+  });
+}
+
+// Phase 3 — Inventory Operational Intelligence (trends, top items, aging,
+// health, forecasting).
+export function useInventoryIntelligence() {
+  return useQuery<InventoryIntelligenceResponse>({
+    queryKey:  INVENTORY_INTELLIGENCE_KEY,
+    queryFn:   () => get<InventoryIntelligenceResponse>(EP.STOCK_INVENTORY_INTELLIGENCE),
+    staleTime: 120_000,
+  });
+}
+
 // ── Stock Movements ───────────────────────────────────────────────────────────
 
 export function useStockMovements() {
@@ -128,6 +149,22 @@ export function useStockMovementCreate() {
     },
   });
   return { createMovement: mutation.mutateAsync, ...mutation };
+}
+
+// Stock & Inventory Phase 3 — adjustments now require manager approval
+// instead of writing stock_levels immediately (audit H-08); submits into
+// the same pending_edits engine every other governed mobile edit uses
+// (reviewed on the existing GovernanceScreen, no new screen needed).
+export function useStockAdjustmentRequestCreate() {
+  const qc = useQueryClient();
+  const mutation = useMutation({
+    mutationFn: (payload: Record<string, unknown>) =>
+      post<{ ok: true; pending: true }>(EP.STOCK_ADJUSTMENT_REQUEST_CREATE, payload),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: MOVEMENTS_KEY });
+    },
+  });
+  return { requestAdjustment: mutation.mutateAsync, ...mutation };
 }
 
 export function useStockMovementDelete() {

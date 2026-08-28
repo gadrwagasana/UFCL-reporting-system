@@ -204,11 +204,88 @@ export interface MonthTotalRow {
   total_qty:     number;
 }
 
+export interface StatusCountRow {
+  status: string;
+  cnt:    number;
+}
+
+export interface TransportJobStatusRow extends StatusCountRow {
+  total_cost: number;
+}
+
+export interface FuelOverview {
+  total_liters: number;
+  total_cost:   number;
+  log_count:    number;
+}
+
+export interface PendingActionsBlock {
+  dispatchApprovals: number;
+  editRequests:      number;
+}
+
+export interface DelayedDeliveryRow {
+  id: number; order_number: string; delivery_date: string | null; status: string; driver_name: string | null;
+}
+export interface DelayedTransportJobRow {
+  id: number; job_number: string; job_date: string | null; status: string;
+}
+export interface WorkshopAlertRow {
+  id: number; vehicle_registration: string; maintenance_type: string; next_due_date: string;
+}
+export interface TodaysDeliveryRow {
+  id: number; order_number: string; delivery_date: string | null; status: string; driver_name: string | null;
+}
+export interface TodaysTransportJobRow {
+  id: number; job_number: string; job_date: string | null; status: string; carrier_type: string;
+}
+export interface ActiveDeliveryRow {
+  id: number; order_number: string; status: string; driver_name: string | null;
+}
+export interface VehicleOnRouteRow {
+  id: number; registration: string; driver_name: string | null; order_number: string;
+}
+export interface VehicleWaitingRow {
+  id: number; registration: string; driver_name: string | null;
+}
+export interface PriorityDeliveryRow {
+  id: number; order_number: string; delivery_date: string | null; status: string; driver_name: string | null; is_delayed: boolean;
+}
+
 export interface LogisticsDashboard {
   workshops:   WorkshopRow[];
   lowStock:    LowStockRow[];
   activity:    StockMovementRow[];
   monthTotals: MonthTotalRow[];
+  // Phase 2 — department-wide operational summary (mirrors the desktop
+  // Logistics Dashboard redesign).
+  deliveryStatusCounts:     StatusCountRow[];
+  dispatchStatusCounts:     StatusCountRow[];
+  transportJobStatusCounts: TransportJobStatusRow[];
+  fleetStatusCounts:        StatusCountRow[];
+  vehiclesInUse:            number;
+  fuelThisMonth:            FuelOverview;
+  pendingActions:           PendingActionsBlock;
+  // Phase 3 — Enterprise Operations Dashboard: Executive KPIs + Operational
+  // Widgets + Alerts.
+  deliveriesToday:           number;
+  deliveriesThisWeek:        number;
+  delayedDeliveriesCount:    number;
+  delayedTransportJobsCount: number;
+  activeDriversCount:        number;
+  fleetActiveCount:          number;
+  fleetUtilizationPct:       number;
+  vehicleAvailability:       number;
+  workshopAlertsCount:       number;
+  delayedDeliveries:         DelayedDeliveryRow[];
+  delayedTransportJobs:      DelayedTransportJobRow[];
+  workshopAlerts:            WorkshopAlertRow[];
+  todaysDeliveries:          TodaysDeliveryRow[];
+  todaysTransportJobs:       TodaysTransportJobRow[];
+  activeDeliveries:          ActiveDeliveryRow[];
+  vehiclesOnRoute:           VehicleOnRouteRow[];
+  vehiclesWaiting:           VehicleWaitingRow[];
+  priorityDeliveries:        PriorityDeliveryRow[];
 }
 
 // ── API envelope wrappers ────────────────────────────────────────────────────

@@ -84,14 +84,20 @@ export function useMaterialRequestApproveFromOverview() {
       action,
       approvedQty,
       reviewNotes,
+      sourceWarehouseId,
+      destinationWorkshopId,
     }: {
-      requestId:    number;
-      action:       'approve' | 'reject';
-      approvedQty?: number;
-      reviewNotes?: string;
-    }) => post(EP.MATERIAL_APPROVE(requestId), { action, approvedQty, reviewNotes }),
+      requestId:              number;
+      action:                 'approve' | 'reject';
+      approvedQty?:           number;
+      reviewNotes?:           string;
+      sourceWarehouseId?:     number;
+      destinationWorkshopId?: number;
+    }) => post(EP.MATERIAL_APPROVE(requestId), { action, approvedQty, reviewNotes, sourceWarehouseId, destinationWorkshopId }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['workshop-overview'] });
+      qc.invalidateQueries({ queryKey: ['material-requests'] });
+      qc.invalidateQueries({ queryKey: ['stock-transfers'] });
     },
   });
   return { approveMaterialRequest: mutation.mutateAsync };

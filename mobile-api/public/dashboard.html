@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UFCL — Operations Dashboard</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .header {
+      background: #1a3c5e;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2d5a8a;
+    }
+    .logo { font-size: 18px; font-weight: 700; color: #fff; letter-spacing: 0.02em; }
+    .logo span { color: #60a5fa; }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .refresh-indicator { font-size: 12px; color: #94a3b8; }
+    .btn-refresh {
+      background: #2563eb; color: #fff; border: none; border-radius: 6px;
+      padding: 6px 14px; font-size: 13px; cursor: pointer; font-weight: 500;
+    }
+    .btn-refresh:hover { background: #1d4ed8; }
+
+    /* ── Auth panel ──────────────────────────────────────────────────────── */
+    .auth-panel {
+      background: #1e293b;
+      border-bottom: 1px solid #334155;
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .auth-label { font-size: 12px; color: #94a3b8; white-space: nowrap; }
+    .auth-input {
+      flex: 1; max-width: 340px;
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      color: #e2e8f0; padding: 6px 12px; font-size: 13px; font-family: monospace;
+    }
+    .auth-input:focus { outline: none; border-color: #3b82f6; }
+    .server-input { flex: 1; max-width: 260px; }
+    .auth-status { font-size: 12px; }
+    .auth-status.ok  { color: #22c55e; }
+    .auth-status.err { color: #ef4444; }
+
+    /* ── Status bar ──────────────────────────────────────────────────────── */
+    .status-bar {
+      background: #1e293b;
+      padding: 8px 24px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      border-bottom: 1px solid #334155;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .status-dot {
+      display: inline-block; width: 8px; height: 8px;
+      border-radius: 50%; margin-right: 6px;
+    }
+    .dot-green  { background: #22c55e; box-shadow: 0 0 6px #22c55e; }
+    .dot-red    { background: #ef4444; box-shadow: 0 0 6px #ef4444; }
+    .dot-yellow { background: #f59e0b; box-shadow: 0 0 6px #f59e0b; }
+    .dot-gray   { background: #475569; }
+
+    /* ── Grid ────────────────────────────────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 24px;
+    }
+    .grid-wide {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+      gap: 16px;
+      padding: 0 24px 24px;
+    }
+
+    /* ── Card ────────────────────────────────────────────────────────────── */
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 20px;
+    }
+    .card-label {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 600;
+      margin-bottom: 10px;
+    }
+    .card-value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    .card-sub { font-size: 12px; color: #64748b; margin-top: 6px; }
+    .card-row { display: flex; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+    .card-row .key { color: #94a3b8; }
+    .card-row .val { color: #e2e8f0; font-weight: 500; }
+
+    .green  { color: #22c55e; }
+    .yellow { color: #f59e0b; }
+    .red    { color: #ef4444; }
+    .blue   { color: #60a5fa; }
+    .white  { color: #f8fafc; }
+
+    /* ── Slow request table ───────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { text-align: left; color: #64748b; font-weight: 600; padding: 6px 10px;
+         border-bottom: 1px solid #334155; text-transform: uppercase; font-size: 11px; }
+    td { padding: 6px 10px; border-bottom: 1px solid #1a2744; color: #cbd5e1; }
+    td.method { font-weight: 700; color: #60a5fa; }
+    td.slow   { color: #f59e0b; }
+    td.veryslow { color: #ef4444; }
+    tr:last-child td { border-bottom: none; }
+
+    /* ── Section title ───────────────────────────────────────────────────── */
+    .section-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #475569;
+      font-weight: 600;
+      padding: 0 24px 8px;
+    }
+
+    /* ── Loader ──────────────────────────────────────────────────────────── */
+    .loading { text-align: center; padding: 60px 24px; color: #475569; font-size: 14px; }
+
+    /* ── Error ───────────────────────────────────────────────────────────── */
+    .error-banner {
+      background: #450a0a;
+      border: 1px solid #7f1d1d;
+      color: #fca5a5;
+      padding: 12px 24px;
+      font-size: 13px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="logo">UFCL <span>Operations</span></div>
+  <div class="header-right">
+    <span class="refresh-indicator" id="refreshCountdown">Refreshes in 30s</span>
+    <button class="btn-refresh" onclick="fetchAll()">Refresh Now</button>
+  </div>
+</div>
+
+<!-- Connection settings -->
+<div class="auth-panel">
+  <span class="auth-label">Server:</span>
+  <input class="auth-input server-input" id="serverUrl"
+         value="http://192.168.1.5:3001" placeholder="http://192.168.1.5:3001" />
+  <span class="auth-label">Metrics token:</span>
+  <input class="auth-input" id="metricsToken" type="password"
+         placeholder="METRICS_TOKEN from .env" />
+  <span class="auth-status" id="authStatus"></span>
+</div>
+
+<!-- Error banner -->
+<div class="error-banner" id="errorBanner"></div>
+
+<!-- Status bar -->
+<div class="status-bar" id="statusBar">
+  <span><span class="status-dot dot-gray" id="dotApi"></span>API</span>
+  <span><span class="status-dot dot-gray" id="dotDb"></span>Database</span>
+  <span id="lastUpdated">Not yet loaded</span>
+</div>
+
+<!-- Content -->
+<div id="content">
+  <div class="loading">Enter the server URL and metrics token above, then click Refresh Now.</div>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let countdown = 30;
+  let timer;
+
+  // ── Storage helpers ───────────────────────────────────────────────────────
+  const save = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+  const load = (k, def) => { try { return localStorage.getItem(k) ?? def; } catch { return def; } };
+
+  document.getElementById('serverUrl').value    = load('ufcl_server', 'http://192.168.1.5:3001');
+  document.getElementById('metricsToken').value = load('ufcl_token',  '');
+
+  document.getElementById('serverUrl').addEventListener('input', e => save('ufcl_server', e.target.value.trim()));
+  document.getElementById('metricsToken').addEventListener('input', e => save('ufcl_token', e.target.value.trim()));
+
+  // ── Fetch helpers ────────────────────────────────────────────────────────
+  const server = () => document.getElementById('serverUrl').value.trim().replace(/\/$/, '');
+  const token  = () => document.getElementById('metricsToken').value.trim();
+
+  async function fetchReady() {
+    const r = await fetch(`${server()}/api/ready`);
+    return r.json();
+  }
+
+  async function fetchMetrics() {
+    const headers = token() ? { Authorization: `Bearer ${token()}` } : {};
+    const r = await fetch(`${server()}/api/metrics`, { headers });
+    if (r.status === 403) throw new Error('Metrics token is missing or wrong (403 Forbidden)');
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }
+
+  // ── Formatting helpers ───────────────────────────────────────────────────
+  function uptime(seconds) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor((seconds % 86400) / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    if (d > 0) return `${d}d ${h}h ${m}m`;
+    if (h > 0) return `${h}h ${m}m`;
+    return `${m}m`;
+  }
+
+  function memClass(mb) {
+    if (mb > 400) return 'red';
+    if (mb > 200) return 'yellow';
+    return 'green';
+  }
+
+  function msClass(ms) {
+    if (ms > 500) return 'red';
+    if (ms > 200) return 'yellow';
+    return 'green';
+  }
+
+  function errClass(count, warn, crit) {
+    if (count >= crit) return 'red';
+    if (count >= warn) return 'yellow';
+    return 'green';
+  }
+
+  function loadClass(load1) {
+    if (load1 > 4) return 'red';
+    if (load1 > 2) return 'yellow';
+    return 'green';
+  }
+
+  function ts(iso) {
+    return new Date(iso).toLocaleTimeString();
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function render(ready, m) {
+    const dbOk    = ready?.db?.connected === true;
+    const dbMs    = ready?.db?.latency_ms ?? '—';
+    const mem     = m.memory ?? {};
+    const resp    = m.response_ms ?? {};
+    const sys     = m.system ?? {};
+    const slow    = m.slow_requests ?? [];
+
+    // Status bar dots
+    document.getElementById('dotApi').className = 'status-dot dot-green';
+    document.getElementById('dotDb').className  = dbOk ? 'status-dot dot-green' : 'status-dot dot-red';
+    document.getElementById('lastUpdated').textContent = 'Last updated: ' + ts(m.ts);
+
+    document.getElementById('authStatus').textContent = 'Connected';
+    document.getElementById('authStatus').className   = 'auth-status ok';
+    document.getElementById('errorBanner').style.display = 'none';
+
+    const html = `
+      <!-- Key metrics -->
+      <div class="grid">
+        <div class="card">
+          <div class="card-label">Uptime</div>
+          <div class="card-value white">${uptime(m.uptime_seconds ?? 0)}</div>
+          <div class="card-sub">API v${m.api_version ?? '—'}</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Active Sessions</div>
+          <div class="card-value blue">${m.active_sessions ?? '—'}</div>
+          <div class="card-sub">Logins in last 8 hours</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Total Requests</div>
+          <div class="card-value white">${(m.requests_total ?? 0).toLocaleString()}</div>
+          <div class="card-sub">${m.requests_5xx ?? 0} server errors</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Response Time</div>
+          <div class="card-value ${msClass(resp.avg ?? 0)}">${resp.avg ?? 0}<span style="font-size:16px;font-weight:400"> ms avg</span></div>
+          <div class="card-sub">p95: ${resp.p95 ?? 0} ms</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Heap Memory</div>
+          <div class="card-value ${memClass(mem.heap_used_mb ?? 0)}">${mem.heap_used_mb ?? 0}<span style="font-size:16px;font-weight:400"> MB</span></div>
+          <div class="card-sub">of ${mem.heap_total_mb ?? 0} MB allocated</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Database</div>
+          <div class="card-value ${dbOk ? 'green' : 'red'}">${dbOk ? 'OK' : 'DOWN'}</div>
+          <div class="card-sub">Latency: ${dbMs} ms</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Auth Failures</div>
+          <div class="card-value ${errClass(m.auth_invalid_token ?? 0, 50, 200)}">${(m.auth_invalid_token ?? 0).toLocaleString()}</div>
+          <div class="card-sub">Invalid tokens since restart</div>
+        </div>
+        <div class="card">
+          <div class="card-label">Rate Limit Hits</div>
+          <div class="card-value ${errClass(m.rate_limit_hits ?? 0, 100, 500)}">${(m.rate_limit_hits ?? 0).toLocaleString()}</div>
+          <div class="card-sub">429s since restart</div>
+        </div>
+        <div class="card">
+          <div class="card-label">APK Version</div>
+          <div class="card-value white" style="font-size:22px">${m.apk_version ?? '—'}</div>
+          <div class="card-sub">Deployed on update server</div>
+        </div>
+      </div>
+
+      <!-- System detail -->
+      <div class="section-title">System</div>
+      <div class="grid-wide">
+        <div class="card">
+          <div class="card-label">System Resources</div>
+          <div class="card-row"><span class="key">CPU Load (1m)</span><span class="val ${loadClass(sys.load_1m ?? 0)}">${sys.load_1m ?? '—'}</span></div>
+          <div class="card-row"><span class="key">CPU Load (5m)</span><span class="val">${sys.load_5m ?? '—'}</span></div>
+          <div class="card-row"><span class="key">CPU Load (15m)</span><span class="val">${sys.load_15m ?? '—'}</span></div>
+          <div class="card-row"><span class="key">Free Memory</span><span class="val">${sys.free_mem_mb ?? '—'} MB of ${sys.total_mem_mb ?? '—'} MB</span></div>
+          <div class="card-row"><span class="key">RSS Memory</span><span class="val">${mem.rss_mb ?? '—'} MB</span></div>
+        </div>
+        <div class="card">
+          <div class="card-label">Request Counters</div>
+          <div class="card-row"><span class="key">Total</span><span class="val">${(m.requests_total ?? 0).toLocaleString()}</span></div>
+          <div class="card-row"><span class="key">5xx Errors</span><span class="val ${errClass(m.requests_5xx ?? 0, 5, 20)}">${m.requests_5xx ?? 0}</span></div>
+          <div class="card-row"><span class="key">Auth Failures (401)</span><span class="val ${errClass(m.auth_invalid_token ?? 0, 50, 200)}">${m.auth_invalid_token ?? 0}</span></div>
+          <div class="card-row"><span class="key">Permission Denied (403)</span><span class="val">${m.permission_denied ?? 0}</span></div>
+          <div class="card-row"><span class="key">Rate Limited (429)</span><span class="val ${errClass(m.rate_limit_hits ?? 0, 100, 500)}">${m.rate_limit_hits ?? 0}</span></div>
+        </div>
+      </div>
+
+      <!-- Slow requests -->
+      ${slow.length > 0 ? `
+      <div class="section-title">Slowest Requests (last ${slow.length})</div>
+      <div style="padding: 0 24px 24px">
+        <div class="card">
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th>Path</th>
+                  <th>Duration</th>
+                  <th>Status</th>
+                  <th>Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${slow.slice(0, 10).map(r => `
+                  <tr>
+                    <td class="method">${r.method}</td>
+                    <td>${r.path}</td>
+                    <td class="${r.ms >= 3000 ? 'veryslow' : 'slow'}">${r.ms} ms</td>
+                    <td>${r.status}</td>
+                    <td>${new Date(r.ts).toLocaleTimeString()}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      ` : ''}
+    `;
+
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function showError(msg) {
+    document.getElementById('dotApi').className = 'status-dot dot-red';
+    document.getElementById('errorBanner').textContent = '⚠ ' + msg;
+    document.getElementById('errorBanner').style.display = 'block';
+    document.getElementById('authStatus').textContent = 'Error';
+    document.getElementById('authStatus').className   = 'auth-status err';
+  }
+
+  // ── Main fetch ───────────────────────────────────────────────────────────
+  async function fetchAll() {
+    resetCountdown();
+    try {
+      const [ready, metrics] = await Promise.all([fetchReady(), fetchMetrics()]);
+      render(ready, metrics);
+    } catch (err) {
+      showError(err.message ?? 'Could not reach the server.');
+      document.getElementById('lastUpdated').textContent = 'Last attempt: ' + new Date().toLocaleTimeString();
+    }
+  }
+
+  // ── Auto-refresh countdown ────────────────────────────────────────────────
+  function resetCountdown() {
+    clearInterval(timer);
+    countdown = 30;
+    document.getElementById('refreshCountdown').textContent = 'Refreshes in 30s';
+    timer = setInterval(() => {
+      countdown--;
+      document.getElementById('refreshCountdown').textContent =
+        countdown > 0 ? `Refreshes in ${countdown}s` : 'Refreshing…';
+      if (countdown <= 0) fetchAll();
+    }, 1000);
+  }
+
+  // Kick off on load
+  resetCountdown();
+  fetchAll();
+</script>
+</body>
+</html>

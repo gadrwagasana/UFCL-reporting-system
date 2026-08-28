@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   StyleSheet, View, Text, ScrollView, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
+  RefreshControl, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -10,6 +10,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }     from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
+import { LoadingState }  from '../../components/LoadingState';
+import { ErrorState }    from '../../components/ErrorState';
 import { useAuthStore }  from '../../stores/authStore';
 import { hasPermission } from '../../utils/permissions';
 import type { UserRole } from '../../types/auth';
@@ -95,10 +97,7 @@ export function AutomationHomeScreen() {
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <StatusBar style="light" />
         <AppHeader title="Automation Center" onBack={() => navigation.goBack()} />
-        <View style={s.center}>
-          <ActivityIndicator color={Colors.navy} />
-          <Text style={s.loadingText}>Loading automation data…</Text>
-        </View>
+        <LoadingState message="Loading automation data…" fullScreen />
       </SafeAreaView>
     );
   }
@@ -108,13 +107,7 @@ export function AutomationHomeScreen() {
       <SafeAreaView style={s.safe} edges={['top', 'bottom']}>
         <StatusBar style="light" />
         <AppHeader title="Automation Center" onBack={() => navigation.goBack()} />
-        <View style={s.center}>
-          <Ionicons name="alert-circle" size={32} color={Colors.error} />
-          <Text style={s.errorText}>{(res as any)?.error || 'Load failed'}</Text>
-          <TouchableOpacity style={s.retryBtn} onPress={() => refetch()}>
-            <Text style={s.retryText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
+        <ErrorState message={(res as any)?.error || 'Load failed'} onRetry={() => refetch()} fullScreen />
       </SafeAreaView>
     );
   }
@@ -264,11 +257,6 @@ export function AutomationHomeScreen() {
 const s = StyleSheet.create({
   safe:        { flex: 1, backgroundColor: Colors.bg },
   scroll:      { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
-  center:      { flex: 1, alignItems: 'center', justifyContent: 'center', gap: Spacing.sm },
-  loadingText: { fontSize: Typography.sm, color: Colors.textSecondary, marginTop: Spacing.xs },
-  errorText:   { fontSize: Typography.sm, color: Colors.error, textAlign: 'center', paddingHorizontal: Spacing.lg },
-  retryBtn:    { marginTop: Spacing.sm, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.xs, backgroundColor: Colors.navy, borderRadius: Radius.md },
-  retryText:   { color: '#fff', fontSize: Typography.sm, fontWeight: Typography.semibold },
 
   kpiRow:  { flexDirection: 'row', gap: Spacing.xs },
   kpiCard: { flex: 1, backgroundColor: Colors.card, borderRadius: Radius.md, padding: Spacing.sm, ...Shadow.sm, alignItems: 'center' },

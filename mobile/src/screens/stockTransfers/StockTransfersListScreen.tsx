@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl,
   TouchableOpacity, Alert, TextInput, ActivityIndicator, Modal,
@@ -10,21 +10,49 @@ import { Ionicons }      from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }             from '../../components/AppHeader';
-import { LoadingState }          from '../../components/LoadingState';
+import { SearchSkeleton }        from '../../components/SearchSkeleton';
 import { ErrorState }            from '../../components/ErrorState';
 import { EmptyState }            from '../../components/EmptyState';
 import { ReasonModal }           from '../../components/ReasonModal';
-import { TransferStatusBadge }   from '../../components/TransferStatusBadge';
+import { StatusBadge }           from '../../components/StatusBadge';
+import { Button }                from '../../components/Button';
+import { ListSearchBar }         from '../../components/ListSearchBar';
 import {
   useStockTransfersList, useStockTransferApprove, useStockTransferReceive,
+  useStockTransferReportDiscrepancy,
 } from '../../hooks/useStockTransfers';
 import { useAuthStore }  from '../../stores/authStore';
 import { hasPermission } from '../../utils/permissions';
+import { loadSavedFilters, saveFilterPreset, removeFilterPreset, loadRecentlyViewed, type SavedFilterPreset, type RecentlyViewedEntry } from '../../utils/storage';
 import type { StockTransfer, TransferVehicle } from '../../types/api';
 import type { StockTransfersStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type Nav = NativeStackNavigationProp<StockTransfersStackParamList, 'StockTransfersList'>;
+
+// Inventory Integrity Phase 1 — mirrors DISCREPANCY_REASONS in
+// db/services/data.js (server is the source of validation truth).
+const DISCREPANCY_REASONS = [
+  'Loss in Transit', 'Damaged During Transport', 'Short Shipment', 'Theft',
+  'Write-off', 'Manual Count Adjustment', 'Expired Material', 'Other',
+];
+
+function LossReasonPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <View style={s.lossReasonWrap}>
+      {DISCREPANCY_REASONS.map((r) => (
+        <TouchableOpacity
+          key={r}
+          style={[s.lossReasonChip, value === r && s.lossReasonChipActive]}
+          onPress={() => onChange(r)}
+          activeOpacity={0.7}
+        >
+          <Text style={[s.lossReasonChipText, value === r && s.lossReasonChipTextActive]}>{r}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+}
 
 // ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ dispatched, received, requested }: { dispatched: number; received: number; requested: number }) {
@@ -118,11 +146,11 @@ function ReceiveModal({
 // ── Transfer row card ─────────────────────────────────────────────────────────
 function TransferRow({
   item, canApprove, canAct,
-  onApprove, onReject, onDispatch, onReceive, onDetail,
+  onApprove, onReject, onDispatch, onReceive, onDiscrepancy, onDetail,
 }: {
   item: StockTransfer; canApprove: boolean; canAct: boolean;
   onApprove: () => void; onReject: () => void;
-  onDispatch: () => void; onReceive: () => void; onDetail: () => void;
+  onDispatch: () => void; onReceive: () => void; onDiscrepancy: () => void; onDetail: () => void;
 }) {
   const showDispatch = canAct
     && ['approved', 'in_transit'].includes(item.status)
@@ -130,7 +158,11 @@ function TransferRow({
   const showReceive  = canAct
     && ['in_transit', 'partially_received'].includes(item.status)
     && item.received_qty < item.dispatched_qty;
+  const showDiscrepancy = canAct
+    && ['approved', 'in_transit', 'partially_received'].includes(item.status)
+    && item.received_qty < item.requested_qty;
   const showDetail   = item.dispatched_qty > 0;
+  const fromMaterialRequest = !!item.reference && item.reference.startsWith('MAT-REQ-');
 
   return (
     <View style={s.card}>
@@ -138,8 +170,9 @@ function TransferRow({
         <View style={{ flex: 1, gap: 2 }}>
           {item.reference && <Text style={s.reference}>{item.reference}</Text>}
           <Text style={s.dateText}>{item.requested_at}</Text>
+          {fromMaterialRequest && <Text style={s.mrBadge}>Material Request</Text>}
         </View>
-        <TransferStatusBadge status={item.status} />
+        <StatusBadge status={item.status} />
       </View>
 
       <Text style={s.itemName}>{item.item_name}</Text>
@@ -163,35 +196,32 @@ function TransferRow({
         <Text style={s.rejectionReason}>{item.rejection_reason}</Text>
       )}
 
+      {item.status === 'completed_with_discrepancy' && (
+        <Text style={s.rejectionReason}>
+          {item.discrepancy_qty ?? 0} {item.uom} short{item.discrepancy_notes ? `: ${item.discrepancy_notes}` : ''}
+        </Text>
+      )}
+
       {item.requested_by && (
         <Text style={s.requestedBy}>Requested by {item.requested_by}</Text>
       )}
 
-      {(canApprove && item.status === 'pending') || showDispatch || showReceive || showDetail ? (
+      {(canApprove && item.status === 'pending') || showDispatch || showReceive || showDiscrepancy || showDetail ? (
         <View style={s.actions}>
           {canApprove && item.status === 'pending' && (
             <>
-              <TouchableOpacity style={[s.actionBtn, s.approveBtn]} onPress={onApprove} activeOpacity={0.8}>
-                <Ionicons name="checkmark" size={13} color={Colors.white} />
-                <Text style={s.actionText}>Approve</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[s.actionBtn, s.rejectBtn]} onPress={onReject} activeOpacity={0.8}>
-                <Ionicons name="close" size={13} color={Colors.white} />
-                <Text style={s.actionText}>Reject</Text>
-              </TouchableOpacity>
+              <Button label="Approve" icon="checkmark" size="sm" color={Colors.success} onPress={onApprove} />
+              <Button label="Reject" icon="close" size="sm" color={Colors.error} onPress={onReject} />
             </>
           )}
           {showDispatch && (
-            <TouchableOpacity style={[s.actionBtn, s.dispatchBtn]} onPress={onDispatch} activeOpacity={0.8}>
-              <Ionicons name="car-outline" size={13} color={Colors.white} />
-              <Text style={s.actionText}>Dispatch</Text>
-            </TouchableOpacity>
+            <Button label="Dispatch" icon="car-outline" size="sm" color={Colors.navy} onPress={onDispatch} />
           )}
           {showReceive && (
-            <TouchableOpacity style={[s.actionBtn, s.receiveBtn]} onPress={onReceive} activeOpacity={0.8}>
-              <Ionicons name="download-outline" size={13} color={Colors.white} />
-              <Text style={s.actionText}>Receive</Text>
-            </TouchableOpacity>
+            <Button label="Receive" icon="download-outline" size="sm" color={Colors.statusInTransitText} onPress={onReceive} />
+          )}
+          {showDiscrepancy && (
+            <Button label="Short/Damaged" icon="alert-circle-outline" size="sm" color={Colors.error} onPress={onDiscrepancy} />
           )}
           {showDetail && (
             <TouchableOpacity style={s.detailBtn} onPress={onDetail} activeOpacity={0.8}>
@@ -212,17 +242,67 @@ export function StockTransfersListScreen() {
   const canAct     = hasPermission(role as any, 'transfer.act');
 
   const { data, isLoading, isError, refetch, isRefetching } = useStockTransfersList();
-  const approveMutation = useStockTransferApprove();
-  const receiveMutation = useStockTransferReceive();
+  const approveMutation    = useStockTransferApprove();
+  const receiveMutation    = useStockTransferReceive();
+  const discrepancyMutation = useStockTransferReportDiscrepancy();
 
-  const [rejectTarget,  setRejectTarget]  = useState<StockTransfer | null>(null);
-  const [receiveTarget, setReceiveTarget] = useState<StockTransfer | null>(null);
+  const [rejectTarget,     setRejectTarget]     = useState<StockTransfer | null>(null);
+  const [receiveTarget,    setReceiveTarget]    = useState<StockTransfer | null>(null);
+  const [discrepancyTarget, setDiscrepancyTarget] = useState<StockTransfer | null>(null);
+  const [lossReason, setLossReason] = useState(DISCREPANCY_REASONS[0]);
   const [actionLoading, setActionLoading] = useState(false);
+  // Phase 2 (Inventory) — in-screen search/filter, matching the toolkit
+  // added to desktop's Stock Transfers page in the same phase.
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
-  if (isLoading) return <LoadingState message="Loading stock transfers…" fullScreen />;
+  // Enterprise UI/UX Standardization Phase 3 — Saved Filters reference
+  // implementation; see loadSavedFilters()/saveFilterPreset() in utils/storage.ts.
+  type TransferFilterValues = { search: string; statusFilter: string };
+  const [presets, setPresets] = useState<SavedFilterPreset<TransferFilterValues>[]>([]);
+  const [savingPresetName, setSavingPresetName] = useState<string | null>(null);
+  useEffect(() => {
+    loadSavedFilters<TransferFilterValues>('stock-transfers').then(setPresets);
+  }, []);
+  function applyPreset(p: SavedFilterPreset<TransferFilterValues>) {
+    setSearch(p.filterValues.search);
+    setStatusFilter(p.filterValues.statusFilter);
+  }
+  async function handleSavePreset() {
+    if (!savingPresetName?.trim()) return;
+    const next = await saveFilterPreset<TransferFilterValues>('stock-transfers', savingPresetName.trim(), { search, statusFilter });
+    setPresets(next);
+    setSavingPresetName(null);
+  }
+  async function handleRemovePreset(id: string) {
+    setPresets(await removeFilterPreset<TransferFilterValues>('stock-transfers', id));
+  }
+
+  // Enterprise UI/UX Standardization Phase 3 — Recently Viewed reference
+  // implementation; pushed from StockTransferDetailScreen on open.
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedEntry[]>([]);
+  useEffect(() => {
+    loadRecentlyViewed('stock-transfer').then(setRecentlyViewed);
+  }, []);
+
+  // Enterprise UI/UX Standardization Phase 3 — SearchSkeleton adopted here
+  // as proof the component (previously procurement-only) generalizes to a
+  // non-procurement list screen with the same search-bar-plus-rows shape.
+  if (isLoading) return <SearchSkeleton rows={6} />;
   if (isError)   return <ErrorState  message="Could not load stock transfers" onRetry={refetch} fullScreen />;
 
-  const { rows, items, vehicles, summary, user_workshop_id } = data!;
+  const { rows: allRows, items, vehicles, summary, user_workshop_id } = data!;
+  const STATUS_OPTIONS = ['all', 'pending', 'approved', 'in_transit', 'partially_received', 'completed', 'rejected'];
+  const rows = allRows.filter(r => {
+    if (statusFilter !== 'all' && r.status !== statusFilter) return false;
+    if (!search.trim()) return true;
+    const q = search.trim().toLowerCase();
+    return r.item_name.toLowerCase().includes(q) ||
+      r.category.toLowerCase().includes(q) ||
+      (r.reference ?? '').toLowerCase().includes(q) ||
+      r.from_warehouse_name.toLowerCase().includes(q) ||
+      r.to_warehouse_name.toLowerCase().includes(q);
+  });
 
   const handleApprove = async (id: number) => {
     setActionLoading(true);
@@ -263,15 +343,36 @@ export function StockTransfersListScreen() {
     finally   { setActionLoading(false); }
   };
 
+  const handleDiscrepancy = async (reason: string) => {
+    if (!discrepancyTarget) return;
+    const id = discrepancyTarget.id;
+    const uom = discrepancyTarget.uom;
+    const reasonType = lossReason;
+    setDiscrepancyTarget(null);
+    setLossReason(DISCREPANCY_REASONS[0]);
+    setActionLoading(true);
+    try {
+      const res = await discrepancyMutation.mutateAsync({ id, notes: reason, lossReason: reasonType });
+      if (!(res as any).ok) {
+        Alert.alert('Error', (res as any).error ?? 'Could not close transfer');
+      } else {
+        Alert.alert('Transfer Closed', `${(res as any).discrepancyQty} ${uom} recorded as short (${reasonType}). Inventory movement #${(res as any).movementId} created.`);
+      }
+    } catch { Alert.alert('Error', 'Action failed. Please try again.'); }
+    finally   { setActionLoading(false); }
+  };
+
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar style="light" />
       <AppHeader
         title="Stock Transfers"
         subtitle="Request → Approval → Dispatch → Receipt"
+        searchModule="stock_transfers"
         dark
         actions={canAct ? [{ icon: 'add', onPress: () => navigation.navigate('StockTransferNewRequest') }] : []}
       />
+      <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search item, category, reference, warehouse…" />
       <FlatList
         data={rows}
         keyExtractor={item => String(item.id)}
@@ -298,6 +399,26 @@ export function StockTransfersListScreen() {
                 <Text style={s.statLabel}>Completed</Text>
               </View>
             </View>
+
+            {/* Enterprise UI/UX Standardization Phase 3 — Recently Viewed */}
+            {recentlyViewed.length > 0 && (
+              <View style={s.recentWrap}>
+                <Text style={s.recentTitle}><Ionicons name="time-outline" size={12} color={Colors.textMuted} /> Recently Viewed</Text>
+                <View style={s.recentChips}>
+                  {recentlyViewed.map((r) => (
+                    <TouchableOpacity
+                      key={r.id}
+                      style={s.recentChip}
+                      onPress={() => navigation.navigate('StockTransferDetail', { transferId: Number(r.id) })}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.recentChipText}>{r.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
+
             {/* Workshop filter notice for restricted roles */}
             {user_workshop_id && (
               <View style={s.workshopBanner}>
@@ -305,6 +426,59 @@ export function StockTransfersListScreen() {
                 <Text style={s.workshopText}>Showing transfers for your workshop</Text>
               </View>
             )}
+            <FlatList
+              horizontal
+              data={STATUS_OPTIONS}
+              keyExtractor={t => t}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={s.chips}
+              renderItem={({ item: t }) => (
+                <TouchableOpacity
+                  style={[s.chip, statusFilter === t && s.chipActive]}
+                  onPress={() => setStatusFilter(t)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[s.chipText, statusFilter === t && s.chipTextActive]}>
+                    {t === 'all' ? 'All' : t.replace('_', ' ')}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+
+            {/* Enterprise UI/UX Standardization Phase 3 — Saved Filters */}
+            <View style={s.savedFiltersRow}>
+              {presets.map((p) => (
+                <View key={p.id} style={s.presetChip}>
+                  <TouchableOpacity onPress={() => applyPreset(p)} activeOpacity={0.7}>
+                    <Text style={s.presetChipText}>{p.name}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleRemovePreset(p.id)} hitSlop={8} accessibilityLabel={`Remove ${p.name} filter preset`}>
+                    <Ionicons name="close" size={12} color={Colors.textMuted} style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              {savingPresetName === null ? (
+                <TouchableOpacity style={s.presetSaveBtn} onPress={() => setSavingPresetName('')} activeOpacity={0.7}>
+                  <Ionicons name="bookmark-outline" size={12} color={Colors.navy} />
+                  <Text style={s.presetSaveBtnText}>Save current filters</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={s.presetNameRow}>
+                  <TextInput
+                    style={s.presetNameInput}
+                    value={savingPresetName}
+                    onChangeText={setSavingPresetName}
+                    placeholder="Preset name…"
+                    placeholderTextColor={Colors.textMuted}
+                    autoFocus
+                    maxLength={40}
+                    onSubmitEditing={handleSavePreset}
+                  />
+                  <TouchableOpacity onPress={handleSavePreset} hitSlop={8}><Ionicons name="checkmark" size={18} color={Colors.success} /></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setSavingPresetName(null)} hitSlop={8}><Ionicons name="close" size={18} color={Colors.textMuted} /></TouchableOpacity>
+                </View>
+              )}
+            </View>
           </>
         }
         renderItem={({ item }) => (
@@ -322,14 +496,15 @@ export function StockTransfersListScreen() {
               vehicles,
             })}
             onReceive={() => setReceiveTarget(item)}
+            onDiscrepancy={() => setDiscrepancyTarget(item)}
             onDetail={()  => navigation.navigate('StockTransferDetail', { transferId: item.id })}
           />
         )}
         ListEmptyComponent={
           <EmptyState
             icon="swap-horizontal-outline"
-            title="No transfers yet"
-            subtitle={canAct ? 'Tap + to request a stock transfer.' : 'No stock transfers have been recorded.'}
+            title={search || statusFilter !== 'all' ? 'No matching transfers' : 'No transfers yet'}
+            subtitle={search || statusFilter !== 'all' ? 'Try a different search or filter.' : (canAct ? 'Tap + to request a stock transfer.' : 'No stock transfers have been recorded.')}
           />
         }
       />
@@ -352,6 +527,17 @@ export function StockTransfersListScreen() {
         onConfirm={handleReceive}
         loading={actionLoading}
       />
+
+      <ReasonModal
+        visible={discrepancyTarget !== null}
+        title={`Close transfer #${discrepancyTarget?.id ?? ''} as short/damaged`}
+        message={discrepancyTarget ? `${discrepancyTarget.requested_qty - discrepancyTarget.received_qty} ${discrepancyTarget.uom} will be recorded as never delivered, and a matching inventory movement will be created. Pick a movement type, then explain why.` : ''}
+        confirmLabel="Close Transfer"
+        loading={actionLoading}
+        onCancel={() => { setDiscrepancyTarget(null); setLossReason(DISCREPANCY_REASONS[0]); }}
+        onConfirm={handleDiscrepancy}
+        extraContent={<LossReasonPicker value={lossReason} onChange={setLossReason} />}
+      />
     </SafeAreaView>
   );
 }
@@ -359,6 +545,12 @@ export function StockTransfersListScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   list: { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
+
+  lossReasonWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: Spacing.xs },
+  lossReasonChip: { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: 5, paddingHorizontal: Spacing.sm, backgroundColor: Colors.card },
+  lossReasonChipActive: { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  lossReasonChipText: { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  lossReasonChipTextActive: { color: Colors.white },
 
   banner: {
     flexDirection: 'row', backgroundColor: Colors.navy,
@@ -369,12 +561,50 @@ const s = StyleSheet.create({
   statValue: { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.white },
   statLabel: { fontSize: 9, color: Colors.tabInactive, textTransform: 'uppercase', letterSpacing: 0.4 },
 
+  recentWrap: { marginBottom: Spacing.sm },
+  recentTitle: { fontSize: 10, color: Colors.textMuted, fontWeight: Typography.medium, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  recentChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  recentChip: {
+    backgroundColor: Colors.card, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border,
+  },
+  recentChipText: { fontSize: Typography.xs, color: Colors.textPrimary },
+
   workshopBanner: {
     flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
     backgroundColor: Colors.infoBg, borderRadius: Radius.md,
     padding: Spacing.sm, marginBottom: Spacing.xs,
   },
   workshopText: { fontSize: Typography.xs, color: Colors.info },
+
+  chips: { gap: Spacing.xs, paddingBottom: Spacing.xs },
+  chip: {
+    backgroundColor: Colors.card, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border,
+  },
+  chipActive:     { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipText:       { fontSize: Typography.xs, color: Colors.textSecondary, textTransform: 'capitalize' },
+  chipTextActive: { color: Colors.white, fontWeight: Typography.medium },
+
+  savedFiltersRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: Spacing.xs, marginTop: Spacing.xs },
+  presetChip: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.card,
+    borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4,
+    borderWidth: 1, borderColor: Colors.border,
+  },
+  presetChipText: { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  presetSaveBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4,
+    borderWidth: 1, borderColor: Colors.navy, borderStyle: 'dashed',
+  },
+  presetSaveBtnText: { fontSize: Typography.xs, color: Colors.navy, fontWeight: Typography.medium },
+  presetNameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, flex: 1, minWidth: 160 },
+  presetNameInput: {
+    flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4, fontSize: Typography.xs, color: Colors.textPrimary,
+    backgroundColor: Colors.card,
+  },
 
   card: {
     backgroundColor: Colors.card, borderRadius: Radius.lg,
@@ -383,6 +613,7 @@ const s = StyleSheet.create({
   cardHeader:  { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   reference:   { fontSize: Typography.xs, fontFamily: 'monospace', color: Colors.textMuted },
   dateText:    { fontSize: 11, color: Colors.textMuted },
+  mrBadge:     { fontSize: 10, color: Colors.info, fontWeight: Typography.medium, marginTop: 1 },
 
   itemName:  { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.textPrimary },
   category:  { fontSize: 11, color: Colors.textMuted },
@@ -407,12 +638,6 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: Colors.border, paddingTop: Spacing.sm, marginTop: Spacing.xs,
     flexWrap: 'wrap',
   },
-  actionBtn:   { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: Spacing.sm, paddingVertical: 5, borderRadius: Radius.md },
-  actionText:  { fontSize: 12, fontWeight: Typography.semibold, color: Colors.white },
-  approveBtn:  { backgroundColor: Colors.success },
-  rejectBtn:   { backgroundColor: Colors.error },
-  dispatchBtn: { backgroundColor: Colors.navy },
-  receiveBtn:  { backgroundColor: Colors.statusInTransitText },
   detailBtn:   { marginLeft: 'auto', padding: 4 },
 
   // Receive modal

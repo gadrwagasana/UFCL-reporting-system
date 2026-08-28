@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, RefreshControl,
 } from 'react-native';
@@ -10,8 +10,9 @@ import { Ionicons }              from '@expo/vector-icons';
 import { AppHeader }             from '../../components/AppHeader';
 import { LoadingState }          from '../../components/LoadingState';
 import { ErrorState }            from '../../components/ErrorState';
-import { TransferStatusBadge }   from '../../components/TransferStatusBadge';
+import { StatusBadge }           from '../../components/StatusBadge';
 import { useStockTransferHistory } from '../../hooks/useStockTransfers';
+import { pushRecentlyViewed }    from '../../utils/storage';
 import type { StockTransfersStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
@@ -37,6 +38,15 @@ export function StockTransferDetailScreen() {
   const navigation = useNavigation();
   const { params } = useRoute<Props['route']>();
   const { data, isLoading, isError, refetch, isRefetching } = useStockTransferHistory(params.transferId);
+
+  // Enterprise UI/UX Standardization Phase 3 — Recently Viewed reference
+  // implementation; see pushRecentlyViewed()/loadRecentlyViewed() in
+  // utils/storage.ts. Kept above the loading/error early returns (Rules of
+  // Hooks) — guards internally for data not being ready yet.
+  useEffect(() => {
+    if (!data?.transfer) return;
+    pushRecentlyViewed('stock-transfer', String(data.transfer.id), data.transfer.reference || data.transfer.item_name);
+  }, [data?.transfer?.id]);
 
   if (isLoading) return <LoadingState message="Loading transfer details…" fullScreen />;
   if (isError || !data?.transfer) {
@@ -66,8 +76,11 @@ export function StockTransferDetailScreen() {
                 <Text style={s.reference}>{transfer.transfer_ref}</Text>
               )}
               <Text style={s.dateText}>{transfer.requested_at}</Text>
+              {transfer.reference && transfer.reference.startsWith('MAT-REQ-') && (
+                <Text style={s.mrBadge}>Material Request</Text>
+              )}
             </View>
-            <TransferStatusBadge status={transfer.status} />
+            <StatusBadge status={transfer.status} />
           </View>
 
           <Text style={s.itemName}>{transfer.item_name}</Text>
@@ -109,6 +122,12 @@ export function StockTransferDetailScreen() {
             <View style={s.rejectionBox}>
               <Text style={s.rejectionLabel}>Rejection reason</Text>
               <Text style={s.rejectionText}>{transfer.rejection_reason}</Text>
+            </View>
+          )}
+          {transfer.status === 'completed_with_discrepancy' && (
+            <View style={s.rejectionBox}>
+              <Text style={s.rejectionLabel}>{transfer.discrepancy_qty ?? 0} {transfer.uom} short</Text>
+              {transfer.discrepancy_notes && <Text style={s.rejectionText}>{transfer.discrepancy_notes}</Text>}
             </View>
           )}
         </View>
@@ -175,6 +194,7 @@ const s = StyleSheet.create({
   cardTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   reference:  { fontSize: Typography.xs, fontFamily: 'monospace', color: Colors.textMuted },
   dateText:   { fontSize: 11, color: Colors.textMuted },
+  mrBadge:    { fontSize: 10, color: Colors.info, fontWeight: Typography.medium, marginTop: 1 },
   itemName:   { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.textPrimary, marginTop: Spacing.xs },
   category:   { fontSize: Typography.xs, color: Colors.textMuted },
 

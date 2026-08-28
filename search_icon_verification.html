@@ -1,0 +1,366 @@
+<title>Search icon — visibility check</title>
+<style>
+  :root {
+    --page-bg: #f6f5f2;
+    --page-bg-alt: #eeece7;
+    --ink: #1c1a17;
+    --ink-muted: #6b665d;
+    --card-bg: #ffffff;
+    --card-border: #e4e0d8;
+    --accent: #b5500a;
+    --pass-bg: #dcefe1;
+    --pass-ink: #1e6b3a;
+    --fail-bg: #fbe4df;
+    --fail-ink: #a6341a;
+    --rule: #d8d3c8;
+
+    /* exact app tokens, reconstructed */
+    --app-navy: #1a3c5e;
+    --app-white: #ffffff;
+    --app-orange: #b5500a;
+    --app-text-primary: #1a1a1a;
+    --app-text-on-dark-muted: rgba(255,255,255,0.7);
+    --app-text-muted: #6c757d;
+    --app-border: #d8dce2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --page-bg: #17140f;
+      --page-bg-alt: #1e1a14;
+      --ink: #efe9df;
+      --ink-muted: #9c9284;
+      --card-bg: #211c16;
+      --card-border: #332c22;
+      --pass-bg: #16301f;
+      --pass-ink: #6fce93;
+      --fail-bg: #3a1e17;
+      --fail-ink: #f09680;
+      --rule: #332c22;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page-bg: #17140f;
+    --page-bg-alt: #1e1a14;
+    --ink: #efe9df;
+    --ink-muted: #9c9284;
+    --card-bg: #211c16;
+    --card-border: #332c22;
+    --pass-bg: #16301f;
+    --pass-ink: #6fce93;
+    --fail-bg: #3a1e17;
+    --fail-ink: #f09680;
+    --rule: #332c22;
+  }
+  :root[data-theme="light"] {
+    --page-bg: #f6f5f2;
+    --page-bg-alt: #eeece7;
+    --ink: #1c1a17;
+    --ink-muted: #6b665d;
+    --card-bg: #ffffff;
+    --card-border: #e4e0d8;
+    --pass-bg: #dcefe1;
+    --pass-ink: #1e6b3a;
+    --fail-bg: #fbe4df;
+    --fail-ink: #a6341a;
+    --rule: #d8d3c8;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--page-bg);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+
+  header.page-head {
+    margin-bottom: 36px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: 26px;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+    margin: 0 0 12px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ink-muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  .notice {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border: 1px solid var(--card-border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    background: var(--card-bg);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--ink-muted);
+  }
+  .notice strong { color: var(--ink); }
+
+  h2 {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+    margin: 48px 0 18px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .compare {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+  }
+  @media (max-width: 640px) {
+    .compare { grid-template-columns: 1fr; }
+  }
+
+  .device-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  .device-label {
+    padding: 12px 16px 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ink-muted);
+  }
+  .device-label .path {
+    display: block;
+    margin-top: 2px;
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--ink-muted);
+    opacity: 0.75;
+  }
+
+  /* ── reconstructed AppHeader, both variants ─────────────────────────── */
+  .app-header {
+    margin: 12px 16px 16px;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.15);
+  }
+  .app-header-row {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .app-header.dark .app-header-row { background: var(--app-navy); }
+  .app-header.light .app-header-row { background: var(--app-white); border-bottom: 1px solid var(--app-border); }
+
+  .hdr-btn {
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .hdr-title-wrap { flex: 1; text-align: center; overflow: hidden; }
+  .hdr-title {
+    font-size: 17px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .app-header.dark .hdr-title { color: var(--app-white); }
+  .app-header.light .hdr-title { color: var(--app-text-primary); }
+
+  .hdr-actions { display: flex; align-items: center; flex-shrink: 0; }
+  .hdr-actions .hdr-btn svg { display: block; }
+  .app-header.dark .hdr-actions .plain-icon { color: var(--app-white); }
+  .app-header.light .hdr-actions .plain-icon { color: var(--app-text-primary); }
+
+  .search-pill {
+    width: 32px; height: 32px;
+    border-radius: 999px;
+    background: var(--app-orange);
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .device-caption {
+    padding: 0 16px 16px;
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-muted);
+  }
+  .device-caption code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; }
+
+  /* ── contrast readout table ─────────────────────────────────────────── */
+  table.contrast {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  table.contrast th, table.contrast td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--rule);
+  }
+  table.contrast th {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-muted);
+  }
+  table.contrast td.num { font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .swatch-pair { display: inline-flex; gap: 4px; vertical-align: middle; margin-right: 8px; }
+  .swatch { width: 14px; height: 14px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.15); }
+  .verdict {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .verdict.pass { background: var(--pass-bg); color: var(--pass-ink); }
+  .verdict.fail { background: var(--fail-bg); color: var(--fail-ink); }
+
+  footer.foot {
+    margin-top: 56px;
+    padding-top: 20px;
+    border-top: 1px solid var(--rule);
+    font-size: 12.5px;
+    color: var(--ink-muted);
+    line-height: 1.6;
+  }
+</style>
+
+<header class="page-head">
+  <p class="eyebrow">AppHeader.tsx — visual QA</p>
+  <h1>Is the search icon actually visible now?</h1>
+  <p class="lede">
+    A pixel-accurate reconstruction of <strong>mobile/src/components/AppHeader.tsx</strong>,
+    built from its real style values and theme tokens — not a screenshot.
+  </p>
+  <div class="notice">
+    <strong>Why a reconstruction and not a screenshot:</strong> this sandbox has no Android
+    emulator, no <code class="mono">adb</code>, and the project has no <code class="mono">react-native-web</code>
+    / <code class="mono">react-dom</code> installed, so the real Expo app can't be launched here.
+    Every colour, size, and layout value below is copied directly from
+    <code class="mono">theme/colors.ts</code> and <code class="mono">AppHeader.tsx</code> — what you
+    see is what those exact values render as. Reload the app on your own device to confirm firsthand.
+  </div>
+</header>
+
+<h2>Both header variants, side by side</h2>
+<div class="compare">
+  <div class="device-card">
+    <div class="device-label">Dark header <span class="path">dark = true (default) — used on most screens</span></div>
+    <div class="app-header dark">
+      <div class="app-header-row">
+        <div class="hdr-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="plain-icon"><path d="M19 12H5M11 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="hdr-title-wrap"><div class="hdr-title">Dashboard</div></div>
+        <div class="hdr-actions">
+          <div class="hdr-btn"><div class="search-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#fff" stroke-width="2.2"/><path d="M20 20l-3.2-3.2" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </div></div>
+        </div>
+      </div>
+    </div>
+    <div class="device-caption">
+      Background <code>#1a3c5e</code> (Colors.navy). Back arrow and title render in
+      <code>#ffffff</code> (Colors.textOnDark). Search sits in a solid <code>#b5500a</code>
+      (Colors.orange) pill with a white glyph — the only non-white, non-navy shape in the bar.
+    </div>
+  </div>
+
+  <div class="device-card">
+    <div class="device-label">Light header <span class="path">dark = false — e.g. Audit, some detail screens</span></div>
+    <div class="app-header light">
+      <div class="app-header-row">
+        <div class="hdr-btn">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" class="plain-icon"><path d="M19 12H5M11 18l-6-6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="hdr-title-wrap"><div class="hdr-title">Audit Trail</div></div>
+        <div class="hdr-actions">
+          <div class="hdr-btn"><div class="search-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#fff" stroke-width="2.2"/><path d="M20 20l-3.2-3.2" stroke="#fff" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </div></div>
+        </div>
+      </div>
+    </div>
+    <div class="device-caption">
+      Background <code>#ffffff</code> (Colors.white). Back arrow and title render in
+      <code>#1a1a1a</code> (Colors.textPrimary). Same orange pill — the badge shape stays
+      consistent across both header colours instead of depending on the glyph tint alone.
+    </div>
+  </div>
+</div>
+
+<h2>Why a filled pill instead of just a tinted icon</h2>
+<table class="contrast">
+  <thead>
+    <tr><th>Treatment</th><th>Pairing</th><th>Contrast ratio</th><th>WCAG 1.4.11 (≥ 3:1)</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>First pass — orange glyph, no background</td>
+      <td>
+        <span class="swatch-pair"><span class="swatch" style="background:#b5500a"></span><span class="swatch" style="background:#1a3c5e"></span></span>
+        orange icon on navy
+      </td>
+      <td class="num">2.22:1</td>
+      <td><span class="verdict fail">below threshold</span></td>
+    </tr>
+    <tr>
+      <td>Existing plain icons, for reference</td>
+      <td>
+        <span class="swatch-pair"><span class="swatch" style="background:#ffffff;border-color:#999"></span><span class="swatch" style="background:#1a3c5e"></span></span>
+        white icon on navy
+      </td>
+      <td class="num">11.34:1</td>
+      <td><span class="verdict pass">pass</span></td>
+    </tr>
+    <tr>
+      <td><strong>Shipped — white glyph on orange pill</strong></td>
+      <td>
+        <span class="swatch-pair"><span class="swatch" style="background:#ffffff;border-color:#999"></span><span class="swatch" style="background:#b5500a"></span></span>
+        white icon on orange fill
+      </td>
+      <td class="num">5.10:1</td>
+      <td><span class="verdict pass">pass</span></td>
+    </tr>
+  </tbody>
+</table>
+
+<footer class="foot">
+  Values computed via the standard WCAG relative-luminance formula against the exact hex codes
+  in <code class="mono">mobile/src/theme/colors.ts</code>. The first-pass tint would have made the
+  icon <em>chromatically</em> different but <em>optically weaker</em> than its navy background —
+  the pill fixes that by keeping the glyph itself on a high-contrast fill, independent of whatever
+  the header colour is.
+</footer>

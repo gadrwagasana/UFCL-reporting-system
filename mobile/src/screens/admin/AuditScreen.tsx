@@ -104,7 +104,7 @@ export function AuditScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Audit Trail" onBack={() => navigation.goBack()} />
+      <AppHeader title="Audit Trail" searchModule="audit_logs" onBack={() => navigation.goBack()} />
 
       {/* Filter toggle */}
       <View style={styles.filterBar}>

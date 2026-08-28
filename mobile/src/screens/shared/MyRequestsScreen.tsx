@@ -5,6 +5,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
@@ -15,8 +17,12 @@ import { get }          from '../../api/client';
 import { EP }           from '../../api/endpoints';
 import { useMaterialRequests } from '../../hooks/useMaterialRequests';
 import { useCasualLabour }     from '../../hooks/useCasualLabour';
+import { useAuth }             from '../../hooks/useAuth';
 import { MyRequestsResponse, MyRequest, MaterialRequest, CasualLabourRequest } from '../../types/api';
+import { MyRequestsStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
+
+type NavProp = NativeStackNavigationProp<MyRequestsStackParamList, 'MyRequestsMain'>;
 
 // ─── Unified timeline item ────────────────────────────────────────────────────
 
@@ -117,6 +123,8 @@ function TimelineCard({ item }: { item: TimelineItem }) {
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
 export function MyRequestsScreen() {
+  const navigation = useNavigation<NavProp>();
+  const { can }     = useAuth();
   const [filter, setFilter] = useState<Filter>('all');
 
   const {
@@ -149,7 +157,23 @@ export function MyRequestsScreen() {
 
   const isLoading    = editLoading || matLoading || labourLoading;
   const isRefetching = editRefetching || matRefetching || labourRefetching;
-  const hasError     = editError && matError && labourError;
+  // Mechanician Phase 1 (Priority 3) — this was `editError && matError &&
+  // labourError` (AND), so the combined error only ever fired when EVERY
+  // source failed. Since /api/my-requests has no permission gate, it never
+  // errors on its own, which meant the flag stayed false even when Material
+  // and/or Labour requests were being silently denied — presenting what
+  // looked like a legitimate empty inbox instead of surfacing the failure.
+  // Now: a full-screen error only when literally nothing could load
+  // (allFailed); a non-blocking banner (below) when some, but not all,
+  // sources failed — so a partial, expected denial (e.g. a role that
+  // correctly has no casual-labour access) doesn't hide data that DID load.
+  const allFailed  = editError && matError && labourError;
+  const someFailed = editError || matError || labourError;
+  const failedLabels = [
+    editError && 'submissions',
+    matError && 'material requests',
+    labourError && 'labour requests',
+  ].filter(Boolean) as string[];
 
   const all: TimelineItem[] = useMemo(() => {
     const items: TimelineItem[] = [];
@@ -175,7 +199,13 @@ export function MyRequestsScreen() {
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="My Requests" />
+      <AppHeader
+        title="My Requests"
+        actions={can('material.request') ? [{
+          icon: 'add',
+          onPress: () => navigation.navigate('MaterialRequestCreate'),
+        }] : []}
+      />
 
       {/* Filter chips */}
       <ScrollView
@@ -202,29 +232,41 @@ export function MyRequestsScreen() {
         })}
       </ScrollView>
 
-      {hasError ? (
+      {allFailed ? (
         <ErrorState message="Could not load requests" onRetry={refetchAll} fullScreen />
       ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetchAll}
-              tintColor={Colors.navy}
-            />
-          }
-          ListEmptyComponent={
-            <EmptyState
-              icon="receipt-outline"
-              title={filter === 'all' ? 'No requests yet' : `No ${FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} requests`}
-              subtitle="Your submitted requests will appear here."
-            />
-          }
-          renderItem={({ item }) => <TimelineCard item={item} />}
-        />
+        <>
+          {someFailed ? (
+            <View style={styles.partialErrorBanner}>
+              <Text style={styles.partialErrorText}>
+                Couldn't load {failedLabels.join(' or ')} right now.
+              </Text>
+              <TouchableOpacity onPress={refetchAll}>
+                <Text style={styles.partialErrorRetry}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
+          <FlatList
+            data={filtered}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={filtered.length === 0 ? styles.emptyContainer : styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={isRefetching}
+                onRefresh={refetchAll}
+                tintColor={Colors.navy}
+              />
+            }
+            ListEmptyComponent={
+              <EmptyState
+                icon="receipt-outline"
+                title={filter === 'all' ? 'No requests yet' : `No ${FILTERS.find((f) => f.key === filter)?.label.toLowerCase()} requests`}
+                subtitle="Your submitted requests will appear here."
+              />
+            }
+            renderItem={({ item }) => <TimelineCard item={item} />}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -234,6 +276,30 @@ const styles = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: Colors.bg },
   list:           { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
   emptyContainer: { flex: 1, justifyContent: 'center' },
+
+  partialErrorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.base,
+    marginBottom: Spacing.sm,
+    padding: Spacing.sm,
+    backgroundColor: Colors.errorBg,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.error,
+  },
+  partialErrorText: {
+    flex: 1,
+    fontSize: Typography.sm,
+    color: Colors.error,
+  },
+  partialErrorRetry: {
+    fontSize: Typography.sm,
+    fontWeight: Typography.semibold,
+    color: Colors.error,
+  },
 
   filterBar: {
     paddingHorizontal: Spacing.base,

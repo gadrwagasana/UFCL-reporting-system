@@ -1,13 +1,22 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { get, post } from '../api/client';
 import { EP } from '../api/endpoints';
-import { MaterialRequestsListResponse, StockItemsResponse } from '../types/api';
+import { MaterialRequestsListResponse, StockItemsResponse, MechanicianDashboardResponse } from '../types/api';
 
 export function useMaterialRequests() {
   return useQuery<MaterialRequestsListResponse>({
     queryKey:  ['material-requests'],
     queryFn:   () => get<MaterialRequestsListResponse>(EP.MATERIAL_LIST),
     staleTime: 2 * 60_000,
+  });
+}
+
+// Mechanician Phase 1 (Priority 5) — tailored dashboard for the mechanician role.
+export function useMechanicianDashboard() {
+  return useQuery<MechanicianDashboardResponse>({
+    queryKey:  ['mechanician-dashboard'],
+    queryFn:   () => get<MechanicianDashboardResponse>(EP.DASHBOARD_MECHANICIAN),
+    staleTime: 60_000,
   });
 }
 
@@ -23,7 +32,9 @@ interface CreateMaterialRequestPayload {
   item_id:       number;
   requested_qty: number;
   reason?:       string;
-  priority?:     'normal' | 'urgent' | 'critical';
+  priority?:     'normal' | 'high' | 'urgent';
+  needed_by?:    string;
+  workshop_id?:  number;
 }
 
 export function useMaterialRequestCreate() {

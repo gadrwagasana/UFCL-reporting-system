@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, RefreshControl, TouchableOpacity,
+  StyleSheet, View, Text, FlatList, ScrollView, RefreshControl, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView }        from 'react-native-safe-area-context';
 import { StatusBar }           from 'expo-status-bar';
@@ -11,13 +11,32 @@ import { LoadingState }        from '../../components/LoadingState';
 import { ErrorState }          from '../../components/ErrorState';
 import { EmptyState }          from '../../components/EmptyState';
 import { OfflineBanner }       from '../../components/OfflineBanner';
-import { DeliveryStatusBadge } from '../../components/DeliveryStatusBadge';
+import { ListSearchBar }       from '../../components/ListSearchBar';
+import { StatusBadge }         from '../../components/StatusBadge';
 import { useDeliveryList }     from '../../hooks/useDeliveries';
 import { DeliveryOrder }       from '../../types/api';
 import { DeliveryStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<DeliveryStackParamList, 'DeliveriesList'>;
+
+type StatusFilter = '' | DeliveryOrder['status'];
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Assigned', label: 'Assigned' },
+  { value: 'In Transit', label: 'In Transit' },
+  { value: 'POD Recorded', label: 'POD Recorded' },
+  { value: 'Failed', label: 'Failed' },
+];
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[s.chip, active && s.chipActive]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 function MetricCard({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
   return (
@@ -33,7 +52,7 @@ function DeliveryCard({ order, onPress }: { order: DeliveryOrder; onPress: () =>
     <TouchableOpacity style={s.card} onPress={onPress} activeOpacity={0.75}>
       <View style={s.cardTop}>
         <Text style={s.orderNumber}>{order.order_number}</Text>
-        <DeliveryStatusBadge status={order.status} />
+        <StatusBadge status={order.status} />
       </View>
       {order.customer_name && (
         <Text style={s.customer} numberOfLines={1}>{order.customer_name}</Text>
@@ -65,9 +84,26 @@ function DeliveryCard({ order, onPress }: { order: DeliveryOrder; onPress: () =>
 export function DeliveriesListScreen() {
   const navigation = useNavigation<NavProp>();
   const { data, isLoading, isError, refetch, isRefetching } = useDeliveryList();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
 
-  const orders  = data?.rows     ?? [];
-  const metrics = data?.metrics;
+  const allOrders = data?.rows     ?? [];
+  const metrics   = data?.metrics;
+  const isFiltered = !!search.trim() || !!statusFilter;
+
+  const orders = useMemo(() => {
+    let out = allOrders;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      out = out.filter((o) =>
+        o.order_number.toLowerCase().includes(q) ||
+        (o.customer_name ?? '').toLowerCase().includes(q) ||
+        (o.driver_name ?? '').toLowerCase().includes(q) ||
+        (o.vehicle_registration ?? '').toLowerCase().includes(q));
+    }
+    if (statusFilter) out = out.filter((o) => o.status === statusFilter);
+    return out;
+  }, [allOrders, search, statusFilter]);
 
   if (isLoading) return <LoadingState message="Loading deliveries…" fullScreen />;
 
@@ -77,6 +113,7 @@ export function DeliveriesListScreen() {
       <OfflineBanner />
       <AppHeader
         title="Deliveries"
+        searchModule="deliveries"
         dark
         actions={[
           { icon: 'add-outline',       onPress: () => navigation.navigate('DeliveryCreate') },
@@ -87,32 +124,47 @@ export function DeliveriesListScreen() {
       {isError ? (
         <ErrorState message="Could not load deliveries" onRetry={refetch} fullScreen />
       ) : (
-        <FlatList
-          data={orders}
-          keyExtractor={item => String(item.id)}
-          contentContainerStyle={orders.length === 0 ? s.emptyContainer : s.list}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
-          ListHeaderComponent={
-            <View style={s.banner}>
-              <MetricCard label="Total"        value={metrics?.total       ?? 0} />
-              <View style={s.div} />
-              <MetricCard label="Pending"      value={metrics?.pending     ?? 0} highlight={(metrics?.pending ?? 0) > 0} />
-              <View style={s.div} />
-              <MetricCard label="In Transit"   value={metrics?.inTransit   ?? 0} highlight={(metrics?.inTransit ?? 0) > 0} />
-              <View style={s.div} />
-              <MetricCard label="POD Recorded" value={metrics?.podRecorded ?? 0} />
-            </View>
-          }
-          ListEmptyComponent={
-            <EmptyState icon="cube-outline" title="No deliveries" subtitle="No delivery orders found. Tap + to create one." />
-          }
-          renderItem={({ item }) => (
-            <DeliveryCard
-              order={item}
-              onPress={() => navigation.navigate('DeliveryDetail', { order: item })}
-            />
-          )}
-        />
+        <>
+          <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search order #, customer, driver, vehicle…" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+            {STATUS_CHIPS.map((c) => (
+              <FilterChip key={c.value || 'all'} label={c.label} active={statusFilter === c.value} onPress={() => setStatusFilter(c.value)} />
+            ))}
+            {isFiltered ? <FilterChip label="Clear" active={false} onPress={() => { setSearch(''); setStatusFilter(''); }} /> : null}
+          </ScrollView>
+          <FlatList
+            data={orders}
+            keyExtractor={item => String(item.id)}
+            contentContainerStyle={orders.length === 0 ? s.emptyContainer : s.list}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
+            ListHeaderComponent={
+              !isFiltered ? (
+                <View style={s.banner}>
+                  <MetricCard label="Total"        value={metrics?.total       ?? 0} />
+                  <View style={s.div} />
+                  <MetricCard label="Pending"      value={metrics?.pending     ?? 0} highlight={(metrics?.pending ?? 0) > 0} />
+                  <View style={s.div} />
+                  <MetricCard label="In Transit"   value={metrics?.inTransit   ?? 0} highlight={(metrics?.inTransit ?? 0) > 0} />
+                  <View style={s.div} />
+                  <MetricCard label="POD Recorded" value={metrics?.podRecorded ?? 0} />
+                </View>
+              ) : null
+            }
+            ListEmptyComponent={
+              <EmptyState
+                icon="cube-outline"
+                title={isFiltered ? 'No matching deliveries' : 'No deliveries'}
+                subtitle={isFiltered ? 'Try different search or filter criteria.' : 'No delivery orders found. Tap + to create one.'}
+              />
+            }
+            renderItem={({ item }) => (
+              <DeliveryCard
+                order={item}
+                onPress={() => navigation.navigate('DeliveryDetail', { order: item })}
+              />
+            )}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -132,6 +184,12 @@ const s = StyleSheet.create({
   metricHighlight: { color: Colors.warning },
   metricLabel:     { fontSize: 10, color: Colors.textMuted, textAlign: 'center' },
   div:             { width: 1, backgroundColor: Colors.border },
+
+  chipRow:      { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm },
+  chip:         { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: 6, paddingHorizontal: Spacing.md, backgroundColor: Colors.card },
+  chipActive:   { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipText:     { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  chipTextActive: { color: Colors.white },
 
   card:        { backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, gap: Spacing.xs, ...Shadow.sm },
   cardTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

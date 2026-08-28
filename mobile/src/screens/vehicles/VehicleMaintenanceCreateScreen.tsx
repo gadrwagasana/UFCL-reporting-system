@@ -9,9 +9,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }    from '../../components/AppHeader';
 import { FormInput }    from '../../components/FormInput';
 import { FormSelect }   from '../../components/FormSelect';
-import { useMaintenanceCreate } from '../../hooks/useVehicles';
+import { useMaintenanceCreate, useMaintenanceUpdate } from '../../hooks/useVehicles';
 import { useOfflineStore }      from '../../stores/offlineStore';
-import { MaintenanceType }      from '../../types/api';
+import { MaintenanceType, VehiclePendingApproval } from '../../types/api';
 import { VehiclesStackParamList } from '../../navigation/types';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
@@ -28,21 +28,35 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// maintenanceList (used to populate the vehicle detail screen this form is
+// opened from) formats dates as 'DD/MM/YYYY' for display; the date columns
+// themselves expect an unambiguous ISO 'YYYY-MM-DD' on write. Convert when
+// pre-filling from an existing record — the create flow never hits this
+// since it starts from today() (already ISO).
+function toIsoDate(ddmmyyyy: string | null): string {
+  if (!ddmmyyyy) return '';
+  const [d, m, y] = ddmmyyyy.split('/');
+  if (!d || !m || !y) return '';
+  return `${y}-${m}-${d}`;
+}
+
 export function VehicleMaintenanceCreateScreen() {
   const navigation = useNavigation<NavProp>();
   const route      = useRoute<RoutePropT>();
-  const { vehicleId, registration } = route.params;
+  const { vehicleId, registration, record } = route.params;
+  const isEdit = !!record;
 
   const { createMaintenance } = useMaintenanceCreate();
+  const { updateMaintenance } = useMaintenanceUpdate();
   const { isOnline }          = useOfflineStore();
 
-  const [date,      setDate]      = useState(today());
-  const [mtype,     setMtype]     = useState<MaintenanceType>('Scheduled');
-  const [desc,      setDesc]      = useState('');
-  const [cost,      setCost]      = useState('');
-  const [nextDue,   setNextDue]   = useState('');
-  const [perfBy,    setPerfBy]    = useState('');
-  const [notes,     setNotes]     = useState('');
+  const [date,      setDate]      = useState(record ? toIsoDate(record.maintenance_date) : today());
+  const [mtype,     setMtype]     = useState<MaintenanceType>(record?.maintenance_type ?? 'Scheduled');
+  const [desc,      setDesc]      = useState(record?.description ?? '');
+  const [cost,      setCost]      = useState(record?.cost != null ? String(record.cost) : '');
+  const [nextDue,   setNextDue]   = useState(record ? toIsoDate(record.next_due_date) : '');
+  const [perfBy,    setPerfBy]    = useState(record?.performed_by ?? '');
+  const [notes,     setNotes]     = useState(record?.notes ?? '');
   const [submitting,setSubmitting]= useState(false);
 
   async function handleSubmit() {
@@ -57,17 +71,28 @@ export function VehicleMaintenanceCreateScreen() {
       Alert.alert('Required', 'Date is required.'); return;
     }
 
+    const payload = {
+      maintenance_date: date,
+      maintenance_type: mtype,
+      description:      desc.trim(),
+      cost:             cost    ? parseFloat(cost)   : null,
+      next_due_date:    nextDue || null,
+      performed_by:     perfBy.trim() || undefined,
+      notes:            notes.trim()  || undefined,
+    };
+
     setSubmitting(true);
     try {
-      await createMaintenance(vehicleId, {
-        maintenance_date: date,
-        maintenance_type: mtype,
-        description:      desc.trim(),
-        cost:             cost    ? parseFloat(cost)   : null,
-        next_due_date:    nextDue || null,
-        performed_by:     perfBy.trim() || undefined,
-        notes:            notes.trim()  || undefined,
-      });
+      if (isEdit) {
+        const result = await updateMaintenance(record!.id, vehicleId, payload);
+        if (result && (result as VehiclePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as VehiclePendingApproval).message);
+          navigation.goBack();
+          return;
+        }
+      } else {
+        await createMaintenance(vehicleId, payload);
+      }
       navigation.goBack();
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Could not save maintenance record.');
@@ -80,7 +105,7 @@ export function VehicleMaintenanceCreateScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
       <AppHeader
-        title="Add Maintenance"
+        title={isEdit ? 'Edit Maintenance' : 'Add Maintenance'}
         subtitle={registration}
         dark
         onBack={() => navigation.goBack()}

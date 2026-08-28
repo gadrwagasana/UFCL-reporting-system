@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl, Alert, TouchableOpacity,
 } from 'react-native';
@@ -11,6 +11,7 @@ import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
+import { ListSearchBar } from '../../components/ListSearchBar';
 import { useWorkshopList, useWorkshopDelete } from '../../hooks/useWorkshops';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { useAuthStore }    from '../../stores/authStore';
@@ -88,8 +89,20 @@ export function WorkshopsListScreen() {
   const { data, isLoading, isError, refetch, isRefetching } = useWorkshopList();
   const { deleteWorkshop } = useWorkshopDelete();
 
-  const workshops = data?.workshops ?? [];
+  const allWorkshops = data?.workshops ?? [];
   const metrics   = data?.metrics   ?? { total: 0, active: 0, inactive: 0, capacity: 0 };
+
+  // Phase 2 (Inventory) — in-screen search, matching the search added to
+  // desktop's own Warehouses page in the same phase.
+  const [search, setSearch] = useState('');
+  const workshops = useMemo(() => {
+    if (!search.trim()) return allWorkshops;
+    const q = search.trim().toLowerCase();
+    return allWorkshops.filter(w =>
+      w.name.toLowerCase().includes(q) ||
+      (w.location ?? '').toLowerCase().includes(q) ||
+      (w.workshop_type ?? '').toLowerCase().includes(q));
+  }, [allWorkshops, search]);
 
   function confirmDelete(item: Workshop) {
     if (!isOnline) { Alert.alert('Online Required', 'Deleting requires a connection.'); return; }
@@ -120,9 +133,11 @@ export function WorkshopsListScreen() {
       <StatusBar style="light" />
       <AppHeader
         title="Workshops"
+        searchModule="workshop"
         dark
         actions={canManage ? [{ icon: 'add-outline', onPress: () => navigation.navigate('WorkshopForm', {}) }] : []}
       />
+      <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search name, location, type…" />
 
       <FlatList
         data={workshops}
@@ -131,7 +146,11 @@ export function WorkshopsListScreen() {
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
         ListHeaderComponent={<MetricsBanner metrics={metrics} />}
         ListEmptyComponent={
-          <EmptyState icon="business-outline" title="No workshops" subtitle="No workshops have been registered." />
+          <EmptyState
+            icon="business-outline"
+            title={search ? 'No matching workshops' : 'No workshops'}
+            subtitle={search ? 'Try a different search.' : 'No workshops have been registered.'}
+          />
         }
         renderItem={({ item }) => (
           <WorkshopRow

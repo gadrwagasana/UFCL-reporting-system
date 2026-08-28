@@ -5,7 +5,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { useQuery } from '@tanstack/react-query';
 import { useNavigation } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { AppHeader }    from '../../components/AppHeader';
@@ -13,11 +12,10 @@ import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { KpiCard }      from '../../components/KpiCard';
-import { get }          from '../../api/client';
-import { EP }           from '../../api/endpoints';
 import { useAuthStore } from '../../stores/authStore';
+import { useCeoOverview } from '../../hooks/useCeoOverview';
+import { useHarvestDashboard, useHarvestExecutiveExtras } from '../../hooks/useHarvest';
 import { CeoTabParamList } from '../../navigation/types';
-import { CeoOverview } from '../../types/dashboard';
 import { DowntimeStatus } from '../../constants/dashboardEnums';
 import { Colors, Spacing, TextStyles, Radius } from '../../theme';
 import { formatNumber, formatCurrency } from '../../utils/formatters';
@@ -28,11 +26,18 @@ export function CeoOverviewScreen() {
   const user       = useAuthStore((s) => s.user);
   const navigation = useNavigation<CeoTabNav>();
 
-  const { data, isLoading, isError, refetch, isRefetching } = useQuery<CeoOverview>({
-    queryKey: ['ceo-overview'],
-    queryFn:  () => get<CeoOverview>(EP.CEO_OVERVIEW),
-    staleTime: 5 * 60_000,
-  });
+  // Master Professionalization Phase C2 — now the shared hook (previously
+  // this screen duplicated the same query inline while the real hook sat
+  // unused with a stale, wrong type — see useCeoOverview.ts).
+  const { data, isLoading, isError, refetch, isRefetching } = useCeoOverview();
+  // Harvesting Phase 3 (Workstream 4) — a separate, additive query rather
+  // than folding into ceo-overview's own backend endpoint, so this stays
+  // fully additive and doesn't touch that (more sensitive) executive query.
+  const { data: harvestOps } = useHarvestDashboard();
+  const totalCompt = harvestOps ? harvestOps.activeCompartments + harvestOps.completedCompartments : 0;
+  const compCompletionPct = totalCompt > 0 ? Math.round((harvestOps!.completedCompartments / totalCompt) * 100) : 0;
+  // Harvesting Phase 4 (Workstream 3) — Executive Reporting extras.
+  const { data: harvestExtras } = useHarvestExecutiveExtras();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -106,6 +111,7 @@ export function CeoOverviewScreen() {
             value={formatNumber(data.production.timber_units)}
             icon="construct"
             color={Colors.navy}
+            subtitle={`${data.production.entries} production entries`}
           />
           <KpiCard
             title="Poles Units"
@@ -128,6 +134,7 @@ export function CeoOverviewScreen() {
             value={formatNumber(data.harvest.trees)}
             icon="leaf-outline"
             color={Colors.green}
+            onPress={() => navigation.navigate('Compartments')}
           />
           <KpiCard
             title="Logs Crosscut"
@@ -136,6 +143,62 @@ export function CeoOverviewScreen() {
             color={Colors.green}
           />
 
+          {/* Harvesting Phase 3 (Workstreams 4 & 5) — Harvest Operations */}
+          {harvestOps && (
+            <>
+              <Text style={styles.sectionTitle}>Harvest Operations</Text>
+              <KpiCard
+                title="Compartment Completion"
+                value={`${compCompletionPct}%`}
+                icon="checkmark-done-outline"
+                color={Colors.green}
+              />
+              <KpiCard
+                title="Delayed Operations"
+                value={formatNumber(harvestOps.planningSummary.delayed)}
+                icon="alert-circle-outline"
+                color={harvestOps.planningSummary.delayed > 0 ? Colors.error : Colors.green}
+                subtitle={harvestOps.planningSummary.delayed > 0 ? 'Needs attention' : 'On schedule'}
+              />
+              <KpiCard
+                title="Operational Efficiency"
+                value={harvestOps.actualVolumeM3 > 0 && harvestOps.plannedVolumeM3 > 0
+                  ? `${Math.round((harvestOps.actualVolumeM3 / harvestOps.plannedVolumeM3) * 100)}%`
+                  : '—'}
+                icon="speedometer-outline"
+                color={Colors.navy}
+                subtitle="Achievement vs. plan, this month"
+              />
+              <KpiCard
+                title="Waiting for Sawmill"
+                value={formatNumber(harvestOps.rawLogInventory)}
+                icon="layers-outline"
+                color={Colors.navy}
+                subtitle="Raw log inventory (logs)"
+              />
+            </>
+          )}
+
+          {/* Harvesting Phase 4 (Workstream 3) — Planning Accuracy & Delay Analysis */}
+          {harvestExtras && (
+            <>
+              <KpiCard
+                title="Planning Completion Rate"
+                value={harvestExtras.planningAccuracy.completionRatePct != null ? `${harvestExtras.planningAccuracy.completionRatePct}%` : '—'}
+                icon="checkmark-circle-outline"
+                color={Colors.green}
+                subtitle={`${harvestExtras.planningAccuracy.totalPlans} plan(s) total`}
+              />
+              <KpiCard
+                title="Total Delay Time"
+                value={`${harvestExtras.delayAnalysis.totalDelayHours}h`}
+                icon="time-outline"
+                color={harvestExtras.delayAnalysis.totalDelayHours > 0 ? Colors.error : Colors.green}
+                subtitle={harvestExtras.delayAnalysis.mostCommonCategory ? `Most common: ${harvestExtras.delayAnalysis.mostCommonCategory}` : 'No delays logged'}
+              />
+            </>
+          )}
+
           {/* Sales */}
           <Text style={styles.sectionTitle}>Sales</Text>
           <KpiCard
@@ -143,12 +206,14 @@ export function CeoOverviewScreen() {
             value={formatNumber(data.sales.total_orders)}
             icon="receipt"
             color={Colors.navy}
+            onPress={() => navigation.navigate('SalesOrders')}
           />
           <KpiCard
             title="Revenue"
             value={formatCurrency(data.sales.revenue, data.sales.currency)}
             icon="cash"
             color={Colors.green}
+            onPress={() => navigation.navigate('SalesOrders')}
           />
 
           {/* Machines */}
@@ -159,6 +224,7 @@ export function CeoOverviewScreen() {
             icon="settings-outline"
             color={Colors.navy}
             subtitle={`${data.machines.available} available · ${data.machines.in_use} in use · ${data.machines.maintenance} maintenance`}
+            onPress={() => navigation.navigate('Machines')}
           />
 
           {/* Operations */}
@@ -168,6 +234,7 @@ export function CeoOverviewScreen() {
             value={formatNumber(data.operations.vehicles)}
             icon="car-outline"
             color={Colors.navy}
+            onPress={() => navigation.navigate('Vehicles')}
           />
           <KpiCard
             title="Casual Labourers"
@@ -175,6 +242,7 @@ export function CeoOverviewScreen() {
             icon="people-outline"
             color={Colors.navy}
             badge={data.operations.pendingLabour}
+            onPress={() => navigation.navigate('CasualLabour')}
           />
         </ScrollView>
       )}

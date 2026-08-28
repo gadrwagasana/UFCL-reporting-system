@@ -6,8 +6,14 @@ import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { useTimberInventory } from '../../hooks/useTimberInventory';
-import type { ProductionDay, HarvestSpecies } from '../../types/api';
+import type {
+  ProductionDay, HarvestSpecies, FinishedTimberFlowRow,
+  SawmillCosting, SawmillReconciliation, TimberProcessingReconciliation,
+  InventoryValueByLocation, ProductProfitability,
+} from '../../types/api';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
+
+function fmtCur(n: number) { return 'RWF ' + Math.round(n).toLocaleString(); }
 
 // ── KPI Banner ────────────────────────────────────────────────────────────────
 function MetricsBanner({ timberStock, polesStock, timberProduced, wasteRate }: {
@@ -98,6 +104,127 @@ function HarvestSummaryCard({ rows }: { rows: HarvestSpecies[] }) {
   );
 }
 
+// ── Finished Timber Flow ──────────────────────────────────────────────────────
+function FinishedTimberFlowCard({ rows }: { rows: FinishedTimberFlowRow[] }) {
+  return (
+    <View style={s.card}>
+      <Text style={s.cardTitle}>Finished timber flow</Text>
+      {rows.length === 0 ? (
+        <Text style={s.emptyText}>No finished timber products linked to stock yet.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View>
+            <View style={s.tableHeader}>
+              {['Product','Ready (Gatare)','Ready to transfer','In transit','At Nyanza','At Showroom'].map(h => (
+                <Text key={h} style={[s.th, { minWidth: h === 'Product' ? 140 : 100 }]}>{h}</Text>
+              ))}
+            </View>
+            {rows.map(r => (
+              <View key={r.productId} style={s.tableRow}>
+                <Text style={[s.td, { minWidth: 140 }, s.tdBold]}>{r.type} {r.subType ?? ''} {r.size}</Text>
+                <Text style={[s.tdNum, { minWidth: 100 }, r.readyForSaleGatare > 0 && { color: Colors.success }]}>
+                  {r.readyForSaleGatare.toLocaleString()}
+                </Text>
+                <Text style={[s.tdNum, { minWidth: 100 }]}>{r.readyForTransfer.toLocaleString()}</Text>
+                <Text style={[s.tdNum, { minWidth: 100 }, r.inTransit > 0 && { color: Colors.warning }]}>
+                  {r.inTransit.toLocaleString()}
+                </Text>
+                <Text style={[s.tdNum, { minWidth: 100 }]}>{r.availableAtNyanza.toLocaleString()}</Text>
+                <Text style={[s.tdNum, { minWidth: 100 }]}>{r.availableAtShowroom.toLocaleString()}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
+// ── Sawmill Phase 2 — Cost, Valuation & Reconciliation ──────────────────────────
+function CostingCard({
+  costing, reconciliation, processing, valueByLocation, profitability,
+}: {
+  costing: SawmillCosting; reconciliation: SawmillReconciliation;
+  processing: TimberProcessingReconciliation; valueByLocation: InventoryValueByLocation[];
+  profitability: ProductProfitability[];
+}) {
+  return (
+    <View style={s.card}>
+      <Text style={s.cardTitle}>Cost, valuation &amp; reconciliation</Text>
+
+      <View style={s.badgeRow}>
+        <View style={[s.badge, reconciliation.reconciled ? s.badgeGreen : s.badgeRed]}>
+          <Text style={[s.badgeText, reconciliation.reconciled ? s.badgeTextGreen : s.badgeTextRed]}>
+            {reconciliation.reconciled ? 'Inventory reconciled' : `Mismatch: ${reconciliation.mismatch} units`}
+          </Text>
+        </View>
+        <View style={[s.badge, processing.reconciled ? s.badgeGreen : s.badgeMuted]}>
+          <Text style={[s.badgeText, processing.reconciled ? s.badgeTextGreen : s.badgeTextMuted]}>
+            Processing: {processing.breakdownSum}/{processing.totalProduced} categorized
+          </Text>
+        </View>
+      </View>
+
+      <View style={s.costGrid}>
+        {[
+          { label: 'Inventory value', value: fmtCur(costing.inventoryValue) },
+          { label: 'Production cost (mo.)', value: fmtCur(costing.productionCostMonth) },
+          { label: 'Sales value (mo.)', value: fmtCur(costing.salesValueMonth) },
+          { label: 'COGS (mo.)', value: fmtCur(costing.cogsMonth) },
+          { label: 'Gross profit (mo.)', value: fmtCur(costing.grossProfitMonth) },
+          { label: 'Margin %', value: costing.grossMarginPctMonth != null ? `${costing.grossMarginPctMonth}%` : '—' },
+        ].map(c => (
+          <View key={c.label} style={s.costCell}>
+            <Text style={s.costValue}>{c.value}</Text>
+            <Text style={s.costLabel}>{c.label}</Text>
+          </View>
+        ))}
+      </View>
+
+      {costing.unresolvedSalesValueMonth > 0 && (
+        <Text style={s.warnText}>
+          {fmtCur(costing.unresolvedSalesValueMonth)} in sales this month has no matching Product Catalog item and is excluded from COGS/Gross Profit.
+        </Text>
+      )}
+
+      <Text style={[s.cardTitle, { marginTop: Spacing.sm }]}>Inventory value by location</Text>
+      {valueByLocation.map(v => (
+        <View key={v.warehouseId} style={s.tableRow}>
+          <Text style={[s.td, { flex: 2 }]}>{v.warehouseName}</Text>
+          <Text style={s.tdNum}>{fmtCur(v.value)}</Text>
+        </View>
+      ))}
+
+      <Text style={[s.cardTitle, { marginTop: Spacing.sm }]}>Product profitability (this month)</Text>
+      {profitability.length === 0 ? (
+        <Text style={s.emptyText}>No catalogued products yet.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View>
+            <View style={s.tableHeader}>
+              {['Product','Std. cost','Default price','Sold','Sales','COGS','Profit','Margin'].map(h => (
+                <Text key={h} style={[s.th, { minWidth: h === 'Product' ? 130 : 90 }]}>{h}</Text>
+              ))}
+            </View>
+            {profitability.map(p => (
+              <View key={p.productId} style={s.tableRow}>
+                <Text style={[s.td, { minWidth: 130 }, s.tdBold]}>{p.type} {p.subType ?? ''} {p.size}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{p.standardCost != null ? fmtCur(p.standardCost) : 'Not set'}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{p.defaultPrice != null ? fmtCur(p.defaultPrice) : 'Not set'}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{p.unitsSoldMonth.toLocaleString()}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{fmtCur(p.salesValueMonth)}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{fmtCur(p.cogsMonth)}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{fmtCur(p.grossProfitMonth)}</Text>
+                <Text style={[s.tdNum, { minWidth: 90 }]}>{p.grossMarginPctMonth != null ? `${p.grossMarginPctMonth}%` : '—'}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      )}
+    </View>
+  );
+}
+
 // ── Last 7 Production Days ────────────────────────────────────────────────────
 function ProductionDaysCard({ rows }: { rows: ProductionDay[] }) {
   return (
@@ -151,6 +278,12 @@ export function TimberInventoryScreen() {
   const logs7          = data!.logs7;
   const harvestSummary = data!.harvestSummary;
   const wasteRate      = data!.wasteRate;
+  const finishedFlow   = data!.finishedTimberFlow ?? [];
+  const costing        = data!.costing;
+  const reconciliation = data!.reconciliation;
+  const processing     = data!.timberProcessingReconciliation;
+  const valueByLocation = data!.inventoryValueByLocation ?? [];
+  const profitability  = data!.productProfitability ?? [];
 
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
@@ -158,6 +291,7 @@ export function TimberInventoryScreen() {
       <AppHeader
         title="Timber Inventory"
         subtitle="Real-time stock balances from daily production and sales"
+        searchModule="timber"
         dark
       />
       <FlatList
@@ -181,6 +315,13 @@ export function TimberInventoryScreen() {
                 <HarvestSummaryCard rows={harvestSummary} />
               </View>
             </View>
+            <FinishedTimberFlowCard rows={finishedFlow} />
+            {costing && reconciliation && processing && (
+              <CostingCard
+                costing={costing} reconciliation={reconciliation} processing={processing}
+                valueByLocation={valueByLocation} profitability={profitability}
+              />
+            )}
             <ProductionDaysCard rows={logs7} />
           </>
         }
@@ -231,4 +372,21 @@ const s = StyleSheet.create({
   tdBold: { fontWeight: Typography.semibold },
 
   emptyText: { fontSize: Typography.xs, color: Colors.textMuted, fontStyle: 'italic', paddingTop: Spacing.xs },
+
+  badgeRow: { flexDirection: 'row', gap: Spacing.xs, flexWrap: 'wrap', marginBottom: Spacing.sm },
+  badge: { borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 4 },
+  badgeGreen: { backgroundColor: Colors.successBg },
+  badgeRed:   { backgroundColor: Colors.errorBg },
+  badgeMuted: { backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.border },
+  badgeText: { fontSize: Typography.xs, fontWeight: Typography.medium },
+  badgeTextGreen: { color: Colors.success },
+  badgeTextRed:   { color: Colors.error },
+  badgeTextMuted: { color: Colors.textMuted },
+
+  costGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
+  costCell: { minWidth: '30%', flexGrow: 1 },
+  costValue: { fontSize: Typography.base, fontWeight: Typography.bold, color: Colors.textPrimary, fontFamily: 'monospace' },
+  costLabel: { fontSize: 10, color: Colors.textMuted, marginTop: 2 },
+
+  warnText: { fontSize: Typography.xs, color: Colors.warning, marginTop: Spacing.sm },
 });

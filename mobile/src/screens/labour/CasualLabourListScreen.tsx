@@ -61,6 +61,20 @@ function QueueCard({ label }: { label: string }) {
 export function CasualLabourListScreen() {
   const navigation = useNavigation<NavProp>();
   const { can }    = useAuth();
+  // HR Enterprise Phase 1 — the Casuals (casual worker registry) entry point.
+  // Gated to 'casual.manage' (admin/ceo/operations/supervisor — matching
+  // data.js's casualsList/Create/Update/Delete role gate exactly) since this
+  // stack is also mounted for harvesting-leader/sawmill-leader/vat-leader
+  // (who submit/view Casual Labour Requests but never held the 'casuals'
+  // permission) — showing this button to them would repeat the broken-
+  // visible-tab bug found and fixed in Sales Enterprise Phase 2.
+  const canManageCasuals = can('casual.manage');
+  // HR Enterprise Phase 2 — same reasoning as canManageCasuals above, its own
+  // distinct permission key ('attendance.manage').
+  const canManageAttendance = can('attendance.manage');
+  // Payroll Enterprise Phase 2 — same reasoning again, its own distinct
+  // permission key ('payroll.manage').
+  const canManagePayroll = can('payroll.manage');
   const { data, isLoading, isError, refetch, isRefetching } = useCasualLabour();
   const queue      = useOfflineStore((s) => s.queue);
 
@@ -77,11 +91,29 @@ export function CasualLabourListScreen() {
       <OfflineBanner />
       <AppHeader
         title="Casual Labour"
+        searchModule="labour"
         dark
-        actions={can('labour.write') ? [{
-          icon: 'add',
-          onPress: () => navigation.navigate('CasualLabourCreate'),
-        }] : []}
+        actions={[
+          ...(canManageCasuals ? [{
+            icon: 'people-outline' as const,
+            label: 'Casual Workers',
+            onPress: () => navigation.navigate('CasualsList'),
+          }] : []),
+          ...(canManageAttendance ? [{
+            icon: 'calendar-outline' as const,
+            label: 'Attendance',
+            onPress: () => navigation.navigate('AttendanceChecklist'),
+          }] : []),
+          ...(canManagePayroll ? [{
+            icon: 'cash-outline' as const,
+            label: 'Payroll',
+            onPress: () => navigation.navigate('PayrollPeriodsList'),
+          }] : []),
+          ...(can('labour.write') ? [{
+            icon: 'add' as const,
+            onPress: () => navigation.navigate('CasualLabourCreate'),
+          }] : []),
+        ]}
       />
 
       {isError ? (

@@ -11,7 +11,7 @@ import type { NativeStackNavigationProp }     from '@react-navigation/native-sta
 import { AppHeader }   from '../../components/AppHeader';
 import { FormSelect }  from '../../components/FormSelect';
 import { FormInput }   from '../../components/FormInput';
-import { useStockMovementCreate } from '../../hooks/useStock';
+import { useStockMovementCreate, useStockAdjustmentRequestCreate } from '../../hooks/useStock';
 import { useOfflineStore } from '../../stores/offlineStore';
 import type { StockItem } from '../../types/api';
 import { StockMovementsStackParamList } from '../../navigation/types';
@@ -20,11 +20,13 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 type NavProp    = NativeStackNavigationProp<StockMovementsStackParamList, 'StockMovementForm'>;
 type RoutePropT = RouteProp<StockMovementsStackParamList, 'StockMovementForm'>;
 
+// Phase 1 (Inventory consolidation) — 'Transfer' removed: moving stock
+// between warehouses now goes exclusively through the dedicated Stock
+// Transfers screens (request→approve→dispatch→receive), not this shortcut.
 const MOVEMENT_TYPES = [
   { label: 'Stock In',    value: 'in' },
   { label: 'Stock Out',   value: 'out' },
   { label: 'Adjustment',  value: 'adjustment' },
-  { label: 'Transfer',    value: 'transfer' },
   { label: 'Return',      value: 'return' },
 ] as const;
 
@@ -85,6 +87,7 @@ export function StockMovementFormScreen() {
   const { items, warehouses, userWorkshopId } = route.params;
   const { isOnline } = useOfflineStore();
   const { createMovement } = useStockMovementCreate();
+  const { requestAdjustment } = useStockAdjustmentRequestCreate();
 
   const defaultWh = warehouses.find(w => w.id === userWorkshopId) ?? warehouses[0];
 
@@ -93,7 +96,6 @@ export function StockMovementFormScreen() {
   const [quantity,     setQuantity]     = useState('');
   const [unitCost,     setUnitCost]     = useState('');
   const [fromWh,       setFromWh]       = useState(defaultWh?.id?.toString() ?? '');
-  const [toWh,         setToWh]         = useState('');
   const [reference,    setReference]    = useState('');
   const [notes,        setNotes]        = useState('');
   const [showPicker,   setShowPicker]   = useState(false);
@@ -108,32 +110,47 @@ export function StockMovementFormScreen() {
     }
   }, [selectedItem]);
 
-  const isTransfer = movType === 'transfer';
-
   const whOptions = warehouses.map(w => ({ label: w.name, value: String(w.id) }));
 
   async function handleSubmit() {
     if (!isOnline) { Alert.alert('Online Required', 'Recording movements requires a connection.'); return; }
     if (!selectedItem) { Alert.alert('Required', 'Select an item.'); return; }
     const q = parseFloat(quantity);
-    if (!q || q <= 0) { Alert.alert('Required', 'Enter a valid quantity.'); return; }
+    const isAdjustment = movType === 'adjustment';
+    // Stock & Inventory Phase 3 — adjustment quantity is the target ("set
+    // to"), which can legitimately be 0 (e.g. a recount finds nothing
+    // left); every other type is a positive delta.
+    if (!Number.isFinite(q) || (isAdjustment ? q < 0 : q <= 0)) { Alert.alert('Required', 'Enter a valid quantity.'); return; }
     if (!fromWh) { Alert.alert('Required', 'Select a warehouse.'); return; }
-    if (isTransfer && !toWh) { Alert.alert('Required', 'Select a destination warehouse for the transfer.'); return; }
-
-    const payload: Record<string, unknown> = {
-      item_id:       selectedItem.id,
-      movement_type: movType,
-      quantity:      q,
-      unit_cost:     parseFloat(unitCost) || selectedItem.unit_cost,
-      warehouse_id:  parseInt(fromWh, 10),
-      reference:     reference.trim() || null,
-      notes:         notes.trim() || null,
-    };
-    if (isTransfer) payload.to_warehouse_id = parseInt(toWh, 10);
+    // Phase 2 (Stock Adjustments) — same reason requirement enforced server-side.
+    if (isAdjustment && !notes.trim()) { Alert.alert('Required', 'A reason is required for stock adjustments.'); return; }
 
     setSubmitting(true);
     try {
-      await createMovement(payload);
+      if (isAdjustment) {
+        // Stock & Inventory Phase 3 (Priority 4/5) — adjustments now
+        // require manager approval instead of writing stock_levels
+        // immediately; submits a request instead of an immediate movement.
+        await requestAdjustment({
+          item_id:      selectedItem.id,
+          quantity:     q,
+          warehouse_id: parseInt(fromWh, 10),
+          reference:    reference.trim() || null,
+          notes:        notes.trim(),
+        });
+        Alert.alert('Request submitted', 'Adjustment request submitted — awaiting manager approval.');
+      } else {
+        const payload: Record<string, unknown> = {
+          item_id:       selectedItem.id,
+          movement_type: movType,
+          quantity:      q,
+          unit_cost:     parseFloat(unitCost) || selectedItem.unit_cost,
+          warehouse_id:  parseInt(fromWh, 10),
+          reference:     reference.trim() || null,
+          notes:         notes.trim() || null,
+        };
+        await createMovement(payload);
+      }
       navigation.goBack();
     } catch (err: any) {
       Alert.alert('Error', err?.message ?? 'Could not record movement.');
@@ -196,26 +213,23 @@ export function StockMovementFormScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Warehouse</Text>
           <FormSelect
-            label={isTransfer ? 'From Warehouse *' : 'Warehouse *'}
+            label="Warehouse *"
             value={fromWh}
             onChange={v => setFromWh(String(v))}
             options={whOptions}
           />
-          {isTransfer && (
-            <FormSelect
-              label="To Warehouse *"
-              value={toWh}
-              onChange={v => setToWh(String(v))}
-              options={whOptions}
-            />
-          )}
         </View>
 
         {/* Reference & Notes */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Reference</Text>
           <FormInput label="Reference / PO Number" value={reference} onChangeText={setReference} placeholder="Optional" />
-          <FormInput label="Notes" value={notes} onChangeText={setNotes} placeholder="Optional" />
+          <FormInput
+            label={movType === 'adjustment' ? 'Reason *' : 'Notes'}
+            value={notes}
+            onChangeText={setNotes}
+            placeholder={movType === 'adjustment' ? 'Required — why is stock being adjusted?' : 'Optional'}
+          />
         </View>
 
         <TouchableOpacity

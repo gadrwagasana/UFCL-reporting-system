@@ -20,12 +20,18 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 type Nav   = NativeStackNavigationProp<AdminStackParamList>;
 type Route = AdminStackScreenProps<'UserDetail'>['route'];
 
+// ERP Remaining Departments Completion Program — this list omitted 3 roles
+// that exist live in role_definitions and are selectable on desktop
+// (renderer/app.js's role dropdown): procurement-officer, procurement-
+// manager, department-manager. An admin using mobile could not create or
+// reassign a user to any of these 3 roles at all.
 const ALL_ROLES: UserRole[] = [
   'admin', 'ceo', 'operations', 'sales', 'sales-staff', 'showroom-staff',
   'finance', 'logistics', 'logistics-officer', 'supervisor', 'storekeeper',
   'storekeeper-assistant', 'mechanician', 'harvesting-leader', 'sawmill-leader',
   'poles-leader', 'vat-leader', 'harvesting-supervisor', 'sawmill-supervisor',
-  'poles-supervisor', 'vat-supervisor',
+  'poles-supervisor', 'vat-supervisor', 'procurement-officer',
+  'procurement-manager', 'department-manager',
 ];
 
 const WORKSHOP_ROLES = new Set([

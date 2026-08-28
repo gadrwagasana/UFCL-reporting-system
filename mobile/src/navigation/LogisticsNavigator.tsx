@@ -2,6 +2,7 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '../theme';
+import { useAuthStore } from '../stores/authStore';
 import { LogisticsTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen } from '../screens/shared/DashboardScreen';
@@ -19,10 +20,21 @@ import { StockMovementsStack }     from './stacks/StockMovementsStack';
 import { TimberInventoryStack }    from './stacks/TimberInventoryStack';
 import { StockTransfersStack }   from './stacks/StockTransfersStack';
 import { DispatchStack }           from './stacks/DispatchStack';
+import { TransportCarriersStack }  from './stacks/TransportCarriersStack';
+import { TransportJobsStack }      from './stacks/TransportJobsStack';
 
 const Tab = createBottomTabNavigator<LogisticsTabParamList>();
 
+// Phase 1 Logistics fix — this navigator previously showed all 15 tabs
+// identically to both 'logistics' and 'logistics-officer', but logistics-officer
+// was never granted machine/dispatch/timber-inventory/vehicle-fuel access and
+// has no workshop-MANAGEMENT (only overview) permission, so those tabs always
+// 403'd for it despite being visible. Every other tab's backend route was
+// fixed in this same phase to match logistics-officer's actual granted
+// permissions, so only these five genuinely-ungranted tabs are hidden here.
 export function LogisticsNavigator() {
+  const role = useAuthStore((s) => s.user?.role);
+  const isOfficer = role === 'logistics-officer';
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -47,6 +59,8 @@ export function LogisticsNavigator() {
             StockTransfers:     ['swap-vertical',   'swap-vertical-outline'],
             Dispatch:           ['send',             'send-outline'],
             VehicleFuel:        ['flame',     'flame-outline'],
+            TransportCarriers:  ['briefcase',        'briefcase-outline'],
+            TransportJobs:      ['navigate',         'navigate-outline'],
             MyRequests:         ['list',      'list-outline'],
           };
           const [a, i] = icons[route.name as keyof LogisticsTabParamList];
@@ -58,16 +72,18 @@ export function LogisticsNavigator() {
       <Tab.Screen name="LogisticsDashboard" component={LogisticsDashboardScreen} options={{ title: 'Warehouse' }} />
       <Tab.Screen name="DeliveryList" component={DeliveryStack}      options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Vehicles"     component={VehiclesStack}      options={{ title: 'Vehicles' }} />
-      <Tab.Screen name="Machines"           component={MachinesStack}          options={{ title: 'Machines' }} />
+      {!isOfficer && <Tab.Screen name="Machines"           component={MachinesStack}          options={{ title: 'Machines' }} />}
       <Tab.Screen name="WorkshopOverview"   component={WorkshopOverviewStack}   options={{ title: 'Wk Overview' }} />
-      <Tab.Screen name="WorkshopManagement" component={WorkshopManagementStack} options={{ title: 'Workshops' }} />
+      {!isOfficer && <Tab.Screen name="WorkshopManagement" component={WorkshopManagementStack} options={{ title: 'Workshops' }} />}
       <Tab.Screen name="StockCatalog"       component={StockCatalogStack}       options={{ title: 'Stock' }} />
       <Tab.Screen name="StockInventory"     component={StockInventoryStack}     options={{ title: 'Levels' }} />
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}     options={{ title: 'Movements' }} />
-      <Tab.Screen name="TimberInventory"    component={TimberInventoryStack}    options={{ title: 'Timber Inv.' }} />
+      {!isOfficer && <Tab.Screen name="TimberInventory"    component={TimberInventoryStack}    options={{ title: 'Timber Inv.' }} />}
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}    options={{ title: 'Transfers' }} />
-      <Tab.Screen name="Dispatch"           component={DispatchStack}           options={{ title: 'Dispatch' }} />
-      <Tab.Screen name="VehicleFuel"        component={VehicleFuelStack}        options={{ title: 'Fuel Logs' }} />
+      {!isOfficer && <Tab.Screen name="Dispatch"           component={DispatchStack}           options={{ title: 'Dispatch' }} />}
+      {!isOfficer && <Tab.Screen name="VehicleFuel"        component={VehicleFuelStack}        options={{ title: 'Fuel Logs' }} />}
+      <Tab.Screen name="TransportCarriers" component={TransportCarriersStack} options={{ title: 'Carriers' }} />
+      <Tab.Screen name="TransportJobs"     component={TransportJobsStack}     options={{ title: 'Transport' }} />
       <Tab.Screen name="MyRequests"   component={MyRequestsStack}    options={{ title: 'My Requests' }} />
     </Tab.Navigator>
   );

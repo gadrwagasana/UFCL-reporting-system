@@ -1,7 +1,12 @@
 export const PAYMENT_TERMS = ['Cash', 'Net 7', 'Net 14', 'Net 30', 'Net 60', 'Custom'] as const;
 export type PaymentTerm = typeof PAYMENT_TERMS[number];
 
-export const PRODUCT_TYPES    = ['Timber', 'Poles'] as const;
+// Nyanza Value-Added Production usability (ERP Enterprise Completion Phase 9)
+// — was Timber/Poles only, so a QC-accepted manufactured product (pallets
+// etc.) had no way to be sold: salesProductsForDropdown already returns
+// every active product regardless of type, but this list gated which
+// category a user could even select before that product ever became visible.
+export const PRODUCT_TYPES    = ['Timber', 'Poles', 'Manufactured Product'] as const;
 export const TIMBER_SUB_TYPES = ['Kiln-dried', 'CCA-treated', 'Untreated'] as const;
 export const CURRENCIES        = ['RWF', 'USD', 'EUR', 'GBP'] as const;
 

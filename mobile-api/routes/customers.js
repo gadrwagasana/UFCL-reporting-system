@@ -10,6 +10,16 @@ const router = express.Router();
 // Roles with 'customers' in ROLE_PAGES (db/services/data.js lines 94-111)
 const CUSTOMER_ROLES = ['admin', 'ceo', 'operations', 'sales'];
 
+// Sales Enterprise Phase 1 — data.js customersCreate now accepts either the
+// 'customers' or 'sales' permission (a walk-in customer can be registered by
+// anyone who can sell, not just Customers-page admins). sales-staff and
+// showroom-staff hold 'sales' but not 'customers' (db/migrate.js), and were
+// previously 403'd here on mobile even though desktop had no gate at all for
+// this specific action — this list closes that gap for Create only; List and
+// Update stay on the narrower CUSTOMER_ROLES, matching customersList/Update's
+// own 'customers'-only gate in data.js.
+const CUSTOMER_CREATE_ROLES = ['admin', 'ceo', 'operations', 'sales', 'sales-staff', 'showroom-staff'];
+
 // GET /api/customers/dropdown — active customers for Sales Order picker.
 // data.js customersForDropdown has auth-only gating (no role check), so any
 // authenticated user may call this endpoint — matches desktop behaviour.
@@ -23,7 +33,7 @@ router.get('/', requireRoles(...CUSTOMER_ROLES), async (req, res) => {
 });
 
 // POST /api/customers — register a new customer
-router.post('/', requireRoles(...CUSTOMER_ROLES), async (req, res) => {
+router.post('/', requireRoles(...CUSTOMER_CREATE_ROLES), async (req, res) => {
   respond(res, await data.customersCreate(req.user.userId, req.body));
 });
 
@@ -47,6 +57,19 @@ router.put('/:id', requireRoles(...CUSTOMER_ROLES), async (req, res) => {
     }));
   }
   respond(res, result);
+});
+
+// PATCH /api/customers/:id/toggle — deactivate/reactivate a customer.
+router.patch('/:id/toggle', requireRoles(...CUSTOMER_ROLES), async (req, res) => {
+  respond(res, await data.customersToggle(req.user.userId, Number(req.params.id), req.body?.reason));
+});
+
+// GET /api/customers/:id/orders — ERP Final Enterprise Completion Gate:
+// confirmed no Customer Detail/order-history view existed on either
+// platform. Gated the same as List/Update ('customers'-only), not the
+// broader CREATE_ROLES set.
+router.get('/:id/orders', requireRoles(...CUSTOMER_ROLES), async (req, res) => {
+  respond(res, await data.customersOrders(req.user.userId, Number(req.params.id)));
 });
 
 module.exports = router;

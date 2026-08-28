@@ -40,6 +40,32 @@ router.post('/', async (req, res) => {
   respond(res, await data.machineLogsCreate(req.user.userId, req.body));
 });
 
+// ── PUT /api/machine-logs/:id ─────────────────────────────────────────────────
+// Edit a machine daily shift log entry.
+// data.js: machineLogsUpdate(userId, logId, payload) — governed (applyGovernance)
+// Remediation Phase 3 — desktop already had edit/delete for this record type
+// (same class as Vehicle Fuel/Maintenance and Machine Fuel Logs, all field
+// data-entry corrected same-day); mobile had create/list only. A pending-
+// approval response is passed through as ok:true, same convention already
+// established in fuel.js/casualLabour.js/logTransport.js.
+router.put('/:id', async (req, res) => {
+  const result = await data.machineLogsUpdate(req.user.userId, Number(req.params.id), req.body);
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
+});
+
+// ── DELETE /api/machine-logs/:id ──────────────────────────────────────────────
+// data.js: machineLogsDelete(userId, logId, reason) — governed
+router.delete('/:id', async (req, res) => {
+  const result = await data.machineLogsDelete(req.user.userId, Number(req.params.id), req.body?.reason);
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
+});
+
 // ── GET /api/machine-logs/fuel-issued ────────────────────────────────────────
 // Look up fuel already issued to a machine on a given date.
 // Used by the create form to pre-fill the fuel_consumed field.

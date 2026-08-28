@@ -80,6 +80,7 @@ export function PolesDeliveriesScreen() {
       <OfflineBanner />
       <AppHeader
         title="Deliveries"
+        searchModule="poles"
         dark
         actions={can('poles.delivery') ? [{
           icon: 'add',

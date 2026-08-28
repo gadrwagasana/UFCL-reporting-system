@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, RefreshControl, TouchableOpacity,
+  StyleSheet, View, Text, FlatList, ScrollView, RefreshControl, TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar }    from 'expo-status-bar';
@@ -11,14 +11,36 @@ import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
+import { ListSearchBar } from '../../components/ListSearchBar';
 import { useMachineList } from '../../hooks/useMachines';
 import { Machine, MachineMetrics } from '../../types/api';
 import { MachinesStackParamList }   from '../../navigation/types';
 import { hasPermission } from '../../utils/permissions';
 import { useAuthStore }  from '../../stores/authStore';
+import { loadRecentlyViewed, type RecentlyViewedEntry } from '../../utils/storage';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<MachinesStackParamList, 'MachinesList'>;
+
+// Phase 2 Workshop parity fix — this screen previously routed search to the
+// global search module only, same gap already fixed for Logistics' 4 list
+// screens (ListSearchBar + status chips, copied verbatim).
+type StatusFilter = '' | Machine['status'];
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'Available', label: 'Available' },
+  { value: 'Running', label: 'Running' },
+  { value: 'Maintenance', label: 'Maintenance' },
+  { value: 'Breakdown', label: 'Breakdown' },
+];
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[styles.chip, active && styles.chipActive]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 function dateColor(dateStr?: string): string {
   if (!dateStr) return Colors.textSecondary;
@@ -99,10 +121,31 @@ export function MachinesListScreen() {
   const can  = (perm: Parameters<typeof hasPermission>[1]) => !!user && hasPermission(user.role, perm);
 
   const { data, isLoading, isError, refetch, isRefetching } = useMachineList();
-  const machines   = data?.machines   ?? [];
-  const metrics    = data?.metrics    ?? { total: 0, available: 0, running: 0, offline: 0 };
+  const allMachines = data?.machines   ?? [];
+  const metrics      = data?.metrics    ?? { total: 0, available: 0, running: 0, offline: 0 };
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
+  const isFiltered = !!search.trim() || !!statusFilter;
+  const machines = useMemo(() => {
+    let out = allMachines;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      out = out.filter((m) =>
+        m.machine_code.toLowerCase().includes(q) ||
+        m.name.toLowerCase().includes(q) ||
+        (m.plate_number ?? '').toLowerCase().includes(q) ||
+        m.category_name.toLowerCase().includes(q) ||
+        (m.workshop_name ?? '').toLowerCase().includes(q));
+    }
+    if (statusFilter) out = out.filter((m) => m.status === statusFilter);
+    return out;
+  }, [allMachines, search, statusFilter]);
 
   const headerActions = [];
+  // Phase 1 Workshop parity fix — desktop's "KPI Performance" NAV page had no
+  // mobile equivalent. Available to everyone who can see this list, matching
+  // machineKpiPerformance's own backend gate ('machine-kpi' OR 'machines').
+  headerActions.push({ icon: 'speedometer-outline' as const, onPress: () => navigation.navigate('MachineKpiPerformance') });
   if (can('machine.cats')) {
     headerActions.push({ icon: 'pricetag-outline' as const, onPress: () => navigation.navigate('MachineCategories') });
   }
@@ -110,29 +153,70 @@ export function MachinesListScreen() {
     headerActions.push({ icon: 'add' as const, onPress: () => navigation.navigate('MachineForm', {}) });
   }
 
+  // Stabilization Phase 6 — Recently Viewed widget, mirroring the Phase 3
+  // reference implementation on StockTransfersListScreen exactly.
+  const [recentlyViewed, setRecentlyViewed] = useState<RecentlyViewedEntry[]>([]);
+  useEffect(() => {
+    loadRecentlyViewed('machine').then(setRecentlyViewed);
+  }, []);
+
   if (isLoading) return <LoadingState message="Loading machine registry…" fullScreen />;
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
-      <AppHeader title="Machine Registry" dark actions={headerActions} />
+      <AppHeader title="Machine Registry" searchModule="machines" dark actions={headerActions} />
 
       {isError ? (
         <ErrorState message="Could not load machines" onRetry={refetch} fullScreen />
       ) : (
-        <FlatList
-          data={machines}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={machines.length === 0 ? styles.emptyContainer : styles.list}
-          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
-          ListHeaderComponent={<MetricsBanner m={metrics} />}
-          ListEmptyComponent={
-            <EmptyState icon="settings-outline" title="No machines" subtitle="No machines registered yet." />
-          }
-          renderItem={({ item }) => (
-            <MachineCard item={item} onPress={() => navigation.navigate('MachineDetail', { machineId: item.id })} />
-          )}
-        />
+        <>
+          <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search code, name, plate, category, workshop…" />
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipRow}>
+            {STATUS_CHIPS.map((c) => (
+              <FilterChip key={c.value || 'all'} label={c.label} active={statusFilter === c.value} onPress={() => setStatusFilter(c.value)} />
+            ))}
+            {isFiltered ? <FilterChip label="Clear" active={false} onPress={() => { setSearch(''); setStatusFilter(''); }} /> : null}
+          </ScrollView>
+          <FlatList
+            data={machines}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={machines.length === 0 ? styles.emptyContainer : styles.list}
+            refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
+            ListHeaderComponent={!isFiltered ? (
+              <>
+                <MetricsBanner m={metrics} />
+                {recentlyViewed.length > 0 && (
+                  <View style={styles.recentWrap}>
+                    <Text style={styles.recentTitle}><Ionicons name="time-outline" size={12} color={Colors.textMuted} /> Recently Viewed</Text>
+                    <View style={styles.recentChips}>
+                      {recentlyViewed.map((r) => (
+                        <TouchableOpacity
+                          key={r.id}
+                          style={styles.recentChip}
+                          onPress={() => navigation.navigate('MachineDetail', { machineId: Number(r.id) })}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.recentChipText}>{r.label}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </>
+            ) : null}
+            ListEmptyComponent={
+              <EmptyState
+                icon="settings-outline"
+                title={isFiltered ? 'No matching machines' : 'No machines'}
+                subtitle={isFiltered ? 'Try different search or filter criteria.' : 'No machines registered yet.'}
+              />
+            }
+            renderItem={({ item }) => (
+              <MachineCard item={item} onPress={() => navigation.navigate('MachineDetail', { machineId: item.id })} />
+            )}
+          />
+        </>
       )}
     </SafeAreaView>
   );
@@ -142,6 +226,12 @@ const styles = StyleSheet.create({
   safe:           { flex: 1, backgroundColor: Colors.bg },
   list:           { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
   emptyContainer: { flex: 1, justifyContent: 'center', padding: Spacing.base },
+
+  chipRow:      { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm },
+  chip:         { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: 6, paddingHorizontal: Spacing.md, backgroundColor: Colors.card },
+  chipActive:   { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipText:     { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  chipTextActive: { color: Colors.white },
 
   banner: {
     flexDirection: 'row', backgroundColor: Colors.card, borderRadius: Radius.lg,
@@ -165,4 +255,13 @@ const styles = StyleSheet.create({
   unassigned:  { fontSize: Typography.xs, color: Colors.textMuted, fontStyle: 'italic' },
   maintRow:    { flexDirection: 'row', alignItems: 'center', gap: 4 },
   maintText:   { fontSize: Typography.xs },
+
+  recentWrap: { marginHorizontal: Spacing.base, marginTop: Spacing.sm },
+  recentTitle: { fontSize: 10, color: Colors.textMuted, fontWeight: Typography.medium, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 },
+  recentChips: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.xs },
+  recentChip: {
+    backgroundColor: Colors.card, borderRadius: Radius.full,
+    paddingHorizontal: Spacing.sm, paddingVertical: 4, borderWidth: 1, borderColor: Colors.border,
+  },
+  recentChipText: { fontSize: Typography.xs, color: Colors.textPrimary },
 });

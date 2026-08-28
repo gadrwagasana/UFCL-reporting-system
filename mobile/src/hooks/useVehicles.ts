@@ -6,6 +6,8 @@ import {
   VehicleDetailResponse,
   VehiclePendingApproval,
   TransportDropdownResponse,
+  FleetDashboardResponse,
+  FleetIntelligenceResponse,
 } from '../types/api';
 
 // ─── List ─────────────────────────────────────────────────────────────────────
@@ -15,6 +17,25 @@ export function useVehicleList() {
     queryKey:  ['vehicles-list'],
     queryFn:   () => get<VehicleListResponse>(EP.VEHICLES_LIST),
     staleTime: 2 * 60_000,
+  });
+}
+
+// Fleet & Equipment Phase 2 — executive dashboard (vehicles + machines).
+export function useFleetDashboard() {
+  return useQuery<FleetDashboardResponse>({
+    queryKey:  ['fleet-dashboard'],
+    queryFn:   () => get<FleetDashboardResponse>(EP.FLEET_DASHBOARD),
+    staleTime: 60_000,
+  });
+}
+
+// Fleet & Equipment Phase 3 — operational intelligence (trends, top lists,
+// cross-department visibility).
+export function useFleetIntelligence() {
+  return useQuery<FleetIntelligenceResponse>({
+    queryKey:  ['fleet-intelligence'],
+    queryFn:   () => get<FleetIntelligenceResponse>(EP.FLEET_INTELLIGENCE),
+    staleTime: 120_000,
   });
 }
 
@@ -93,11 +114,18 @@ export function useVehicleCreate() {
   return { createVehicle };
 }
 
+// Fleet & Equipment Phase 1 (Priority 5) — vehiclesUpdate/vehiclesDelete are
+// now governed (can return a pendingApproval response instead of applying
+// immediately), matching how useFuelLogDelete/useMaintenanceDelete already
+// handle it below.
 export function useVehicleUpdate() {
   const qc = useQueryClient();
 
-  async function updateVehicle(id: number, payload: VehiclePayload): Promise<void> {
-    await put(EP.VEHICLES_UPDATE(id), payload);
+  async function updateVehicle(id: number, payload: VehiclePayload): Promise<VehiclePendingApproval | void> {
+    const result = await put<VehiclePendingApproval>(EP.VEHICLES_UPDATE(id), payload);
+    if (result && (result as VehiclePendingApproval).pendingApproval) {
+      return result as VehiclePendingApproval;
+    }
     await qc.invalidateQueries({ queryKey: ['vehicles-list'] });
     await qc.invalidateQueries({ queryKey: ['vehicle-detail', id] });
   }
@@ -108,8 +136,11 @@ export function useVehicleUpdate() {
 export function useVehicleDelete() {
   const qc = useQueryClient();
 
-  async function deleteVehicle(id: number, reason?: string): Promise<void> {
-    await del(EP.VEHICLES_DELETE(id), { reason });
+  async function deleteVehicle(id: number, reason?: string): Promise<VehiclePendingApproval | void> {
+    const result = await del<VehiclePendingApproval>(EP.VEHICLES_DELETE(id), { reason });
+    if (result && (result as VehiclePendingApproval).pendingApproval) {
+      return result as VehiclePendingApproval;
+    }
     await qc.invalidateQueries({ queryKey: ['vehicles-list'] });
     qc.removeQueries({ queryKey: ['vehicle-detail', id] });
   }
@@ -179,6 +210,26 @@ export function useMaintenanceCreate() {
   }
 
   return { createMaintenance };
+}
+
+// Stabilization Phase 5 (F-16) — maintenanceUpdate had backend/IPC wiring
+// (desktop) but no REST route or mobile UI at all.
+export function useMaintenanceUpdate() {
+  const qc = useQueryClient();
+
+  async function updateMaintenance(
+    recordId:  number,
+    vehicleId: number,
+    payload:   MaintenancePayload,
+  ): Promise<VehiclePendingApproval | void> {
+    const result = await put<VehiclePendingApproval>(EP.VEHICLES_MAINTENANCE_UPDATE(recordId), payload);
+    if (result && (result as VehiclePendingApproval).pendingApproval) {
+      return result as VehiclePendingApproval;
+    }
+    await qc.invalidateQueries({ queryKey: ['vehicle-detail', vehicleId] });
+  }
+
+  return { updateMaintenance };
 }
 
 export function useMaintenanceDelete() {

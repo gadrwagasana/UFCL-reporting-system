@@ -6,12 +6,14 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { AppHeader }    from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
 import { useNotifications, useNotificationActions, Notification } from '../../hooks/useNotifications';
+import { resolveNotificationRoute } from '../../utils/notificationRouting';
 import { Colors, Spacing, Typography } from '../../theme';
 
 // ── Category filter tabs ──────────────────────────────────────────────────────
@@ -44,7 +46,7 @@ function NotifCard({
   onPress,
 }: {
   item: Notification;
-  onPress: (id: number) => void;
+  onPress: (item: Notification) => void;
 }) {
   const catColor = CATEGORY_COLOR[item.category] ?? Colors.textMuted;
   const catIcon  = (CATEGORY_ICON[item.category] ?? 'notifications-outline') as never;
@@ -52,7 +54,7 @@ function NotifCard({
   return (
     <TouchableOpacity
       style={[styles.card, !item.read && styles.cardUnread]}
-      onPress={() => onPress(item.id)}
+      onPress={() => onPress(item)}
       activeOpacity={0.75}
     >
       <View style={styles.cardLeft}>
@@ -73,6 +75,12 @@ function NotifCard({
           <Text style={styles.module}>{item.related_module}</Text>
         ) : null}
       </View>
+      {/* ERP Enterprise Completion Phase 5 (Workstream 13) — chevron only
+          when a route is actually resolvable, so non-actionable
+          notifications look exactly as they did before. */}
+      {resolveNotificationRoute(item.related_module, item.related_id).kind !== 'none' ? (
+        <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} style={styles.chevron} />
+      ) : null}
     </TouchableOpacity>
   );
 }
@@ -80,6 +88,7 @@ function NotifCard({
 // ── Screen ────────────────────────────────────────────────────────────────────
 
 export function NotificationsScreen() {
+  const navigation = useNavigation<any>();
   const [category, setCategory] = useState<CategoryKey>(null);
   const [search,   setSearch]   = useState('');
   const [markingAll, setMarkingAll] = useState(false);
@@ -92,6 +101,29 @@ export function NotificationsScreen() {
   const handleMarkRead = useCallback(async (id: number) => {
     try { await markRead(id); } catch { /* silently ignore — notification is advisory */ }
   }, [markRead]);
+
+  // ERP Enterprise Completion Phase 5 (Workstream 6/9) — marks read (same
+  // call as before, read-state behavior unchanged) and additionally
+  // navigates via the routing registry when a destination resolves.
+  // Non-actionable notifications keep their exact prior behavior (mark
+  // read only). Never trusts related_module/related_id for anything beyond
+  // navigation — the destination screen's own existing authorized fetch is
+  // what actually decides whether the record is shown (Workstream 14).
+  const handlePress = useCallback(async (item: Notification) => {
+    await handleMarkRead(item.id);
+    const route = resolveNotificationRoute(item.related_module, item.related_id);
+    if (route.kind === 'root') {
+      navigation.navigate(route.screen);
+    } else if (route.kind === 'nested') {
+      navigation.navigate(route.screen, route.params);
+    } else if (item.related_module) {
+      // Had a related_module but no known destination — e.g. an inline-
+      // action list screen (rejection holds, resolution engine, harvest
+      // waste, showroom damage) or 'material-requests' (needs the full
+      // fetched object, not just an id) — see notificationRouting.ts.
+      Alert.alert('No linked page available', 'This notification has no linked screen on mobile yet.');
+    }
+  }, [handleMarkRead, navigation]);
 
   const handleMarkAll = useCallback(async () => {
     Alert.alert(
@@ -118,6 +150,9 @@ export function NotificationsScreen() {
       <AppHeader
         title="Notifications"
         subtitle={unread > 0 ? `${unread} unread` : 'All caught up'}
+        searchModule="notifications"
+        hideNotifications
+        onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined}
       />
       <OfflineBanner />
 
@@ -174,7 +209,7 @@ export function NotificationsScreen() {
           data={data?.rows ?? []}
           keyExtractor={(item) => String(item.id)}
           renderItem={({ item }) => (
-            <NotifCard item={item} onPress={handleMarkRead} />
+            <NotifCard item={item} onPress={handlePress} />
           )}
           refreshControl={
             <RefreshControl
@@ -304,6 +339,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   cardBody: { flex: 1 },
+  chevron: { alignSelf: 'center', marginLeft: 4 },
   cardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',

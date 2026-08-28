@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   StyleSheet, View, Text, ScrollView, Alert, TouchableOpacity, ActivityIndicator,
 } from 'react-native';
@@ -10,11 +10,12 @@ import { NativeStackNavigationProp }          from '@react-navigation/native-sta
 import { AppHeader }    from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
-import { useMachineDetail } from '../../hooks/useMachines';
+import { useMachineDetail, useMachineDelete } from '../../hooks/useMachines';
 import { MaintSchedule }    from '../../types/api';
 import { MachinesStackParamList } from '../../navigation/types';
 import { hasPermission }  from '../../utils/permissions';
 import { useAuthStore }   from '../../stores/authStore';
+import { pushRecentlyViewed } from '../../utils/storage';
 import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp    = NativeStackNavigationProp<MachinesStackParamList, 'MachineDetail'>;
@@ -88,16 +89,52 @@ export function MachineDetailScreen() {
   const can  = (perm: Parameters<typeof hasPermission>[1]) => !!user && hasPermission(user.role, perm);
 
   const { data, isLoading, isError, refetch } = useMachineDetail(machineId);
+  const { deleteMachine } = useMachineDelete();
   const machine   = data?.machine;
   const schedules = data?.schedules ?? [];
+
+  // Stabilization Phase 6 — Recently Viewed, mirroring the Phase 3 reference
+  // implementation on StockTransferDetailScreen exactly (same helper, same
+  // "before the early returns" placement per Rules of Hooks).
+  useEffect(() => {
+    if (!machine) return;
+    pushRecentlyViewed('machine', String(machine.id), `${machine.machine_code} — ${machine.name}`);
+  }, [machine?.id]);
 
   if (isLoading) return <LoadingState message="Loading machine…" fullScreen />;
   if (isError || !machine) return <ErrorState message="Could not load machine" onRetry={refetch} fullScreen />;
 
   const statusColor = STATUS_COLOR[machine.status] ?? Colors.textSecondary;
 
+  // Stabilization Phase 5 (F-19) — machinesDelete (soft-deactivate) had no
+  // mobile UI trigger at all; mirrors desktop's new Archive action, same
+  // permission gate as Edit.
+  function confirmArchive() {
+    Alert.alert(
+      'Archive Machine',
+      `Archive "${machine!.name}"? It will be removed from the active machine registry and its logs/history are preserved, but there is currently no way to reactivate it from this screen — this cannot be undone without direct database access.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Archive', style: 'destructive',
+          onPress: async () => {
+            const result = await deleteMachine(machine!.id);
+            if (result && 'pendingApproval' in result && result.pendingApproval) {
+              Alert.alert('Submitted for Review', result.message || 'This action requires manager approval.');
+              return;
+            }
+            navigation.goBack();
+          },
+        },
+      ],
+    );
+  }
+
   const editAction = can('machine.register')
-    ? [{ icon: 'create-outline' as const, onPress: () => navigation.navigate('MachineForm', { machine }) }]
+    ? [
+        { icon: 'create-outline' as const, label: 'Edit machine', onPress: () => navigation.navigate('MachineForm', { machine }) },
+        { icon: 'archive-outline' as const, label: 'Archive machine', onPress: confirmArchive },
+      ]
     : [];
 
   return (

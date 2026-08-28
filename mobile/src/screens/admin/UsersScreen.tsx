@@ -198,6 +198,7 @@ export function UsersScreen() {
       <OfflineBanner />
       <AppHeader
         title="Users"
+        searchModule="users"
         onBack={() => navigation.goBack()}
         actions={
           myRole && hasPermission(myRole, 'admin.users')

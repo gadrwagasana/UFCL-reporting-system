@@ -19,6 +19,11 @@ type NavProp    = NativeStackNavigationProp<ProductsStackParamList, 'ProductForm
 type RoutePropT = RouteProp<ProductsStackParamList, 'ProductForm'>;
 
 // Auto-generate the size string from dimension inputs — mirrors desktop logic.
+// Nyanza Value-Added Production Completion Phase — "Manufactured Product"
+// doesn't fit either dimension model (pallets/crates etc. don't have a
+// width/height/length or diameter/length spec the same way timber/poles
+// do), so its size is free text instead of auto-generated — handled by the
+// caller (manualSize state below), not this function.
 function buildSize(
   type: string, w: string, h: string, l: string, d: string,
 ): string {
@@ -34,7 +39,11 @@ function buildSize(
   return '';
 }
 
-const TYPE_OPTIONS    = [{ label: 'Timber', value: 'Timber' }, { label: 'Poles', value: 'Poles' }];
+const TYPE_OPTIONS = [
+  { label: 'Timber', value: 'Timber' },
+  { label: 'Poles', value: 'Poles' },
+  { label: 'Manufactured Product', value: 'Manufactured Product' },
+];
 const SUBTYPE_OPTIONS = [
   { label: 'Kiln-dried',  value: 'Kiln-dried' },
   { label: 'CCA-treated', value: 'CCA-treated' },
@@ -57,17 +66,25 @@ export function ProductFormScreen() {
   const [heightMm,   setHeightMm]   = useState(existing?.height_mm   != null ? String(existing.height_mm)   : '');
   const [lengthM,    setLengthM]    = useState(existing?.length_m    != null ? String(existing.length_m)    : '');
   const [diameterMm, setDiameterMm] = useState(existing?.diameter_mm != null ? String(existing.diameter_mm) : '');
+  const [manualSize, setManualSize] = useState(existing?.type === 'Manufactured Product' ? existing.size : '');
   const [machine,    setMachine]    = useState(existing?.machine      ?? '');
   const [ref,        setRef]        = useState(existing?.ref          ?? '');
+  const [standardCost, setStandardCost] = useState(existing?.standard_cost != null ? String(existing.standard_cost) : '');
+  const [defaultPrice, setDefaultPrice] = useState(existing?.default_price != null ? String(existing.default_price) : '');
+  const [costApprover, setCostApprover] = useState(existing?.standard_cost_approved_by ?? '');
+  const [costEffectiveDate, setCostEffectiveDate] = useState('');
+  const [priceApprover, setPriceApprover] = useState(existing?.default_price_approved_by ?? '');
+  const [priceEffectiveDate, setPriceEffectiveDate] = useState('');
   const [reason,     setReason]     = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Size preview — auto-generated, matches desktop dimension-preview logic
-  const sizePreview = buildSize(type, widthMm, heightMm, lengthM, diameterMm);
+  // Size preview — auto-generated, matches desktop dimension-preview logic.
+  // Manufactured Product has no dimension model, so its size is free text.
+  const sizePreview = type === 'Manufactured Product' ? manualSize.trim() : buildSize(type, widthMm, heightMm, lengthM, diameterMm);
 
-  // Reset sub_type when switching from Timber to Poles
+  // Reset sub_type when switching away from Timber
   useEffect(() => {
-    if (type === 'Poles') setSubType('');
+    if (type !== 'Timber') setSubType('');
   }, [type]);
 
   async function handleSubmit() {
@@ -81,9 +98,29 @@ export function ProductFormScreen() {
     if (!sizePreview) {
       if (type === 'Timber')
         Alert.alert('Required', 'Width, height, and length are required to calculate the size.');
-      else
+      else if (type === 'Poles')
         Alert.alert('Required', 'Diameter and length are required to calculate the size.');
+      else
+        Alert.alert('Required', 'Enter a product size / spec.');
       return;
+    }
+    if (!(Number(standardCost) > 0)) {
+      Alert.alert('Required', 'Standard cost is required and must be greater than zero.'); return;
+    }
+    if (!costApprover.trim()) {
+      Alert.alert('Required', 'A Finance approver name is required for Standard Cost.'); return;
+    }
+    if (!costEffectiveDate.trim()) {
+      Alert.alert('Required', 'An effective date (YYYY-MM-DD) is required for Standard Cost.'); return;
+    }
+    if (!(Number(defaultPrice) > 0)) {
+      Alert.alert('Required', 'Default selling price is required and must be greater than zero.'); return;
+    }
+    if (!priceApprover.trim()) {
+      Alert.alert('Required', 'A Management approver name is required for Default Selling Price.'); return;
+    }
+    if (!priceEffectiveDate.trim()) {
+      Alert.alert('Required', 'An effective date (YYYY-MM-DD) is required for Default Selling Price.'); return;
     }
     if (!isEdit && !reason.trim()) {
       Alert.alert('Required', 'A reason is required for the audit trail.'); return;
@@ -99,6 +136,12 @@ export function ProductFormScreen() {
       ...(diameterMm && { diameter_mm: Number(diameterMm) }),
       ...(machine.trim() && { machine: machine.trim() }),
       ...(ref.trim()     && { ref:     ref.trim() }),
+      standard_cost:  Number(standardCost),
+      default_price:  Number(defaultPrice),
+      standard_cost_approved_by:    costApprover.trim(),
+      standard_cost_effective_date: costEffectiveDate.trim(),
+      default_price_approved_by:    priceApprover.trim(),
+      default_price_effective_date: priceEffectiveDate.trim(),
       ...(!isEdit        && { reason:  reason.trim() }),
     };
 
@@ -134,7 +177,7 @@ export function ProductFormScreen() {
           <FormSelect
             label="Type"
             value={type}
-            onChange={(v) => setType(v as unknown as 'Timber' | 'Poles')}
+            onChange={(v) => setType(v as unknown as 'Timber' | 'Poles' | 'Manufactured Product')}
             options={TYPE_OPTIONS}
             required
           />
@@ -186,6 +229,15 @@ export function ProductFormScreen() {
           </View>
         )}
 
+        {/* Manufactured Product — free-text size, no dimension model */}
+        {type === 'Manufactured Product' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Product Size / Spec</Text>
+            <FormInput label="Size / Spec" value={manualSize} onChangeText={setManualSize}
+              placeholder="e.g. Standard Pallet 1.2x1.0m" required />
+          </View>
+        )}
+
         {/* Size preview */}
         {sizePreview ? (
           <View style={styles.previewBox}>
@@ -193,6 +245,22 @@ export function ProductFormScreen() {
             <Text style={styles.previewValue}>{sizePreview}</Text>
           </View>
         ) : null}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Enterprise Costing</Text>
+          <FormInput label="Standard Cost (RWF/piece)" value={standardCost} onChangeText={setStandardCost}
+            placeholder="Amount" keyboardType="numeric" required />
+          <FormInput label="Finance Approver" value={costApprover} onChangeText={setCostApprover}
+            placeholder="Name of Finance approver" required />
+          <FormInput label="Cost Effective Date" value={costEffectiveDate} onChangeText={setCostEffectiveDate}
+            placeholder="YYYY-MM-DD" required />
+          <FormInput label="Default Selling Price (RWF/piece)" value={defaultPrice} onChangeText={setDefaultPrice}
+            placeholder="Amount" keyboardType="numeric" required />
+          <FormInput label="Management Approver" value={priceApprover} onChangeText={setPriceApprover}
+            placeholder="Name of Management approver" required />
+          <FormInput label="Price Effective Date" value={priceEffectiveDate} onChangeText={setPriceEffectiveDate}
+            placeholder="YYYY-MM-DD" required />
+        </View>
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Optional Details</Text>

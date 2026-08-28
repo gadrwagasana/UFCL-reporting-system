@@ -22,6 +22,7 @@ import { SawmillSupervisorNavigator }   from './SawmillSupervisorNavigator';
 import { PolesSupervisorNavigator }     from './PolesSupervisorNavigator';
 import { VatSupervisorNavigator }       from './VatSupervisorNavigator';
 import { FinanceNavigator }             from './FinanceNavigator';
+import { ProcurementNavigator }         from './ProcurementNavigator';
 
 export function MainNavigator() {
   const role      = useAuthStore((s) => s.user?.role) as UserRole | undefined;
@@ -88,6 +89,11 @@ export function MainNavigator() {
 
     case 'finance':
       return <FinanceNavigator />;
+
+    case 'procurement-officer':
+    case 'procurement-manager':
+    case 'department-manager':
+      return <ProcurementNavigator />;
 
     default:
       return <ComingSoonScreen />;

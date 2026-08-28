@@ -10,6 +10,7 @@ import { StyleSheet, View, Text, ScrollView } from 'react-native';
 
 import { RootNavigator }  from './src/navigation/RootNavigator';
 import { UpdateModal }    from './src/components/UpdateModal';
+import { Toast }          from './src/components/Toast';
 import { useUpdateChecker } from './src/hooks/useUpdateChecker';
 
 // ─── Release error boundary ───────────────────────────────────────────────────
@@ -61,6 +62,7 @@ function AppShell() {
   return (
     <>
       <RootNavigator />
+      <Toast />
       {updateAvailable && meta && (
         <UpdateModal meta={meta} onDismiss={dismiss} />
       )}

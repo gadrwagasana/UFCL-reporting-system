@@ -22,6 +22,7 @@ export function SalesOrderDeliverScreen() {
 
   const { data } = useSalesOrdersList();
   const vehicles = data?.dropdowns?.vehicles ?? [];
+  const order = data?.rows?.find((o) => o.id === orderId);
   const deliverMutation = useSalesOrderDeliver();
 
   const [vehicleId,     setVehicleId]     = useState('');
@@ -29,6 +30,11 @@ export function SalesOrderDeliverScreen() {
   const [deliveryDate,  setDeliveryDate]  = useState('');
   const [routeNote,     setRouteNote]     = useState('');
   const [notes,         setNotes]         = useState('');
+  // Phase 1 Logistics fix — this field didn't exist at all, so a delivery
+  // created from mobile never carried a qty_dispatched, which meant the
+  // linked Sales Order's dispatched-quantity/status was silently never
+  // updated by this flow (desktop's create form always collects this).
+  const [qtyDispatched, setQtyDispatched] = useState('');
 
   const vehicleOptions = vehicles.map(v => ({
     label: `${v.registration} — ${v.make}${v.driver_assigned ? ` · ${v.driver_assigned}` : ''}`,
@@ -42,7 +48,8 @@ export function SalesOrderDeliverScreen() {
     if (chosen?.driver_assigned) setDriverName(chosen.driver_assigned);
   };
 
-  const canSubmit = driverName.trim() && !deliverMutation.isPending;
+  const qtyDispatchedNum = Number(qtyDispatched);
+  const canSubmit = driverName.trim() && qtyDispatched.trim() && qtyDispatchedNum > 0 && !deliverMutation.isPending;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
@@ -54,6 +61,7 @@ export function SalesOrderDeliverScreen() {
         delivery_date: deliveryDate.trim() || undefined,
         route:        routeNote.trim() || undefined,
         notes:        notes.trim() || undefined,
+        qty_dispatched: qtyDispatchedNum,
       });
       Alert.alert('Success', 'Delivery dispatched.', [{ text: 'OK', onPress: () => navigation.goBack() }]);
     } catch {
@@ -81,6 +89,22 @@ export function SalesOrderDeliverScreen() {
               value={vehicleId}
               placeholder="Select vehicle…"
               onChange={handleVehicleChange}
+            />
+          </View>
+
+          {/* Quantity dispatched */}
+          <View style={s.field}>
+            <Text style={s.label}>
+              Quantity Dispatched <Text style={s.req}>*</Text>
+              {order?.qty_remaining != null ? <Text style={s.opt}> ({order.qty_remaining} remaining)</Text> : null}
+            </Text>
+            <TextInput
+              style={s.input}
+              value={qtyDispatched}
+              onChangeText={setQtyDispatched}
+              placeholder="e.g. 20"
+              placeholderTextColor={Colors.textMuted}
+              keyboardType="numeric"
             />
           </View>
 

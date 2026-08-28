@@ -1,12 +1,15 @@
 import React, { useState } from 'react';
 import {
-  StyleSheet, View, Text, ScrollView, TouchableOpacity, Alert,
+  StyleSheet, View, Text, ScrollView, Alert,
 } from 'react-native';
 import { SafeAreaView }        from 'react-native-safe-area-context';
 import { StatusBar }           from 'expo-status-bar';
 import { Ionicons }            from '@expo/vector-icons';
 import { AppHeader }           from '../../components/AppHeader';
-import { DeliveryStatusBadge } from '../../components/DeliveryStatusBadge';
+import { StatusBadge }         from '../../components/StatusBadge';
+import { Button }              from '../../components/Button';
+import { AlertBanner }         from '../../components/AlertBanner';
+import { LogisticsHistoryCard } from '../../components/LogisticsHistoryCard';
 import { ReasonModal }         from '../../components/ReasonModal';
 import { useDeliveryDelete }   from '../../hooks/useDeliveries';
 import { DeliveryStackScreenProps } from '../../navigation/types';
@@ -82,7 +85,7 @@ export function DeliveryDetailScreen({ route, navigation }: Props) {
       <ScrollView contentContainerStyle={s.scroll}>
         {/* Status */}
         <View style={s.statusCard}>
-          <DeliveryStatusBadge status={order.status} />
+          <StatusBadge status={order.status} />
           {order.delivery_date && <Text style={s.statusDate}>{order.delivery_date}</Text>}
         </View>
 
@@ -106,12 +109,10 @@ export function DeliveryDetailScreen({ route, navigation }: Props) {
 
         {/* Remaining SO units warning */}
         {closeShortQty > 0 && closeShortPct !== null && (
-          <View style={s.warnBanner}>
-            <Ionicons name="warning-outline" size={16} color={Colors.warning} />
-            <Text style={s.warnText}>
-              {closeShortQty} units remaining on SO ({closeShortPct}% of {order.so_quantity} ordered)
-            </Text>
-          </View>
+          <AlertBanner
+            type="warning"
+            message={`${closeShortQty} units remaining on SO (${closeShortPct}% of ${order.so_quantity} ordered)`}
+          />
         )}
 
         {/* Delivery details */}
@@ -139,20 +140,17 @@ export function DeliveryDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
+        {/* History */}
+        <LogisticsHistoryCard module="deliveries" recordId={order.id} />
+
         {/* Actions */}
         {(canUpdateStatus || canRecordPOD) && (
           <View style={s.actions}>
             {canUpdateStatus && (
-              <TouchableOpacity style={s.actionBtn} onPress={handleStatusPress} activeOpacity={0.8}>
-                <Ionicons name="refresh-outline" size={18} color={Colors.white} />
-                <Text style={s.actionText}>Update Status</Text>
-              </TouchableOpacity>
+              <Button label="Update Status" icon="refresh-outline" onPress={handleStatusPress} color={Colors.navy} fullWidth />
             )}
             {canRecordPOD && (
-              <TouchableOpacity style={[s.actionBtn, s.podBtn]} onPress={handlePODPress} activeOpacity={0.8}>
-                <Ionicons name="checkmark-circle-outline" size={18} color={Colors.white} />
-                <Text style={s.actionText}>Record POD</Text>
-              </TouchableOpacity>
+              <Button label="Record POD" icon="checkmark-circle-outline" onPress={handlePODPress} color={Colors.success} fullWidth />
             )}
           </View>
         )}
@@ -188,12 +186,6 @@ const s = StyleSheet.create({
   qtyValue: { fontSize: Typography.xl, fontWeight: Typography.bold, color: Colors.textPrimary },
   qtyLabel: { fontSize: Typography.xs, color: Colors.textMuted, marginTop: 2 },
 
-  warnBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: Spacing.xs,
-    backgroundColor: Colors.warning + '1A', borderRadius: Radius.md, padding: Spacing.sm,
-  },
-  warnText: { flex: 1, fontSize: Typography.xs, color: Colors.warning, fontWeight: Typography.medium },
-
   card:         { backgroundColor: Colors.card, borderRadius: Radius.lg, padding: Spacing.base, gap: Spacing.xs, ...Shadow.sm },
   sectionTitle: { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.textMuted, marginBottom: Spacing.xs },
   row:          { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingVertical: 4 },
@@ -201,7 +193,4 @@ const s = StyleSheet.create({
   rowValue:     { fontSize: Typography.sm, color: Colors.textPrimary, fontWeight: Typography.medium, flex: 2, textAlign: 'right' },
 
   actions:    { gap: Spacing.sm },
-  actionBtn:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: Spacing.xs, backgroundColor: Colors.navy, borderRadius: Radius.lg, padding: Spacing.base },
-  podBtn:     { backgroundColor: Colors.success },
-  actionText: { color: Colors.white, fontWeight: Typography.semibold, fontSize: Typography.base },
 });

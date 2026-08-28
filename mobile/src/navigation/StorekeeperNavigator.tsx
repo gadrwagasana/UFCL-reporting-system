@@ -6,6 +6,7 @@ import { StorekeeperTabParamList } from './types';
 import { DASHBOARD_TAB_OPTIONS, DASHBOARD_TAB_ICON } from './shared/dashboardTabConfig';
 import { DashboardScreen }          from '../screens/shared/DashboardScreen';
 import { ComingSoonScreen }          from '../screens/shared/ComingSoonScreen';
+import { MaterialRequestsStack }     from './MaterialRequestsStack';
 import { MyRequestsStack }           from './stacks/MyRequestsStack';
 import { WorkshopOverviewStack }     from './stacks/WorkshopOverviewStack';
 import { WorkshopManagementStack }   from './stacks/WorkshopManagementStack';
@@ -51,7 +52,11 @@ export function StorekeeperNavigator() {
       <Tab.Screen name="StockInventory"     component={StockInventoryStack}      options={{ title: 'Levels' }} />
       <Tab.Screen name="StockMovements"     component={StockMovementsStack}      options={{ title: 'Movements' }} />
       <Tab.Screen name="StockTransfers"    component={StockTransfersStack}     options={{ title: 'Transfers' }} />
-      <Tab.Screen name="MaterialReview"     component={ComingSoonScreen}         options={{ title: 'Materials' }} />
+      {/* ERP Enterprise Completion Gate — was a ComingSoonScreen placeholder;
+          storekeeper holds 'material.review' (mobile/src/utils/permissions.ts)
+          and had no path to the existing, already-wired-for-6-other-roles
+          MaterialRequestsStack. Reused as-is. */}
+      <Tab.Screen name="MaterialReview"     component={MaterialRequestsStack}    options={{ title: 'Materials' }} />
       <Tab.Screen name="Reports"            component={ReportsStack}             options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"         component={MyRequestsStack}          options={{ title: 'My Requests' }} />
     </Tab.Navigator>

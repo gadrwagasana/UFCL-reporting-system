@@ -14,6 +14,12 @@ interface Props {
   allowEmpty?:   boolean;
   onCancel:      () => void;
   onConfirm:     (reason: string) => void;
+  // Inventory Integrity Phase 1 — optional slot rendered between the message
+  // and the text input, so callers that need more than free text (e.g. a
+  // standardized reason-category picker) can extend this dialog without a
+  // second, duplicate modal component. Undefined by default — every existing
+  // caller (Reject/Cancel/etc.) is unaffected.
+  extraContent?: React.ReactNode;
 }
 
 export function ReasonModal({
@@ -25,6 +31,7 @@ export function ReasonModal({
   allowEmpty = false,
   onCancel,
   onConfirm,
+  extraContent,
 }: Props) {
   const [reason, setReason] = useState('');
 
@@ -48,6 +55,7 @@ export function ReasonModal({
         <View style={styles.dialog}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
+          {extraContent}
           <TextInput
             style={styles.input}
             value={reason}

@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl,
-  TouchableOpacity, Alert, ActivityIndicator, Modal,
+  TouchableOpacity, Alert, ActivityIndicator, Modal, ScrollView,
 } from 'react-native';
 import { SafeAreaView }      from 'react-native-safe-area-context';
 import { StatusBar }         from 'expo-status-bar';
@@ -9,11 +9,13 @@ import { Ionicons }          from '@expo/vector-icons';
 import { useNavigation }     from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AppHeader }               from '../../components/AppHeader';
+import { OfflineBanner }           from '../../components/OfflineBanner';
 import { LoadingState }            from '../../components/LoadingState';
 import { ErrorState }              from '../../components/ErrorState';
 import { EmptyState }              from '../../components/EmptyState';
+import { ListSearchBar }           from '../../components/ListSearchBar';
 import { ReasonModal }             from '../../components/ReasonModal';
-import { SalesOrderStatusBadge }   from '../../components/SalesOrderStatusBadge';
+import { StatusBadge }             from '../../components/StatusBadge';
 import { FulfilmentProgress }      from '../../components/FulfilmentProgress';
 import {
   useSalesOrdersList, useSalesOrderPay, useSalesOrderStatus,
@@ -28,6 +30,31 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type Nav = NativeStackNavigationProp<SalesOrdersStackParamList, 'SalesOrdersList'>;
 
+// Master Professionalization Phase C1 (Gap Register PR-01) — this list used
+// to have zero search/filter/pagination of any kind, hard-capped at 50 rows
+// server-side with no way to reach anything past it. Same filter-chip
+// convention as VehiclesListScreen/PayrollPeriodsListScreen (each screen
+// defines its own local FilterChip — no shared component exists yet in this
+// codebase, so this follows the established copy, not a new pattern).
+const PAGE_SIZE = 30;
+const STATUS_CHIPS: { value: string; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Confirmed', label: 'Confirmed' },
+  { value: 'Dispatched', label: 'Dispatched' },
+  { value: 'Delivered', label: 'Delivered' },
+  { value: 'Closed (Short)', label: 'Closed Short' },
+  { value: 'Cancelled', label: 'Cancelled' },
+];
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[s.chip, active && s.chipActive]} activeOpacity={0.7} onPress={onPress}>
+      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
 // ── Status picker modal ────────────────────────────────────────────────────────
 function StatusModal({
   order, onClose, onConfirm, loading,
@@ -38,7 +65,15 @@ function StatusModal({
   loading: boolean;
 }) {
   const [selected, setSelected] = useState(order?.status ?? 'Pending');
-  React.useEffect(() => { if (order) setSelected(order.status); }, [order]);
+  // Sales Enterprise Phase 1 — real gap found: selecting Cancelled here had
+  // zero extra confirmation, unlike Delete (ReasonModal) and Close Short
+  // (its own destructive-style Alert.alert). Require an explicit second tap
+  // before Cancelled can actually be submitted; every other status is
+  // unaffected and submits on the first Update tap as before.
+  const [cancelConfirmed, setCancelConfirmed] = useState(false);
+  React.useEffect(() => { if (order) setSelected(order.status); setCancelConfirmed(false); }, [order]);
+  React.useEffect(() => { if (selected !== 'Cancelled') setCancelConfirmed(false); }, [selected]);
+  const isCancelPending = selected === 'Cancelled' && !cancelConfirmed;
   return (
     <Modal visible={order !== null} transparent animationType="fade" onRequestClose={onClose}>
       <View style={s.modalOverlay}>
@@ -52,18 +87,33 @@ function StatusModal({
               onPress={() => setSelected(st)}
               activeOpacity={0.7}
             >
-              <SalesOrderStatusBadge status={st} />
+              <StatusBadge status={st} />
               {selected === st && <Ionicons name="checkmark" size={16} color={Colors.navy} />}
             </TouchableOpacity>
           ))}
+          {selected === 'Cancelled' && (
+            <View style={s.cancelWarn}>
+              <Text style={s.cancelWarnText}>
+                Cancelling this order cannot be undone.
+              </Text>
+              <TouchableOpacity
+                style={s.cancelConfirmRow}
+                onPress={() => setCancelConfirmed(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={cancelConfirmed ? 'checkbox' : 'square-outline'} size={18} color={Colors.error} />
+                <Text style={s.cancelConfirmText}>Yes, cancel this order</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={s.modalActions}>
             <TouchableOpacity style={s.cancelBtn} onPress={onClose} disabled={loading}>
               <Text style={s.cancelText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={s.confirmBtn}
+              style={[s.confirmBtn, isCancelPending && s.confirmBtnDisabled]}
               onPress={() => onConfirm(selected)}
-              disabled={loading}
+              disabled={loading || isCancelPending}
               activeOpacity={0.8}
             >
               {loading
@@ -93,12 +143,13 @@ function StockCard({ label, value, sub }: { label: string; value: number; sub?: 
 
 // ── Order row card ─────────────────────────────────────────────────────────────
 function OrderRow({
-  item, canEdit, canPay,
-  onEdit, onPay, onStatus, onCloseShort, onDeliver, onDelete,
+  item, canEdit, canPay, canDelete,
+  onEdit, onPay, onStatus, onCloseShort, onDeliver, onDelete, onViewCustomer, onViewDetail,
 }: {
-  item: SalesOrder; canEdit: boolean; canPay: boolean;
+  item: SalesOrder; canEdit: boolean; canPay: boolean; canDelete: boolean;
   onEdit: () => void; onPay: () => void; onStatus: () => void;
   onCloseShort: () => void; onDeliver: () => void; onDelete: () => void;
+  onViewCustomer: () => void; onViewDetail: () => void;
 }) {
   const total     = (item.quantity * item.unit_price).toLocaleString();
   const hasActivity = item.qty_dispatched_total > 0 || item.qty_accepted_total > 0;
@@ -108,17 +159,24 @@ function OrderRow({
     && new Date(item.payment_due_date) < new Date();
 
   return (
-    <View style={s.card}>
+    <TouchableOpacity style={s.card} onPress={onViewDetail} activeOpacity={0.85}>
       <View style={s.cardHeader}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={s.orderNum}>
             {item.order_number}
             {item.pending_deletion ? <Text style={s.pendingDel}> · Pending Deletion</Text> : null}
           </Text>
-          <Text style={s.customerName}>{item.customer_name}</Text>
+          {item.customer_id ? (
+            <TouchableOpacity onPress={onViewCustomer} activeOpacity={0.7} style={s.customerLinkRow}>
+              <Text style={[s.customerName, s.customerLink]}>{item.customer_name}</Text>
+              <Ionicons name="chevron-forward-circle-outline" size={13} color={Colors.textMuted} />
+            </TouchableOpacity>
+          ) : (
+            <Text style={s.customerName}>{item.customer_name}</Text>
+          )}
         </View>
-        <TouchableOpacity onPress={onStatus} activeOpacity={0.8} style={{ alignSelf: 'flex-start' }}>
-          <SalesOrderStatusBadge status={item.status} />
+        <TouchableOpacity onPress={canEdit ? onStatus : undefined} disabled={!canEdit} activeOpacity={0.8} style={{ alignSelf: 'flex-start' }}>
+          <StatusBadge status={item.status} />
         </TouchableOpacity>
       </View>
 
@@ -200,11 +258,13 @@ function OrderRow({
             <Text style={s.actionText}>Close Short</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[s.actionBtn, s.deleteBtn]} onPress={onDelete} activeOpacity={0.8}>
-          <Ionicons name="trash-outline" size={12} color={Colors.white} />
-        </TouchableOpacity>
+        {canDelete && (
+          <TouchableOpacity style={[s.actionBtn, s.deleteBtn]} onPress={onDelete} activeOpacity={0.8}>
+            <Ionicons name="trash-outline" size={12} color={Colors.white} />
+          </TouchableOpacity>
+        )}
       </View>
-    </View>
+    </TouchableOpacity>
   );
 }
 
@@ -215,8 +275,37 @@ export function SalesOrdersListScreen() {
   const canCreate  = hasPermission(role as any, 'sales.create');
   const canEdit    = hasPermission(role as any, 'sales.edit');
   const canPay     = hasPermission(role as any, 'sales.pay');
+  // Master Professionalization Phase C1 — Delete and status-change had no
+  // permission gate at all on this screen (unlike Edit/Pay/Close-Short,
+  // which correctly check canEdit/canPay); every role that could reach this
+  // screen saw both buttons regardless of holding sales.edit. Backend still
+  // enforced governance/ownership either way — this only fixes the
+  // client-side affordance inconsistency. Reuses sales.edit since both are
+  // edit-tier actions on an existing order, same as Edit/Close-Short.
+  const canDelete  = canEdit;
 
-  const { data, isLoading, isError, refetch, isRefetching } = useSalesOrdersList();
+  // Master Professionalization Phase C1 (Gap Register PR-01) — this screen
+  // used to fetch once with no params at all, matching the old backend
+  // contract that hard-capped at 50 rows with no filter support. Page-based
+  // accumulation (not true infinite scroll) so pull-to-refresh and filter
+  // changes both behave predictably.
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('');
+  const [page, setPage]     = useState(1);
+  const [accRows, setAccRows] = useState<SalesOrder[]>([]);
+  const isFiltered = !!search.trim() || !!status;
+
+  useEffect(() => { setPage(1); }, [search, status]);
+
+  const { data, isLoading, isError, refetch, isFetching } = useSalesOrdersList({
+    search: search.trim() || undefined, status: status || undefined, page, pageSize: PAGE_SIZE,
+  });
+
+  useEffect(() => {
+    if (!data) return;
+    setAccRows(prev => (data.page && data.page > 1) ? [...prev, ...data.rows] : data.rows);
+  }, [data]);
+
   const payMutation        = useSalesOrderPay();
   const statusMutation     = useSalesOrderStatus();
   const closeShortMutation = useSalesOrderCloseShort();
@@ -226,10 +315,20 @@ export function SalesOrdersListScreen() {
   const [deleteTarget,  setDeleteTarget]  = useState<SalesOrder | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  if (isLoading) return <LoadingState message="Loading sales orders…" fullScreen />;
+  if (isLoading && page === 1 && accRows.length === 0) return <LoadingState message="Loading sales orders…" fullScreen />;
   if (isError)   return <ErrorState  message="Could not load sales orders" onRetry={refetch} fullScreen />;
 
-  const { rows, metrics, stock } = data!;
+  const rows    = accRows;
+  const total   = data?.total ?? rows.length;
+  const canLoadMore = rows.length < total;
+  const metrics = data?.metrics ?? { pending: 0, confirmed: 0, inProgress: 0, delivered: 0, closed: 0 };
+  const stock   = data?.stock ?? {
+    timberStock: 0, timberProduced: 0, timberSold: 0,
+    polesStock: 0, polesProduced: 0, polesSold: 0,
+    kilnDriedStock: 0, ccaTreatedStock: 0, untreatedStock: 0,
+  };
+
+  const handleRefresh = () => { setPage(1); refetch(); };
 
   const handlePay = async (id: number, orderNum: string) => {
     Alert.alert('Mark as Paid', `Confirm full payment received for ${orderNum}?`, [
@@ -287,19 +386,32 @@ export function SalesOrdersListScreen() {
   return (
     <SafeAreaView style={s.safe} edges={['top']}>
       <StatusBar style="light" />
+      <OfflineBanner />
       <AppHeader
         title="Sales Orders"
         subtitle="Timber & poles dispatch to customers"
+        searchModule="sales"
         dark
         actions={canCreate ? [{ icon: 'add', onPress: () => navigation.navigate('SalesOrderCreate') }] : []}
       />
+      <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search order #, customer, product…" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+        {STATUS_CHIPS.map((c) => (
+          <FilterChip key={c.value || 'all'} label={c.label} active={status === c.value} onPress={() => setStatus(c.value)} />
+        ))}
+        {isFiltered ? <FilterChip label="Clear" active={false} onPress={() => { setSearch(''); setStatus(''); }} /> : null}
+      </ScrollView>
       <FlatList
         data={rows}
         keyExtractor={item => String(item.id)}
-        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
-        contentContainerStyle={s.list}
+        refreshControl={<RefreshControl refreshing={isFetching && page === 1} onRefresh={handleRefresh} tintColor={Colors.navy} />}
+        contentContainerStyle={rows.length === 0 ? s.emptyContainer : s.list}
+        onEndReachedThreshold={0.4}
+        onEndReached={() => { if (!isFetching && canLoadMore) setPage(p => p + 1); }}
+        ListFooterComponent={isFetching && page > 1 ? <ActivityIndicator style={{ marginVertical: Spacing.base }} color={Colors.navy} /> : null}
         ListHeaderComponent={
-          <>
+          !isFiltered ? (
+            <>
             {/* Order metrics */}
             <View style={s.metricsBanner}>
               {([
@@ -324,13 +436,15 @@ export function SalesOrdersListScreen() {
               <StockCard label="CCA-treated" value={stock.ccaTreatedStock} />
               <StockCard label="Untreated"   value={stock.untreatedStock} />
             </View>
-          </>
+            </>
+          ) : null
         }
         renderItem={({ item }) => (
           <OrderRow
             item={item}
             canEdit={canEdit}
             canPay={canPay}
+            canDelete={canDelete}
             onEdit={() => navigation.navigate('SalesOrderEdit', { order: item })}
             onPay={() => handlePay(item.id, item.order_number)}
             onStatus={() => setStatusTarget(item)}
@@ -349,13 +463,18 @@ export function SalesOrdersListScreen() {
               customerName: item.customer_name,
             })}
             onDelete={() => setDeleteTarget(item)}
+            onViewCustomer={() => item.customer_id && navigation.navigate('CustomerDetail', {
+              customerId:   item.customer_id,
+              customerName: item.customer_name,
+            })}
+            onViewDetail={() => navigation.navigate('SalesOrderDetail', { orderId: item.id, orderNumber: item.order_number })}
           />
         )}
         ListEmptyComponent={
           <EmptyState
             icon="cart-outline"
-            title="No sales orders yet"
-            subtitle={canCreate ? 'Tap + to create a new sales order.' : 'No sales orders have been recorded.'}
+            title={isFiltered ? 'No matching orders' : 'No sales orders yet'}
+            subtitle={isFiltered ? 'Try a different search or filter.' : (canCreate ? 'Tap + to create a new sales order.' : 'No sales orders have been recorded.')}
           />
         }
       />
@@ -383,6 +502,13 @@ export function SalesOrdersListScreen() {
 const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.bg },
   list: { padding: Spacing.base, gap: Spacing.sm, paddingBottom: Spacing.xxxl },
+  emptyContainer: { flex: 1, justifyContent: 'center' },
+
+  chipRow:      { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm },
+  chip:         { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: 6, paddingHorizontal: Spacing.md, backgroundColor: Colors.card },
+  chipActive:   { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipText:     { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  chipTextActive: { color: Colors.white },
 
   metricsBanner: {
     flexDirection: 'row', backgroundColor: Colors.navy, borderRadius: Radius.lg,
@@ -408,6 +534,8 @@ const s = StyleSheet.create({
   orderNum:     { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.textPrimary, fontFamily: 'monospace' },
   pendingDel:   { fontSize: 11, color: Colors.error, fontWeight: '400' },
   customerName: { fontSize: Typography.xs, color: Colors.textSecondary },
+  customerLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 3, alignSelf: 'flex-start' },
+  customerLink:     { color: Colors.navy, fontWeight: Typography.medium },
 
   productRow:   { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
   typeBadge:    { borderRadius: Radius.sm, paddingHorizontal: 6, paddingVertical: 2 },
@@ -458,5 +586,11 @@ const s = StyleSheet.create({
   cancelBtn:    { flex: 1, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, paddingVertical: Spacing.sm, alignItems: 'center' },
   cancelText:   { fontSize: Typography.sm, color: Colors.textSecondary },
   confirmBtn:   { flex: 2, backgroundColor: Colors.navy, borderRadius: Radius.md, paddingVertical: Spacing.sm, alignItems: 'center' },
+  confirmBtnDisabled: { backgroundColor: Colors.textMuted },
   confirmText:  { fontSize: Typography.sm, fontWeight: Typography.semibold, color: Colors.white },
+
+  cancelWarn:        { backgroundColor: Colors.errorBg, borderRadius: Radius.md, padding: Spacing.sm, gap: Spacing.xs },
+  cancelWarnText:    { fontSize: Typography.xs, color: Colors.error },
+  cancelConfirmRow:  { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs },
+  cancelConfirmText: { fontSize: Typography.sm, color: Colors.error, fontWeight: Typography.medium },
 });

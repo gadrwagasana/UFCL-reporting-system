@@ -5,19 +5,28 @@ import { Colors } from '../theme';
 import { VatSupervisorTabParamList } from './types';
 import { VatInboundStack }  from './VatInboundStack';
 import { VatEntriesStack }  from './VatEntriesStack';
+import { StockTransfersStack } from './stacks/StockTransfersStack';
 import { ProfileScreen }    from '../screens/profile/ProfileScreen';
 
 const Tab = createBottomTabNavigator<VatSupervisorTabParamList>();
 
+// Nyanza Value-Added Production Completion Phase — the VatInbound route key
+// is kept unchanged (lower-risk than a nav param rename) but now points to
+// the batch-creation form instead of a "pick a transfer" list.
 const tabIcons: Record<keyof VatSupervisorTabParamList, [string, string]> = {
-  VatInbound: ['arrow-down-circle', 'arrow-down-circle-outline'],
+  VatInbound: ['add-circle', 'add-circle-outline'],
   VatEntries: ['layers',            'layers-outline'],
+  // Stock & Inventory Phase 4 (audit finding M-15/M-16) / ERP UI/UX
+  // Completion Phase 8 — vat-supervisor holds the backend 'stock-transfers'
+  // permission but had no navigation entry point to reach it at all.
+  StockTransfers: ['swap-vertical', 'swap-vertical-outline'],
   Profile:    ['person',            'person-outline'],
 };
 
 const tabLabels: Record<keyof VatSupervisorTabParamList, string> = {
-  VatInbound: 'Inbound',
+  VatInbound: 'New Batch',
   VatEntries: 'Processed',
+  StockTransfers: 'Transfers',
   Profile:    'Profile',
 };
 
@@ -37,8 +46,9 @@ export function VatSupervisorNavigator() {
         title: tabLabels[route.name as keyof VatSupervisorTabParamList],
       })}
     >
-      <Tab.Screen name="VatInbound" component={VatInboundStack}  options={{ title: 'Inbound' }} />
+      <Tab.Screen name="VatInbound" component={VatInboundStack}  options={{ title: 'New Batch' }} />
       <Tab.Screen name="VatEntries" component={VatEntriesStack}  options={{ title: 'Processed' }} />
+      <Tab.Screen name="StockTransfers" component={StockTransfersStack} options={{ title: 'Transfers' }} />
       <Tab.Screen name="Profile"    component={ProfileScreen}    options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

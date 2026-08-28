@@ -5,12 +5,13 @@ import {
 import { SafeAreaView }  from 'react-native-safe-area-context';
 import { StatusBar }     from 'expo-status-bar';
 import { Ionicons }      from '@expo/vector-icons';
+import { useRoute } from '@react-navigation/native';
 import { AppHeader }     from '../../components/AppHeader';
 import { OfflineBanner } from '../../components/OfflineBanner';
 import { FormInput }     from '../../components/FormInput';
 import { FormSelect }    from '../../components/FormSelect';
 import { DatePickerField } from '../../components/DatePickerField';
-import { useMachineLogCreate, useMachineLogList, useMachineFuelIssued } from '../../hooks/useMachineLog';
+import { useMachineLogCreate, useMachineLogUpdate, useMachineLogList, useMachineFuelIssued } from '../../hooks/useMachineLog';
 import { MachineLogStackScreenProps } from '../../navigation/types';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { Colors, Spacing, Typography, Radius } from '../../theme';
@@ -19,29 +20,35 @@ const SHIFTS = ['Full Day', 'Day Shift', 'Night Shift'];
 
 type Props = MachineLogStackScreenProps<'MachineLogCreate'>;
 
+// Remediation Phase 3 — dual-purpose create/edit, mirroring the same
+// create-vs-edit-one-form pattern LogTransportCreateScreen already adopted
+// this program (optional `entry` route param puts it into edit mode).
 export function MachineLogCreateScreen({ navigation }: Props) {
+  const route    = useRoute<Props['route']>();
+  const existing = route.params?.entry;
   const { createLog }   = useMachineLogCreate();
+  const { updateLog }   = useMachineLogUpdate();
   const { data: listData } = useMachineLogList();
   const isOnline        = useOfflineStore((s) => s.isOnline);
 
   const machines        = listData?.machines ?? [];
   const itemCategories  = listData?.itemCategories ?? [];
 
-  const [machineId, setMachineId]         = useState('');
-  const [logDate, setLogDate]             = useState<string>(new Date().toISOString().split('T')[0]);
-  const [shift, setShift]                 = useState('Full Day');
-  const [hoursWorked, setHoursWorked]     = useState('');
-  const [downtimeHours, setDowntimeHours] = useState('');
-  const [downtimeReason, setDowntimeReason] = useState('');
-  const [fuelConsumed, setFuelConsumed]       = useState('');
-  const [dailyProduction, setDailyProduction] = useState('');
-  const [capacityPerDay, setCapacityPerDay]   = useState('');
-  const [productType, setProductType]         = useState('');
-  const [logsLoaded, setLogsLoaded]           = useState('');
-  const [logsUnloaded, setLogsUnloaded]       = useState('');
-  const [loadingTrips, setLoadingTrips]       = useState('');
-  const [itemCategory, setItemCategory]       = useState('');
-  const [remarks, setRemarks]                 = useState('');
+  const [machineId, setMachineId]         = useState(existing ? String(existing.machine_id) : '');
+  const [logDate, setLogDate]             = useState<string>(existing?.log_date ?? new Date().toISOString().split('T')[0]);
+  const [shift, setShift]                 = useState(existing?.shift ?? 'Full Day');
+  const [hoursWorked, setHoursWorked]     = useState(existing?.hours_worked != null ? String(existing.hours_worked) : '');
+  const [downtimeHours, setDowntimeHours] = useState(existing?.downtime_hours != null ? String(existing.downtime_hours) : '');
+  const [downtimeReason, setDowntimeReason] = useState(existing?.downtime_reason ?? '');
+  const [fuelConsumed, setFuelConsumed]       = useState(existing?.fuel_consumed != null ? String(existing.fuel_consumed) : '');
+  const [dailyProduction, setDailyProduction] = useState(existing?.daily_production != null ? String(existing.daily_production) : '');
+  const [capacityPerDay, setCapacityPerDay]   = useState(existing?.capacity_per_day != null ? String(existing.capacity_per_day) : '');
+  const [productType, setProductType]         = useState(existing?.product_type ?? '');
+  const [logsLoaded, setLogsLoaded]           = useState(existing?.logs_loaded != null ? String(existing.logs_loaded) : '');
+  const [logsUnloaded, setLogsUnloaded]       = useState(existing?.logs_unloaded != null ? String(existing.logs_unloaded) : '');
+  const [loadingTrips, setLoadingTrips]       = useState(existing?.loading_trips != null ? String(existing.loading_trips) : '');
+  const [itemCategory, setItemCategory]       = useState(existing?.item_category ?? '');
+  const [remarks, setRemarks]                 = useState(existing?.remarks ?? '');
   const [submitting, setSubmitting]       = useState(false);
   const [errors, setErrors]               = useState<Record<string, string>>({});
 
@@ -87,7 +94,7 @@ export function MachineLogCreateScreen({ navigation }: Props) {
 
     setSubmitting(true);
     try {
-      await createLog({
+      const payload = {
         machine_id:       Number(machineId),
         log_date:         logDate,
         shift,
@@ -103,7 +110,15 @@ export function MachineLogCreateScreen({ navigation }: Props) {
         loading_trips:    loadingTrips    ? parseInt(loadingTrips, 10)  : undefined,
         item_category:    itemCategory || undefined,
         remarks:          remarks.trim() || undefined,
-      });
+      };
+      if (existing) {
+        const result = await updateLog(existing.id, payload);
+        if (result && 'pendingApproval' in result && result.pendingApproval) {
+          Alert.alert('Submitted for Review', result.message);
+        }
+      } else {
+        await createLog(payload);
+      }
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not save machine log.');
@@ -116,7 +131,7 @@ export function MachineLogCreateScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Log Machine Shift" dark onBack={() => navigation.goBack()} />
+      <AppHeader title={existing ? 'Edit Machine Log' : 'Log Machine Shift'} dark onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {!isOnline && (
@@ -260,7 +275,7 @@ export function MachineLogCreateScreen({ navigation }: Props) {
         >
           {submitting
             ? <ActivityIndicator color={Colors.white} />
-            : <Text style={styles.submitText}>Save Log</Text>
+            : <Text style={styles.submitText}>{existing ? 'Save Changes' : 'Save Log'}</Text>
           }
         </TouchableOpacity>
       </ScrollView>

@@ -48,4 +48,18 @@ router.post('/:id/review', requireRoles('ceo', 'operations', 'admin'), async (re
   ));
 });
 
+// ── DELETE /api/casual-labour/:id ─────────────────────────────────────────────
+// Remediation Phase 2 — casualLabourRequestsDelete had desktop/IPC wiring
+// with no REST route; a submitted request could never be withdrawn on
+// mobile. Governed (applyGovernance) — a pending-approval response is
+// passed through as ok:true, same convention as fuel.js's governed routes.
+// Body: { reason?: string }
+router.delete('/:id', async (req, res) => {
+  const result = await data.casualLabourRequestsDelete(req.user.userId, Number(req.params.id), req.body?.reason);
+  if (!result.ok && result.pendingApproval) {
+    return respond(res, { ok: true, pendingApproval: true, level: result.level, message: result.message });
+  }
+  respond(res, result);
+});
+
 module.exports = router;

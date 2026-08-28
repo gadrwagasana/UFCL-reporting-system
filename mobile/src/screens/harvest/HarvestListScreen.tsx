@@ -130,11 +130,21 @@ export function HarvestListScreen() {
       <OfflineBanner />
       <AppHeader
         title="Harvest Log"
+        searchModule="production"
         dark
-        actions={can('harvest.write') ? [{
-          icon: 'add',
-          onPress: () => navigation.navigate('HarvestCreate'),
-        }] : []}
+        actions={[
+          // Harvesting Phase 1 (Workstream 2) — read-only, available to
+          // anyone who can see this list at all (not gated on harvest.write,
+          // which only governs mutating actions).
+          { icon: 'stats-chart-outline' as const, label: 'Harvest dashboard', onPress: () => navigation.navigate('HarvestDashboard') },
+          // Harvesting Phase 2 (Workstream 1) — read-only entry point too;
+          // HarvestPlanListScreen itself gates its own "New plan"/edit/delete
+          // actions on harvest.write.
+          { icon: 'calendar-outline' as const, label: 'Harvest planning', onPress: () => navigation.navigate('HarvestPlanList') },
+          // Enterprise Timber Lifecycle Integration Program — Phase 1
+          { icon: 'trash-outline' as const, label: 'Harvest waste', onPress: () => navigation.navigate('HarvestWaste') },
+          ...(can('harvest.write') ? [{ icon: 'add' as const, label: 'Log harvest', onPress: () => navigation.navigate('HarvestCreate') }] : []),
+        ]}
       />
 
       {isError ? (

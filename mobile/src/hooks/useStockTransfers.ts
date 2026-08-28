@@ -54,6 +54,15 @@ export function useStockTransferReceive() {
   });
 }
 
+export function useStockTransferReportDiscrepancy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, notes, lossReason }: { id: number; notes: string; lossReason: string }) =>
+      post<{ ok: true; discrepancyQty: number; movementId: number }>(EP.STOCK_TRANSFERS_REPORT_DISCREPANCY(id), { notes, lossReason }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK }),
+  });
+}
+
 export function useStockTransferHistory(transferId: number) {
   return useQuery<StockTransferHistoryResponse>({
     queryKey:  [...QK, 'history', transferId],

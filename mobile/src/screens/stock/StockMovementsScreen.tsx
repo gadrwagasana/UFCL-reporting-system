@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   StyleSheet, View, Text, FlatList, RefreshControl,
-  TouchableOpacity, Alert, Modal, TextInput,
+  TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar }    from 'expo-status-bar';
@@ -13,9 +13,7 @@ import { LoadingState }        from '../../components/LoadingState';
 import { ErrorState }          from '../../components/ErrorState';
 import { EmptyState }          from '../../components/EmptyState';
 import { ReasonModal }          from '../../components/ReasonModal';
-import {
-  useStockMovements, useStockMovementDelete, useTransferApproveFromMovements,
-} from '../../hooks/useStock';
+import { useStockMovements, useStockMovementDelete } from '../../hooks/useStock';
 import { useAuthStore }   from '../../stores/authStore';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { hasPermission }  from '../../utils/permissions';
@@ -25,65 +23,37 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<StockMovementsStackParamList, 'StockMovementsList'>;
 
+// 'transfer' kept here for historical-row display only (see MovRow) — no
+// longer a creatable type (Phase 1 Inventory consolidation). 'loss' is also
+// system-only — created exclusively by Stock Transfers' Report Discrepancy
+// action (Inventory Integrity Phase 1), never from the manual "+" form.
 const TYPE_COLORS: Record<string, string> = {
   in:         Colors.success,
   out:        Colors.error,
   adjustment: Colors.warning,
   transfer:   Colors.navy,
   return:     Colors.textSecondary,
+  loss:       Colors.error,
 };
 const TYPE_LABELS: Record<string, string> = {
-  in: 'IN', out: 'OUT', adjustment: 'ADJ', transfer: 'TRF', return: 'RET',
+  in: 'IN', out: 'OUT', adjustment: 'ADJ', transfer: 'TRF', return: 'RET', loss: 'LOSS',
 };
 
-// ── Reject Reason Modal ───────────────────────────────────────────────────────
-function RejectModal({ onConfirm, onClose }: { onConfirm: (reason: string) => void; onClose: () => void }) {
-  const [reason, setReason] = useState('');
-  return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={s.overlay} activeOpacity={1} onPress={onClose} />
-      <View style={s.sheet}>
-        <Text style={s.sheetTitle}>Reject Transfer</Text>
-        <TextInput
-          style={s.reasonInput}
-          value={reason}
-          onChangeText={setReason}
-          placeholder="Reason for rejection…"
-          placeholderTextColor={Colors.textMuted}
-          multiline
-          autoFocus
-        />
-        <TouchableOpacity
-          style={[s.rejectBtn, !reason.trim() && s.btnDisabled]}
-          onPress={() => { if (reason.trim()) { onConfirm(reason.trim()); onClose(); } }}
-          disabled={!reason.trim()}
-          activeOpacity={0.8}
-        >
-          <Text style={s.rejectBtnText}>Reject</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onClose} style={s.cancelBtn} activeOpacity={0.7}>
-          <Text style={s.cancelText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </Modal>
-  );
-}
-
 // ── Movement Row ──────────────────────────────────────────────────────────────
+// Phase 1 (Inventory consolidation) — transfer approve/reject removed from
+// this row: moving stock between warehouses now goes exclusively through
+// the dedicated Stock Transfers screens. Historical transfer-type rows
+// still display here (read-only), just without an inline action.
 function MovRow({
   item,
-  canApprove,
   canDelete,
-  onApprove,
-  onReject,
   onDelete,
+  onViewTransfer,
 }: {
   item: StockMovement;
-  canApprove: boolean;
   canDelete: boolean;
-  onApprove: () => void;
-  onReject:  () => void;
   onDelete:  () => void;
+  onViewTransfer: (transferId: number) => void;
 }) {
   const typeColor  = TYPE_COLORS[item.movement_type] ?? Colors.textMuted;
   const typeLabel  = TYPE_LABELS[item.movement_type] ?? item.movement_type.toUpperCase();
@@ -106,7 +76,7 @@ function MovRow({
 
       <View style={s.qtyRow}>
         <Text style={[s.qty, { color: typeColor }]}>
-          {item.movement_type === 'out' || item.movement_type === 'return' ? '-' : '+'}
+          {['out', 'return', 'loss'].includes(item.movement_type) ? '-' : '+'}
           {item.quantity} <Text style={s.uom}>{item.uom}</Text>
         </Text>
         {item.total_value != null && (
@@ -122,32 +92,27 @@ function MovRow({
         </Text>
       ) : null}
 
+      {item.movement_type === 'loss' && item.loss_reason ? <Text style={s.rejectionText}>Reason: {item.loss_reason}</Text> : null}
       {item.reference && <Text style={s.metaText}>Ref: {item.reference}</Text>}
       {item.rejection_reason && <Text style={s.rejectionText}>Rejected: {item.rejection_reason}</Text>}
+      {item.notes && <Text style={s.metaText}>{item.notes}</Text>}
 
       <Text style={s.dateText}>{item.created_at} · {item.created_by}</Text>
 
-      {/* Transfer approval actions */}
-      {isPending && item.movement_type === 'transfer' && canApprove && (
-        <View style={s.approvalRow}>
-          <TouchableOpacity style={s.approveBtn} onPress={onApprove} activeOpacity={0.8}>
-            <Ionicons name="checkmark-circle-outline" size={14} color={Colors.white} />
-            <Text style={s.approveBtnText}>Approve</Text>
+      <View style={s.actionsRow}>
+        {item.transfer_id ? (
+          <TouchableOpacity style={s.linkBtn} onPress={() => onViewTransfer(item.transfer_id!)} activeOpacity={0.7}>
+            <Ionicons name="swap-horizontal-outline" size={13} color={Colors.navy} />
+            <Text style={s.linkText}>View Transfer</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={s.rejectActionBtn} onPress={onReject} activeOpacity={0.8}>
-            <Ionicons name="close-circle-outline" size={14} color={Colors.error} />
-            <Text style={s.rejectActionText}>Reject</Text>
+        ) : null}
+        {canDelete && !item.pending_deletion && (
+          <TouchableOpacity style={s.deleteBtn} onPress={onDelete} activeOpacity={0.7}>
+            <Ionicons name="trash-outline" size={13} color={Colors.error} />
+            <Text style={s.deleteText}>Delete</Text>
           </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Delete */}
-      {canDelete && !item.pending_deletion && (
-        <TouchableOpacity style={s.deleteBtn} onPress={onDelete} activeOpacity={0.7}>
-          <Ionicons name="trash-outline" size={13} color={Colors.error} />
-          <Text style={s.deleteText}>Delete</Text>
-        </TouchableOpacity>
-      )}
+        )}
+      </View>
     </View>
   );
 }
@@ -159,21 +124,27 @@ export function StockMovementsScreen() {
   const { isOnline } = useOfflineStore();
   const { data, isLoading, isError, refetch, isRefetching } = useStockMovements();
   const { deleteMovement }  = useStockMovementDelete();
-  const { approveTransfer } = useTransferApproveFromMovements();
 
-  const canApprove = hasPermission(role as any, 'stock.approve');
   const canCreate  = hasPermission(role as any, 'stock.movements');
 
   const [typeFilter,  setTypeFilter]  = useState('all');
   const [deleteItem,  setDeleteItem]  = useState<StockMovement | null>(null);
-  const [rejectItem,  setRejectItem]  = useState<StockMovement | null>(null);
 
   const rows       = data?.rows ?? [];
   const items      = data?.items ?? [];
   const warehouses = data?.warehouses ?? [];
   const userWsId   = data?.user_workshop_id;
 
-  const typeOptions = ['all', 'in', 'out', 'adjustment', 'transfer', 'return'];
+  const typeOptions = ['all', 'in', 'out', 'adjustment', 'transfer', 'return', 'loss'];
+
+  // Inventory Integrity Phase 1 — Stock Movements and Stock Transfers are
+  // separate tabs/stacks on mobile (same as every role navigator that hosts
+  // both); no existing precedent for typed cross-navigator params here, so
+  // this uses the same narrow `as never` escape hatch already established
+  // for the Mechanician dashboard's cross-tab deep links.
+  const goToTransfer = (transferId: number) => {
+    (navigation as any).navigate('StockTransfers' as never, { screen: 'StockTransferDetail', params: { transferId } } as never);
+  };
 
   const filtered = useMemo(() => {
     if (typeFilter === 'all') return rows;
@@ -188,24 +159,6 @@ export function StockMovementsScreen() {
     if (!deleteItem) return;
     await deleteMovement({ id: deleteItem.id, reason });
     setDeleteItem(null);
-  }
-
-  async function handleApprove(id: number) {
-    if (!isOnline) { Alert.alert('Online Required', 'Approvals require a connection.'); return; }
-    try {
-      await approveTransfer({ id, action: 'approve' });
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Could not approve transfer.');
-    }
-  }
-
-  async function handleReject(id: number, reason: string) {
-    if (!isOnline) { Alert.alert('Online Required', 'Rejections require a connection.'); return; }
-    try {
-      await approveTransfer({ id, action: 'reject', reason });
-    } catch (err: any) {
-      Alert.alert('Error', err?.message ?? 'Could not reject transfer.');
-    }
   }
 
   if (isLoading) return <LoadingState message="Loading movements…" fullScreen />;
@@ -278,14 +231,12 @@ export function StockMovementsScreen() {
         renderItem={({ item }) => (
           <MovRow
             item={item}
-            canApprove={canApprove}
             canDelete={canCreate}
-            onApprove={() => handleApprove(item.id)}
-            onReject={() => setRejectItem(item)}
             onDelete={() => {
               if (!isOnline) { Alert.alert('Online Required', 'Deleting requires a connection.'); return; }
               setDeleteItem(item);
             }}
+            onViewTransfer={goToTransfer}
           />
         )}
       />
@@ -296,13 +247,6 @@ export function StockMovementsScreen() {
           title={`Delete movement for "${deleteItem.item_name}"?`}
           onCancel={() => setDeleteItem(null)}
           onConfirm={handleDelete}
-        />
-      )}
-
-      {rejectItem && (
-        <RejectModal
-          onConfirm={reason => handleReject(rejectItem.id, reason)}
-          onClose={() => setRejectItem(null)}
         />
       )}
     </SafeAreaView>
@@ -356,41 +300,9 @@ const s = StyleSheet.create({
   rejectionText: { fontSize: Typography.xs, color: Colors.error },
   dateText: { fontSize: 10, color: Colors.textMuted },
 
-  approvalRow:    { flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.xs },
-  approveBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: Colors.success, borderRadius: Radius.md, paddingVertical: 6,
-  },
-  approveBtnText: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.white },
-  rejectActionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
-    backgroundColor: Colors.error + '15', borderRadius: Radius.md, paddingVertical: 6,
-    borderWidth: 1, borderColor: Colors.error + '40',
-  },
-  rejectActionText: { fontSize: Typography.xs, fontWeight: Typography.semibold, color: Colors.error },
-
-  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingTop: 2 },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.base, paddingTop: 2 },
+  deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
   deleteText: { fontSize: 11, color: Colors.error },
-
-  // Reject modal
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
-  sheet: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    backgroundColor: Colors.card, borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    padding: Spacing.lg, gap: Spacing.sm,
-  },
-  sheetTitle:  { fontSize: Typography.lg, fontWeight: Typography.bold, color: Colors.textPrimary },
-  reasonInput: {
-    backgroundColor: Colors.bg, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border,
-    padding: Spacing.sm, fontSize: Typography.base, color: Colors.textPrimary,
-    minHeight: 80, textAlignVertical: 'top',
-  },
-  rejectBtn: {
-    backgroundColor: Colors.error, borderRadius: Radius.lg,
-    paddingVertical: Spacing.sm, alignItems: 'center',
-  },
-  btnDisabled:   { opacity: 0.5 },
-  rejectBtnText: { fontSize: Typography.base, fontWeight: Typography.semibold, color: Colors.white },
-  cancelBtn:     { alignItems: 'center', paddingVertical: Spacing.xs },
-  cancelText:    { fontSize: Typography.sm, color: Colors.textMuted },
+  linkBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  linkText: { fontSize: 11, color: Colors.navy, fontWeight: Typography.medium },
 });

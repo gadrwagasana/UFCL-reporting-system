@@ -75,7 +75,10 @@ export function DashboardScreen() {
         <AlertsPanel
           alerts={alerts}
           onPress={(type) => {
-            if (type === 'pending_changes') navigation.navigate('ChangeRequestList');
+            // ERP Remaining Departments Completion Program — 'ChangeRequestList'
+            // is not a registered route anywhere (the real screen name is
+            // 'Changes'); this tile silently failed to navigate on tap.
+            if (type === 'pending_changes') navigation.navigate('Changes');
           }}
         />
 

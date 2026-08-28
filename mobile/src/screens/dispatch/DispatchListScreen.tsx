@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
-  StyleSheet, View, Text, FlatList, RefreshControl,
+  StyleSheet, View, Text, FlatList, ScrollView, RefreshControl,
   TouchableOpacity, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { AppHeader }   from '../../components/AppHeader';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
+import { ListSearchBar } from '../../components/ListSearchBar';
 import { ReasonModal }  from '../../components/ReasonModal';
 import {
   useDispatchList, useDispatchReview, useDispatchDelete,
@@ -25,6 +26,23 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 type Nav = NativeStackNavigationProp<DispatchStackParamList, 'DispatchList'>;
 
 const DISPATCHED_CLR = '#7C3AED';
+
+type StatusFilter = '' | DispatchRequest['status'];
+const STATUS_CHIPS: { value: StatusFilter; label: string }[] = [
+  { value: '', label: 'All' },
+  { value: 'Pending', label: 'Pending' },
+  { value: 'Approved', label: 'Approved' },
+  { value: 'Dispatched', label: 'Dispatched' },
+  { value: 'Rejected', label: 'Rejected' },
+];
+
+function FilterChip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <TouchableOpacity style={[s.chip, active && s.chipActive]} onPress={onPress} activeOpacity={0.7}>
+      <Text style={[s.chipText, active && s.chipTextActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 const STATUS_COLOR: Record<string, string> = {
@@ -158,12 +176,28 @@ export function DispatchListScreen() {
   const [rejectTarget, setRejectTarget] = useState<DispatchRequest | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DispatchRequest | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('');
 
   if (isLoading) return <LoadingState message="Loading dispatch queue…" fullScreen />;
   if (isError)   return <ErrorState  message="Could not load dispatch queue" onRetry={refetch} fullScreen />;
 
-  const rows = data!.rows;
-  const pendingCount = rows.filter(r => r.status === 'Pending').length;
+  const allRows = data!.rows;
+  const pendingCount = allRows.filter(r => r.status === 'Pending').length;
+  const isFiltered = !!search.trim() || !!statusFilter;
+  const rows = allRows.filter((r) => {
+    if (statusFilter && r.status !== statusFilter) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      if (!(
+        r.request_number.toLowerCase().includes(q) ||
+        (r.customer_name ?? '').toLowerCase().includes(q) ||
+        (r.driver_name ?? '').toLowerCase().includes(q) ||
+        (r.vehicle_registration ?? '').toLowerCase().includes(q)
+      )) return false;
+    }
+    return true;
+  });
 
   const handleReview = async (id: number, status: string, notes?: string) => {
     setActionLoading(true);
@@ -201,30 +235,40 @@ export function DispatchListScreen() {
       <AppHeader
         title="Dispatch Control"
         subtitle="Review and authorise vehicle dispatch"
+        searchModule="dispatch"
         dark
         actions={[{
           icon: 'add',
           onPress: () => navigation.navigate('DispatchNewRequest'),
         }]}
       />
+      <ListSearchBar value={search} onChangeText={setSearch} placeholder="Search request #, customer, driver, vehicle…" />
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.chipRow}>
+        {STATUS_CHIPS.map((c) => (
+          <FilterChip key={c.value || 'all'} label={c.label} active={statusFilter === c.value} onPress={() => setStatusFilter(c.value)} />
+        ))}
+        {isFiltered ? <FilterChip label="Clear" active={false} onPress={() => { setSearch(''); setStatusFilter(''); }} /> : null}
+      </ScrollView>
       <FlatList
         data={rows}
         keyExtractor={item => String(item.id)}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={Colors.navy} />}
         contentContainerStyle={s.list}
         ListHeaderComponent={
-          <>
-            <MetricsBanner rows={rows} />
-            {pendingCount > 0 && canApprove && (
-              <View style={s.alertBanner}>
-                <Ionicons name="time-outline" size={16} color={Colors.warning} />
-                <Text style={s.alertText}>
-                  <Text style={{ fontWeight: Typography.semibold }}>{pendingCount} request{pendingCount > 1 ? 's' : ''}</Text>
-                  {' '}awaiting your approval
-                </Text>
-              </View>
-            )}
-          </>
+          !isFiltered ? (
+            <>
+              <MetricsBanner rows={allRows} />
+              {pendingCount > 0 && canApprove && (
+                <View style={s.alertBanner}>
+                  <Ionicons name="time-outline" size={16} color={Colors.warning} />
+                  <Text style={s.alertText}>
+                    <Text style={{ fontWeight: Typography.semibold }}>{pendingCount} request{pendingCount > 1 ? 's' : ''}</Text>
+                    {' '}awaiting your approval
+                  </Text>
+                </View>
+              )}
+            </>
+          ) : null
         }
         renderItem={({ item }) => (
           <RequestRow
@@ -239,8 +283,8 @@ export function DispatchListScreen() {
         ListEmptyComponent={
           <EmptyState
             icon="send-outline"
-            title="No dispatch requests"
-            subtitle="Tap + to submit a new dispatch request."
+            title={isFiltered ? 'No matching requests' : 'No dispatch requests'}
+            subtitle={isFiltered ? 'Try different search or filter criteria.' : 'Tap + to submit a new dispatch request.'}
           />
         }
       />
@@ -282,6 +326,12 @@ const s = StyleSheet.create({
     justifyContent: 'space-around', ...Shadow.sm,
     marginBottom: Spacing.sm,
   },
+  chipRow:      { flexDirection: 'row', alignItems: 'center', gap: Spacing.xs, paddingHorizontal: Spacing.base, paddingBottom: Spacing.sm },
+  chip:         { borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.full, paddingVertical: 6, paddingHorizontal: Spacing.md, backgroundColor: Colors.card },
+  chipActive:   { backgroundColor: Colors.navy, borderColor: Colors.navy },
+  chipText:     { fontSize: Typography.xs, color: Colors.textPrimary, fontWeight: Typography.medium },
+  chipTextActive: { color: Colors.white },
+
   stat:      { alignItems: 'center', gap: 2 },
   statValue: { fontSize: Typography.sm, fontWeight: Typography.bold, color: Colors.white },
   statLabel: { fontSize: 9, color: Colors.tabInactive, textTransform: 'uppercase', letterSpacing: 0.4 },

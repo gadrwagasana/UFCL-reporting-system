@@ -13,6 +13,7 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { LoadingState } from '../../components/LoadingState';
 import { ErrorState }   from '../../components/ErrorState';
 import { EmptyState }   from '../../components/EmptyState';
+import { ReasonModal }  from '../../components/ReasonModal';
 import { useProductList, useProductToggle } from '../../hooks/useProducts';
 import { useOfflineStore } from '../../stores/offlineStore';
 import { Product } from '../../types/api';
@@ -21,7 +22,7 @@ import { Colors, Spacing, Typography, Radius, Shadow } from '../../theme';
 
 type NavProp = NativeStackNavigationProp<ProductsStackParamList, 'ProductsList'>;
 
-const FILTERS = ['All', 'Kiln-dried', 'CCA-treated', 'Untreated', 'Poles', 'Active'] as const;
+const FILTERS = ['All', 'Kiln-dried', 'CCA-treated', 'Untreated', 'Poles', 'Manufactured Product', 'Active'] as const;
 type FilterKey = typeof FILTERS[number];
 
 function MetricBanner({ rows }: { rows: Product[] }) {
@@ -88,6 +89,19 @@ function ProductCard({
 
       <Text style={styles.cardSize}>{product.size}</Text>
 
+      <View style={styles.costRow}>
+        {product.standard_cost ? (
+          <Text style={styles.costText}>Cost: RWF {Number(product.standard_cost).toLocaleString()}</Text>
+        ) : (
+          <View style={styles.costMissingBadge}><Text style={styles.costMissingText}>Cost not set</Text></View>
+        )}
+        {product.default_price ? (
+          <Text style={styles.costText}>Price: RWF {Number(product.default_price).toLocaleString()}</Text>
+        ) : (
+          <View style={styles.costMissingBadge}><Text style={styles.costMissingText}>Price not set</Text></View>
+        )}
+      </View>
+
       {product.machine ? (
         <Text style={styles.cardMeta}>
           <Ionicons name="settings-outline" size={12} color={Colors.textMuted} /> {product.machine}
@@ -140,24 +154,30 @@ export function ProductsListScreen() {
   const rows     = data?.rows ?? [];
   const canToggle = data?.isAdmin ?? false;
 
+  // ERP UI/UX Completion Phase 8 (audit finding H-13 pattern) — Alert.prompt
+  // is iOS-only; state for the cross-platform ReasonModal replacement.
+  const [toggleTarget, setToggleTarget] = useState<Product | null>(null);
+  const [toggling, setToggling] = useState(false);
+
   function handleToggle(product: Product) {
     if (!isOnline) {
       Alert.alert('Online Required', 'Product status changes require an active connection.');
       return;
     }
-    Alert.prompt(
-      product.active ? 'Deactivate Product' : 'Reactivate Product',
-      `Enter a reason for ${product.active ? 'deactivating' : 'reactivating'} ${product.size}:`,
-      async (reason) => {
-        if (!reason?.trim()) return;
-        try {
-          await toggleProduct(product.id, reason.trim());
-        } catch (err: any) {
-          Alert.alert('Error', err?.message ?? 'Could not update product status.');
-        }
-      },
-      'plain-text',
-    );
+    setToggleTarget(product);
+  }
+
+  async function submitToggle(reason: string) {
+    if (!toggleTarget || !reason.trim()) return;
+    setToggling(true);
+    try {
+      await toggleProduct(toggleTarget.id, reason.trim());
+      setToggleTarget(null);
+    } catch (err: any) {
+      Alert.alert('Error', err?.message ?? 'Could not update product status.');
+    } finally {
+      setToggling(false);
+    }
   }
 
   if (isLoading) return <LoadingState message="Loading products…" fullScreen />;
@@ -168,6 +188,7 @@ export function ProductsListScreen() {
       <OfflineBanner />
       <AppHeader
         title="Products"
+        searchModule="products"
         dark
         actions={[{
           icon: 'add',
@@ -222,6 +243,16 @@ export function ProductsListScreen() {
           )}
         />
       )}
+
+      <ReasonModal
+        visible={!!toggleTarget}
+        title={toggleTarget?.active ? 'Deactivate Product' : 'Reactivate Product'}
+        message={toggleTarget ? `Enter a reason for ${toggleTarget.active ? 'deactivating' : 'reactivating'} ${toggleTarget.size}:` : ''}
+        confirmLabel={toggleTarget?.active ? 'Deactivate' : 'Reactivate'}
+        loading={toggling}
+        onCancel={() => setToggleTarget(null)}
+        onConfirm={submitToggle}
+      />
     </SafeAreaView>
   );
 }
@@ -288,4 +319,9 @@ const styles = StyleSheet.create({
 
   inactiveBadge:     { backgroundColor: Colors.errorBg, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2 },
   inactiveBadgeText: { fontSize: Typography.xs, color: Colors.error },
+
+  costRow:  { flexDirection: 'row', gap: Spacing.sm, flexWrap: 'wrap' },
+  costText: { fontSize: Typography.xs, color: Colors.textSecondary, fontFamily: 'monospace' },
+  costMissingBadge: { backgroundColor: Colors.errorBg, borderRadius: Radius.full, paddingHorizontal: Spacing.sm, paddingVertical: 2 },
+  costMissingText:  { fontSize: Typography.xs, color: Colors.error, fontWeight: Typography.medium },
 });

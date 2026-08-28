@@ -10,6 +10,7 @@ import { StockMovementsStack }   from './stacks/StockMovementsStack';
 import { MyRequestsStack }       from './stacks/MyRequestsStack';
 import { ProfileScreen }         from '../screens/profile/ProfileScreen';
 import { ReportsStack }          from './stacks/ReportsStack';
+import { MaintenanceJobsStack }  from './MaintenanceJobsStack';
 
 const Tab = createBottomTabNavigator<SawmillTabParamList>();
 
@@ -20,6 +21,7 @@ const tabIcons: Record<keyof SawmillTabParamList, [string, string]> = {
   StockMovements:  ['swap-horizontal', 'swap-horizontal-outline'],
   Reports:         ['stats-chart',    'stats-chart-outline'],
   MyRequests:      ['list',      'list-outline'],
+  MaintenanceJobs: ['build',     'build-outline'],
   Profile:         ['person',    'person-outline'],
 };
 
@@ -30,6 +32,7 @@ const tabLabels: Record<keyof SawmillTabParamList, string> = {
   StockMovements:  'Stock Mvmt',
   Reports:         'Reports',
   MyRequests:      'My Requests',
+  MaintenanceJobs: 'Jobs',
   Profile:         'Profile',
 };
 
@@ -55,6 +58,7 @@ export function SawmillNavigator() {
       <Tab.Screen name="StockMovements"  component={StockMovementsStack}   options={{ title: 'Stock Mvmt' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
       <Tab.Screen name="MyRequests"      component={MyRequestsStack}       options={{ title: 'My Requests' }} />
+      <Tab.Screen name="MaintenanceJobs" component={MaintenanceJobsStack}  options={{ title: 'Jobs' }} />
       <Tab.Screen name="Profile"         component={ProfileScreen}         options={{ title: 'Profile' }} />
     </Tab.Navigator>
   );

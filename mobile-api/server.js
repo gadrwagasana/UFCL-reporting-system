@@ -13,6 +13,11 @@ const { ErrorCode }     = require('./constants/errorCodes');
 const logger  = require('./lib/logger');
 const metrics = require('./lib/metrics');
 
+// Stabilization Phase 3 — must run before any route file is required below,
+// since each one calls express.Router() and registers handlers at
+// require-time. See middleware/asyncErrors.js for why this exists.
+require('./middleware/asyncErrors').installAsyncErrorHandling();
+
 const app  = express();
 const PORT = process.env.MOBILE_API_PORT || 3001;
 
@@ -150,8 +155,21 @@ app.use('/api/ceo',              require('./routes/ceo'));
 app.use('/api/sawmill',          require('./routes/sawmill'));
 app.use('/api/harvest',          require('./routes/harvest'));
 app.use('/api/log-transport',    require('./routes/logTransport'));
+// Timber Lifecycle Phase 1 — Harvest Waste / Resolution Engine / Production
+// Offcuts + Resaw + Quality Inspection, plus the generalized attachments
+// subsystem (files live on this server's disk under uploads/lifecycle/,
+// same non-Postgres-storage pattern as supplierDocuments.js).
+app.use('/api/harvest-waste',    require('./routes/harvestWaste'));
+app.use('/api/resolutions',      require('./routes/resolutions'));
+app.use('/api/production-offcuts', require('./routes/productionOffcuts'));
+app.use('/api/rejection-holds',    require('./routes/rejectionHolds'));
+app.use('/api/attachments',      require('./routes/attachments'));
 app.use('/api/material-requests',require('./routes/materialRequests'));
 app.use('/api/casual-labour',    require('./routes/casualLabour'));
+app.use('/api/casuals',          require('./routes/casuals'));
+app.use('/api/attendance',       require('./routes/attendance'));
+app.use('/api/payroll',          require('./routes/payroll'));
+app.use('/api/finance-center',   require('./routes/finance'));
 app.use('/api/poles',            require('./routes/poles'));
 app.use('/api/deliveries',       require('./routes/deliveries'));
 app.use('/api/machine-logs',     require('./routes/machineLogs'));
@@ -161,6 +179,9 @@ app.use('/api/meta',             require('./routes/meta'));
 
 // Sprint 4 — VAT workflow
 app.use('/api/vat',              require('./routes/vat'));
+
+// Timber Lifecycle Phase 3 — Showroom Quality/Damage Check
+app.use('/api/showroom-damage',  require('./routes/showroomDamage'));
 
 // Notifications — all authenticated roles
 app.use('/api/notifications',    require('./routes/notifications'));
@@ -173,6 +194,7 @@ app.use('/api/customers',        require('./routes/customers'));
 app.use('/api/products',         require('./routes/products'));
 app.use('/api/vehicles',         require('./routes/vehicles'));
 app.use('/api/machines',         require('./routes/machines'));
+app.use('/api/maintenance-jobs', require('./routes/maintenanceJobs'));
 app.use('/api/workshops',        require('./routes/workshops'));
 app.use('/api/compartments',     require('./routes/compartments'));
 app.use('/api/stock',            require('./routes/stock'));
@@ -182,11 +204,37 @@ app.use('/api/timber-inventory', require('./routes/timberInventory'));
 app.use('/api/stock-transfers',  require('./routes/stockTransfers'));
 app.use('/api/dispatch',         require('./routes/dispatch'));
 app.use('/api/sales',            require('./routes/sales'));
+app.use('/api/transport',        require('./routes/transport'));
 
 app.use('/api/reports',        require('./routes/reports'));
 app.use('/api/admin',          require('./routes/admin'));
 app.use('/api/automation',     require('./routes/automation'));
 app.use('/api/epm',            require('./routes/epm'));
+
+// Global Search — cross-module search, access enforced inside data.globalSearch
+app.use('/api/search',         require('./routes/search'));
+
+// Procurement Management — Requisition → RFQ/Quotation → PO → Goods Receipt →
+// Invoice Match → Payment, driven by data.procurementApprovalAction's generic
+// multi-stage chain. Access enforced inside each data.js function.
+app.use('/api/procurement/suppliers',    require('./routes/procurementSuppliers'));
+app.use('/api/procurement/requisitions', require('./routes/procurementRequisitions'));
+app.use('/api/procurement/rfq',          require('./routes/procurementRfq'));
+app.use('/api/procurement/orders',       require('./routes/procurementOrders'));
+app.use('/api/procurement/invoices',     require('./routes/procurementInvoices'));
+
+// Supplier Relationship Management (SRM) — Phase 4. Contracts/compliance/
+// communications/improvement-plans/dashboard/reports, plus the document
+// center (files live on this server's disk under uploads/suppliers/, never
+// in Postgres — see supplierDocuments.js). The documents mount is more
+// specific than /api/srm so it must be registered first.
+app.use('/api/srm/documents',            require('./routes/supplierDocuments'));
+app.use('/api/srm',                      require('./routes/srm'));
+
+// ERP Enterprise Completion Phase 4 — Pending Edit / Deletion Request
+// governance review (approve/reject side). Submission side already worked
+// on mobile via each entity route's existing applyGovernance() passthrough.
+app.use('/api/governance',               require('./routes/governance'));
 
 // ── Monitoring dashboard (static HTML, no JWT) ────────────────────────────────
 // Served at /dashboard.html — admin opens in browser, fetches /api/metrics with token.
@@ -205,7 +253,19 @@ app.use((req, res) => {
 // ── Global error handler ──────────────────────────────────────────────────────
 
 app.use((err, req, res, _next) => {
-  logger.error('request_error', { method: req.method, path: req.path, message: err.message });
+  // Stabilization Phase 3 — this is now the actual destination for every
+  // route handler's thrown/rejected error (see middleware/asyncErrors.js),
+  // not just the rare synchronous throw it used to catch. Logs the full
+  // context needed to debug a live incident; the response itself stays a
+  // generic 500 — never leak err.message/stack to the client.
+  logger.error('request_error', {
+    method:  req.method,
+    path:    req.path,
+    userId:  req.user?.userId ?? null,
+    role:    req.user?.role ?? null,
+    message: err.message,
+    stack:   err.stack,
+  });
   console.error('[server]', err.message);
   res.status(500).json(buildEnvelope(false, {
     code:    ErrorCode.INTERNAL_ERROR,

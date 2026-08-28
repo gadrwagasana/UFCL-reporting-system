@@ -6,6 +6,7 @@ import { MachineDetailScreen }              from '../../screens/machines/Machine
 import { MachineFormScreen }                from '../../screens/machines/MachineFormScreen';
 import { MachineMaintScheduleCreateScreen } from '../../screens/machines/MachineMaintScheduleCreateScreen';
 import { MachineCategoriesScreen }          from '../../screens/machines/MachineCategoriesScreen';
+import { MachineKpiPerformanceScreen }      from '../../screens/machines/MachineKpiPerformanceScreen';
 
 const Stack = createNativeStackNavigator<MachinesStackParamList>();
 
@@ -17,6 +18,7 @@ export function MachinesStack() {
       <Stack.Screen name="MachineForm"                component={MachineFormScreen} />
       <Stack.Screen name="MachineMaintScheduleCreate" component={MachineMaintScheduleCreateScreen} />
       <Stack.Screen name="MachineCategories"          component={MachineCategoriesScreen} />
+      <Stack.Screen name="MachineKpiPerformance"      component={MachineKpiPerformanceScreen} />
     </Stack.Navigator>
   );
 }

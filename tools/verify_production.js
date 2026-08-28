@@ -31,10 +31,10 @@ async function go() {
     storekeeper:             { must:['stock-items','stock-movements','stock-transfers','material-requests','logistics-dashboard','workshop-overview'], must_not:['daily-timber','daily-poles','harvest','sales','machines','kpi'] },
     'storekeeper-assistant': { must:['stock-movements','machine-fuel','material-requests','workshop-overview'], must_not:['stock-items','stock-transfers','daily-timber','sales','machines','users'] },
     'mechanician':           { must:['material-requests'], must_not:['stock-movements','stock-items','stock-transfers','daily-timber','sales','machines','users'] },
-    'harvesting-leader':     { must:['daily-harvest','harvest','log-transport','compartments','casual-requests','workshop-overview'], must_not:['daily-timber','daily-poles','value-added-timber','sales','machine-logs','stock-movements','users'] },
-    'sawmill-leader':        { must:['daily-timber','machine-logs','machine-fuel','material-requests','casual-requests','workshop-overview'], must_not:['daily-harvest','daily-poles','value-added-timber','sales','stock-movements','users'] },
-    'poles-leader':          { must:['daily-poles','machine-logs','machine-fuel','material-requests','casual-requests','workshop-overview'], must_not:['daily-timber','daily-harvest','value-added-timber','sales','users'] },
-    'vat-leader':            { must:['value-added-timber','timber-inventory','material-requests','casual-requests','workshop-overview'], must_not:['daily-harvest','daily-poles','sales','machine-logs','stock-movements','users'] },
+    'harvesting-leader':     { must:['daily-harvest','harvest','log-transport','compartments','casual-requests','workshop-overview'], must_not:['daily-timber','daily-poles','value-added-production','sales','machine-logs','stock-movements','users'] },
+    'sawmill-leader':        { must:['daily-timber','machine-logs','machine-fuel','material-requests','casual-requests','workshop-overview'], must_not:['daily-harvest','daily-poles','value-added-production','sales','stock-movements','users'] },
+    'poles-leader':          { must:['daily-poles','machine-logs','machine-fuel','material-requests','casual-requests','workshop-overview'], must_not:['daily-timber','daily-harvest','value-added-production','sales','users'] },
+    'vat-leader':            { must:['value-added-production','timber-inventory','material-requests','casual-requests','workshop-overview'], must_not:['daily-harvest','daily-poles','sales','machine-logs','stock-movements','users'] },
     'sales-staff':           { must:['sales','deliveries','products'], must_not:['daily-timber','daily-poles','harvest','logistics-dashboard','stock-movements','machine-logs','users','casual-requests'] },
     'showroom-staff':        { must:['sales','deliveries','products','timber-inventory'], must_not:['daily-timber','daily-poles','harvest','logistics-dashboard','stock-movements','machine-logs','users','casual-requests'] },
   };
@@ -104,7 +104,7 @@ async function go() {
   // For each key table, confirm the pattern: workshop_id = $param OR workshop_id IS NULL covers both restricted and legacy
   // We verify by checking that records with NULL workshop_id exist OR the table is fresh (no records yet)
   // Tables that have deleted_at; casual tables do not
-  const tablesWithDeletedAt = ['daily_logs','harvest_logs','log_transport','value_added_timber','sales_orders','machine_daily_logs'];
+  const tablesWithDeletedAt = ['daily_logs','harvest_logs','log_transport','value_added_production_batches','sales_orders','machine_daily_logs'];
   const tablesWithoutDeletedAt = ['casual_labour_requests','casuals'];
   const keyTables = [...tablesWithDeletedAt, ...tablesWithoutDeletedAt];
   for (const t of keyTables) {
@@ -187,10 +187,10 @@ async function go() {
 
   // workshop_id column on all key tables
   const { rows: wsColRows } = await pool.query(
-    'SELECT table_name FROM information_schema.columns WHERE table_schema=\'public\' AND column_name=\'workshop_id\' AND table_name IN (\'daily_logs\',\'harvest_logs\',\'log_transport\',\'value_added_timber\',\'casual_labour_requests\',\'casuals\',\'machine_daily_logs\',\'sales_orders\',\'app_users\') ORDER BY table_name'
+    'SELECT table_name FROM information_schema.columns WHERE table_schema=\'public\' AND column_name=\'workshop_id\' AND table_name IN (\'daily_logs\',\'harvest_logs\',\'log_transport\',\'value_added_production_batches\',\'casual_labour_requests\',\'casuals\',\'machine_daily_logs\',\'sales_orders\',\'app_users\') ORDER BY table_name'
   );
   const wsColTables = wsColRows.map(r => r.table_name);
-  ['daily_logs','harvest_logs','log_transport','value_added_timber','casual_labour_requests','casuals','machine_daily_logs','sales_orders','app_users'].forEach(t => {
+  ['daily_logs','harvest_logs','log_transport','value_added_production_batches','casual_labour_requests','casuals','machine_daily_logs','sales_orders','app_users'].forEach(t => {
     wsColTables.includes(t) ? ok('workshop_id column on: ' + t) : fail('workshop_id MISSING from: ' + t);
   });
 

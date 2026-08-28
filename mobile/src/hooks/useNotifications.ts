@@ -28,17 +28,25 @@ export interface NotificationsResponse {
 interface Filters {
   category?: string | null;
   search?:   string | null;
+  // ERP Enterprise Completion Phase 3 (Workstream 11) — AppHeader now calls
+  // this hook app-wide for the unread badge; screens that already render the
+  // full NotificationsScreen (which calls this hook itself, with its own
+  // filters) pass enabled:false via hideNotifications to avoid firing a
+  // redundant, differently-keyed query.
+  enabled?:  boolean;
 }
 
 export function useNotifications(filters: Filters = {}) {
+  const { enabled = true, ...queryFilters } = filters;
   return useQuery<NotificationsResponse>({
-    queryKey:       ['notifications', filters],
+    queryKey:       ['notifications', queryFilters],
     queryFn:        () => get<NotificationsResponse>(EP.NOTIFICATIONS_LIST, {
-      category: filters.category ?? undefined,
-      search:   filters.search   ?? undefined,
+      category: queryFilters.category ?? undefined,
+      search:   queryFilters.search   ?? undefined,
     }),
     staleTime:      30_000,
     refetchInterval: 30_000, // poll every 30s — matches desktop behaviour
+    enabled,
   });
 }
 

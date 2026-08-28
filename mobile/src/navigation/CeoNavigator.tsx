@@ -28,6 +28,9 @@ import { SalesOrdersStack }         from './stacks/SalesOrdersStack';
 import { DeliveryStack }            from './stacks/DeliveryStack';
 import { ReportsStack }             from './stacks/ReportsStack';
 import { AdminStack }              from './stacks/AdminStack';
+import { ProcurementStack }         from './stacks/ProcurementStack';
+import { CasualLabourStack }        from './CasualLabourStack';
+import { FinanceCenterStack }       from './FinanceCenterStack';
 
 const Tab = createBottomTabNavigator<CeoTabParamList>();
 
@@ -66,6 +69,9 @@ export function CeoNavigator() {
             SalesOrders:        { active: 'cart',             inactive: 'cart-outline' },
             Deliveries:         { active: 'truck',            inactive: 'truck-outline' },
             Reports:            { active: 'stats-chart',      inactive: 'stats-chart-outline' },
+            Procurement:        { active: 'cart',             inactive: 'cart-outline' },
+            CasualLabour:  { active: 'people',          inactive: 'people-outline' },
+            FinanceCenter: { active: 'cash',            inactive: 'cash-outline' },
             Admin:         { active: 'shield',          inactive: 'shield-outline' },
             Notifications: { active: 'notifications',  inactive: 'notifications-outline' },
             Profile:       { active: 'person',         inactive: 'person-outline' },
@@ -135,6 +141,14 @@ export function CeoNavigator() {
       <Tab.Screen name="SalesOrders"     component={SalesOrdersStack}     options={{ title: 'Sales Orders' }} />
       <Tab.Screen name="Deliveries"      component={DeliveryStack}        options={{ title: 'Deliveries' }} />
       <Tab.Screen name="Reports"         component={ReportsStack}          options={{ title: 'Reports' }} />
+      <Tab.Screen name="Procurement"     component={ProcurementStack}      options={{ title: 'Procurement' }} />
+      {/* ERP Enterprise Completion Phase 3 (Workstream 11) — ceo previously
+          had no path to Casual Labour requests on mobile at all, despite
+          being one of only two roles that can review them. Reuses the exact
+          same stack already registered in 4 other navigators. */}
+      <Tab.Screen name="CasualLabour"    component={CasualLabourStack}     options={{ title: 'Labour' }} />
+      {/* Finance Enterprise Phase 2 — admin/ceo hold 'finance-center' too */}
+      <Tab.Screen name="FinanceCenter"   component={FinanceCenterStack}    options={{ title: 'Finance' }} />
       <Tab.Screen name="Admin"           component={AdminStack}            options={{ title: 'Admin' }} />
       <Tab.Screen
         name="Notifications"

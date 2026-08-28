@@ -10,28 +10,44 @@ import { OfflineBanner } from '../../components/OfflineBanner';
 import { FormInput }     from '../../components/FormInput';
 import { FormSelect }    from '../../components/FormSelect';
 import { DatePickerField } from '../../components/DatePickerField';
-import { useMachineFuelCreate, useMachineFuelTargets } from '../../hooks/useMachineFuel';
+import { useMachineFuelCreate, useMachineFuelUpdate, useMachineFuelTargets } from '../../hooks/useMachineFuel';
 import { MachineFuelStackScreenProps } from '../../navigation/types';
 import { useOfflineStore } from '../../stores/offlineStore';
+import { MachinePendingApproval } from '../../types/api';
 import { Colors, Spacing, Typography, Radius } from '../../theme';
 
 const FUEL_TYPES = ['Diesel', 'Petroleum/Essence', 'Petrol', 'Chain Oil', 'Engine Oil'];
 
 type Props = MachineFuelStackScreenProps<'MachineFuelCreate'>;
 
-export function MachineFuelCreateScreen({ navigation }: Props) {
+// machineFuelLogsList formats log_date as 'DD/MM/YYYY' (date_fmt) but the raw
+// log_date column is already ISO ('YYYY-MM-DD' or a full timestamp) — unlike
+// the vehicle-maintenance records (F-16), no DD/MM/YYYY conversion is needed
+// here, just truncating a timestamp to a date if present.
+function toIsoDate(raw: string): string {
+  return raw.slice(0, 10);
+}
+
+export function MachineFuelCreateScreen({ navigation, route }: Props) {
+  const entry = route.params?.entry;
+  const isEdit = !!entry;
+
   const { createLog }      = useMachineFuelCreate();
+  const { updateLog }      = useMachineFuelUpdate();
   const { data: targetsData } = useMachineFuelTargets();
   const isOnline           = useOfflineStore((s) => s.isOnline);
   const targets            = targetsData?.rows ?? [];
 
-  const [targetId, setTargetId]       = useState('');
-  const [targetSource, setTargetSource] = useState<'machine' | 'vehicle' | null>(null);
-  const [logDate, setLogDate]         = useState<string>(new Date().toISOString().split('T')[0]);
-  const [fuelType, setFuelType]       = useState('Diesel');
-  const [quantity, setQuantity]       = useState('');
-  const [operator, setOperator]       = useState('');
-  const [notes, setNotes]             = useState('');
+  const initialTargetId     = entry ? String(entry.machine_id ?? entry.vehicle_id ?? '') : '';
+  const initialTargetSource = entry ? (entry.machine_id ? 'machine' : entry.vehicle_id ? 'vehicle' : null) : null;
+
+  const [targetId, setTargetId]       = useState(initialTargetId);
+  const [targetSource, setTargetSource] = useState<'machine' | 'vehicle' | null>(initialTargetSource);
+  const [logDate, setLogDate]         = useState<string>(entry ? toIsoDate(entry.log_date) : new Date().toISOString().split('T')[0]);
+  const [fuelType, setFuelType]       = useState(entry?.fuel_type ?? 'Diesel');
+  const [quantity, setQuantity]       = useState(entry ? String(entry.quantity) : '');
+  const [operator, setOperator]       = useState(entry?.operator ?? '');
+  const [notes, setNotes]             = useState(entry?.notes ?? '');
   const [submitting, setSubmitting]   = useState(false);
   const [errors, setErrors]           = useState<Record<string, string>>({});
 
@@ -66,17 +82,28 @@ export function MachineFuelCreateScreen({ navigation }: Props) {
     }
     if (!validate()) return;
 
+    const payload = {
+      log_date:   logDate,
+      fuel_type:  fuelType,
+      quantity:   parseFloat(quantity),
+      machine_id: targetSource === 'machine' ? Number(targetId) : undefined,
+      vehicle_id: targetSource === 'vehicle' ? Number(targetId) : undefined,
+      operator:   operator.trim() || undefined,
+      notes:      notes.trim() || undefined,
+    };
+
     setSubmitting(true);
     try {
-      await createLog({
-        log_date:   logDate,
-        fuel_type:  fuelType,
-        quantity:   parseFloat(quantity),
-        machine_id: targetSource === 'machine' ? Number(targetId) : undefined,
-        vehicle_id: targetSource === 'vehicle' ? Number(targetId) : undefined,
-        operator:   operator.trim() || undefined,
-        notes:      notes.trim() || undefined,
-      });
+      if (isEdit) {
+        const result = await updateLog(entry!.id, payload);
+        if (result && (result as MachinePendingApproval).pendingApproval) {
+          Alert.alert('Submitted for Review', (result as MachinePendingApproval).message);
+          navigation.goBack();
+          return;
+        }
+      } else {
+        await createLog(payload);
+      }
       navigation.goBack();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Could not save fuel log.');
@@ -89,7 +116,7 @@ export function MachineFuelCreateScreen({ navigation }: Props) {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar style="light" />
       <OfflineBanner />
-      <AppHeader title="Log Machine Fuel" dark onBack={() => navigation.goBack()} />
+      <AppHeader title={isEdit ? 'Edit Fuel Log' : 'Log Machine Fuel'} dark onBack={() => navigation.goBack()} />
 
       <ScrollView contentContainerStyle={styles.scroll}>
         {!isOnline && (
